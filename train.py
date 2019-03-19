@@ -79,6 +79,11 @@ if __name__ == '__main__':
         help='Path to save logs and models.',
     )
     parser.add_argument(
+        '--text_pooling', default='lens',
+        choices=['mean', 'max', 'lens'],
+        help='Path to save logs and models.',
+    )
+    parser.add_argument(
         '--image_encoder', default='scan',
         choices=imgenc.get_available_imgenc(),
         help='Path to save logs and models.',
@@ -191,6 +196,7 @@ if __name__ == '__main__':
         img_dim=train_loader.dataset.get_img_dim(),
         num_embeddings=train_loader.dataset.tokenizer.get_nb_words(),
         embed_dim=args.embed_dim,
+        txt_pooling=args.text_pooling,
     )
 
     model = LAVSE(**model_params).to(device)

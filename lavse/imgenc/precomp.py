@@ -6,6 +6,7 @@ import torch.nn as nn
 from ..utils.layers import default_initializer, l1norm, l2norm
 from ..layers import attention, convblocks
 
+
 def load_state_dict_with_replace(state_dict, own_state):
     new_state = OrderedDict()
     for name, param in state_dict.items():
