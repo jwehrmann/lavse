@@ -120,14 +120,14 @@ class ConvGRU(nn.Module):
         x = self.embed(x)
         b, t, e = x.shape
         # Forward propagate RNN
-        packed = pack_padded_sequence(x, lengths, batch_first=True)
+        # packed = pack_padded_sequence(x, lengths, batch_first=True)
 
         # Forward propagate RNN
-        out, _ = self.rnn(packed)
+        cap_emb, _ = self.rnn(x)
 
         # Reshape *final* output to (batch_size, hidden_size)
-        padded = pad_packed_sequence(out, batch_first=True)
-        cap_emb, cap_len = padded
+        # padded = pad_packed_sequence(out, batch_first=True)
+        # cap_emb, cap_len = padded
 
         if self.use_bi_gru:
             b, t, d = cap_emb.shape
