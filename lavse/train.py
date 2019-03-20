@@ -220,8 +220,7 @@ class Trainer:
         self.model.eval()
 
         n = loader.dataset.length
-        im_div = loader.dataset.im_div
-        img_embeddings = np.zeros((n//im_div, self.model.latent_size))
+        img_embeddings = np.zeros((n, self.model.latent_size))
         text_embeddings = np.zeros((n, self.model.latent_size))
 
         test_iter = DataIterator(loader, device=self.device)
