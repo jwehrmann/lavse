@@ -1,14 +1,14 @@
-import argparse 
-from lavse.data import get_loaders, get_loader
+import argparse
 from pathlib import Path
-from lavse.utils.logger import create_logger
-from lavse.model import LAVSE
-from addict import Dict
-from lavse import loss
-from lavse import train
-from lavse import txtenc, imgenc
 
 import torch
+
+import profiles
+from addict import Dict
+from lavse import imgenc, loss, train, txtenc
+from lavse.data import get_loader, get_loaders
+from lavse.model import LAVSE
+from lavse.utils.logger import create_logger
 
 
 if __name__ == '__main__':
@@ -74,6 +74,11 @@ if __name__ == '__main__':
         help='Path to save logs and models.',
     )
     parser.add_argument(
+        '--profile', default=None, 
+        choices=profiles.get_profile_names(),
+        help='Import pre-defined setup from profiles.py',
+    )
+    parser.add_argument(
         '--text_encoder', default='gru',
         choices=txtenc.get_available_txtenc(),
         help='Path to save logs and models.',
@@ -114,6 +119,14 @@ if __name__ == '__main__':
         help='Number of steps to print and record the log.',
     )
     parser.add_argument(
+        '--nb_epochs', default=45, type=int,
+        help='Number of epochs.',
+    )
+    parser.add_argument(
+        '--early_stop', default=5, type=int,
+        help='Early stop patience.',
+    )
+    parser.add_argument(
         '--val_step', default=500, type=int,
         help='Number of steps to run validation.',
     )
@@ -122,7 +135,7 @@ if __name__ == '__main__':
         help='Use max instead of sum in the rank loss (i.e., k=1)',
     )
     parser.add_argument(
-        '--increase_k', default=.4, type=float,
+        '--increase_k', default=.0, type=float,
         help='Rate for linear increase of k hyper-parameter (used when not --max_violation). ',
     )
     parser.add_argument(
@@ -134,9 +147,19 @@ if __name__ == '__main__':
         choices=['debug', 'info'],
         help='Log/verbosity level.',
     )
+
+    
     args = parser.parse_args()
+    args = Dict(vars(args))
     
     logger = create_logger(level=args.log_level)
+
+    if args.profile is not None:
+        profile_args = profiles.get_profile(args.profile)
+        args.update(profile_args)
+        logger.info(f'Using profile {args.profile}')
+    
+    logger.info(f'Used args: \n{args}')
 
     train_data = args.train_data
     data_name, lang = train_data.split('.')
@@ -241,7 +264,7 @@ if __name__ == '__main__':
         train_loader=train_loader, 
         valid_loaders=val_loaders, 
         lang_loaders=adapt_loaders,
-        nb_epochs=45, 
-        early_stop=5,
+        nb_epochs=args.nb_epochs, 
+        early_stop=args.early_stop,
+        path=args.outpath,
     )
-
