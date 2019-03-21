@@ -91,13 +91,10 @@ def collate_lang_liwe(data):
         lengths: list; valid length for each padded caption.
     """
     # Sort a data list by caption length
-    words_a, words_b, ids = zip(*data)
+    lang_a, lang_b, ids = zip(*data)
     
     # lens_a = np.array([len(cap) for cap in words_a])
     # lens_b = np.array([len(cap) for cap in words_b])
-
-    lang_a = map(lambda x: torch.Tensor(x), words_a)
-    lang_b = map(lambda x: torch.Tensor(x), words_b)
 
     # Merget captions (convert tuple of 1D tensor to 2D tensor)
     targ_a, lens_a = liwe_padding(lang_a)
