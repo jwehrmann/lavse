@@ -91,7 +91,7 @@ def collate_lang_liwe(data):
         lengths: list; valid length for each padded caption.
     """
     # Sort a data list by caption length
-    words_a, lang_a, words_b, lang_b, ids = zip(*data)
+    words_a, words_b, ids = zip(*data)
     
     # lens_a = np.array([len(cap) for cap in words_a])
     # lens_b = np.array([len(cap) for cap in words_b])
