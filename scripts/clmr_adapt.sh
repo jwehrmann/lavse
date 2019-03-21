@@ -18,6 +18,15 @@ python train.py \
 --outpath $OUT_PATH/lavse/clmr/f30k_precomp.en_jap_precomp.jt/
 
 
+python train.py \
+--data_path $DATA_PATH \
+--train_data f30k_precomp.en \
+--val_data f30k_precomp.en jap_precomp.jp \
+--adapt_data jap_precomp.en-jp \
+--profile clmr \
+--outpath $OUT_PATH/lavse/clmr/f30k_precomp.en_jap_precomp.jp/
+
+
 # All datasets
 python train.py \
 --data_path $DATA_PATH \
