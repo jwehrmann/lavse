@@ -36,4 +36,5 @@ python train.py \
 --adapt_data jap_precomp.en-jt \
 --profile liwe \
 --outpath $OUT_PATH/lavse/liwe/coco_precomp.en_jap_precomp.jt/
+--lr_decay_interval 10 \
 

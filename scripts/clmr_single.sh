@@ -6,12 +6,14 @@ python train.py \
 --profile clmr \
 --outpath $OUT_PATH/lavse/clmr/f30k_precomp.en/
 
+
 python train.py \
 --data_path $DATA_PATH \
 --train_data m30k_precomp.de \
 --val_data m30k_precomp.de \
 --profile clmr \
 --outpath $OUT_PATH/lavse/clmr/m30k_precomp.de/
+
 
 python train.py \
 --data_path $DATA_PATH \
@@ -20,12 +22,14 @@ python train.py \
 --profile clmr \
 --outpath $OUT_PATH/lavse/clmr/f30k_precomp.de/
 
+
 python train.py \
 --data_path $DATA_PATH \
 --train_data jap_precomp.jt \
 --val_data jap_precomp.jt \
 --profile clmr \
 --outpath $OUT_PATH/lavse/clmr/jap_precomp.jt/
+
 
 python train.py \
 --data_path $DATA_PATH \
@@ -40,4 +44,5 @@ python train.py \
 --train_data coco_precomp.en \
 --val_data coco_precomp.en  \
 --profile clmr \
---outpath $OUT_PATH/lavse/clmr/coco_precomp.en/
+--outpath $OUT_PATH/lavse/clmr/coco_precomp.en/ \
+--lr_decay_interval 10 \
