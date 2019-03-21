@@ -17,6 +17,7 @@ _profiles = {
         'early_stop': 30,
         'nb_epochs': 30,
         'max_violation': True,
+        'vocab_path': 'vocab/complete.json',
     },
     'clmr': {
         'lr': 6e-4,
@@ -27,12 +28,11 @@ _profiles = {
         'image_encoder': 'hierarchical',
         'text_pooling': 'mean',
         'text_repr': 'word',
-        'lr_decay_interval': 15,
-        'lr_decay_rate': 0.1,
         'early_stop': 5,
         'nb_epochs': 30,
         'initial_k': 0.9,
         'increase_k': 0.1,
+        'vocab_path': 'vocab/complete.json',
     },
     'liwe': {
         'lr': 6e-4,
@@ -43,12 +43,11 @@ _profiles = {
         'image_encoder': 'hierarchical',
         'text_pooling': 'mean',
         'text_repr': 'liwe',
-        'lr_decay_interval': 10,
-        'lr_decay_rate': 0.1,
         'early_stop': 5,
         'nb_epochs': 30,
         'initial_k': 0.9,
         'increase_k': 0.1,
+        'vocab_path': 'vocab/char.json',
     },
 }
 
