@@ -39,7 +39,7 @@ _profiles = {
         'margin': 0.2,
         'latent_size': 1024,
         'grad_clip': 2.,
-        'text_encoder': 'convgru_sa',
+        'text_encoder': 'liwe_gru',
         'image_encoder': 'hierarchical',
         'text_pooling': 'mean',
         'text_repr': 'liwe',
