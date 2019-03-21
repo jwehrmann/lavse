@@ -17,14 +17,6 @@ python train.py \
 
 python train.py \
 --data_path $DATA_PATH \
---train_data jap_precomp.de \
---val_data m30k_precomp.de \
---profile liwe \
---outpath $OUT_PATH/lavse/liwe/f30k_precomp.de/
-
-
-python train.py \
---data_path $DATA_PATH \
 --train_data jap_precomp.jt \
 --val_data jap_precomp.jt \
 --profile liwe \

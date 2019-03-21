@@ -17,14 +17,6 @@ python train.py \
 
 python train.py \
 --data_path $DATA_PATH \
---train_data jap_precomp.de \
---val_data m30k_precomp.de \
---profile clmr \
---outpath $OUT_PATH/lavse/clmr/f30k_precomp.de/
-
-
-python train.py \
---data_path $DATA_PATH \
 --train_data jap_precomp.jt \
 --val_data jap_precomp.jt \
 --profile clmr \
@@ -46,3 +38,4 @@ python train.py \
 --profile clmr \
 --outpath $OUT_PATH/lavse/clmr/coco_precomp.en/ \
 --lr_decay_interval 10 \
+
