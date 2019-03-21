@@ -176,17 +176,17 @@ __text_representation__ = {
     'word': {
         'collate_fn': collate_fns.collate_fn_word,
         'collate_fn_lang': collate_fns.collate_lang_word,
-        'tokenizer_args': {'word_level': True, 'char_level': False},
+        'tokenizer_args': {'char_level': False},
     },
     'char': {
-        'collate_fn': collate_fns.collate_fn_char,
-        'collate_fn_lang': None,
-        'tokenizer_args': {'word_level': False, 'char_level': True},
+        'collate_fn': collate_fns.collate_lang_word,
+        'collate_fn_lang': collate_fns.collate_lang_word,
+        'tokenizer_args': {'char_level': True},
     },
     'liwe': {
         'collate_fn': collate_fns.collate_fn_liwe,
-        'collate_fn_lang': None,
-        'tokenizer_args': {'word_level': False, 'char_level': True},
+        'collate_fn_lang': collate_fns.collate_lang_word,
+        'tokenizer_args': {'char_level': True},
     },
 }
 

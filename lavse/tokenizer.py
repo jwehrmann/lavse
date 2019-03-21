@@ -1,4 +1,45 @@
-from .tokenizers.word import WordTokenizer
+import json
+import logging
+from collections import Counter
+
+import torch
+from tqdm import tqdm
+
+import nltk
+
+from .utils.logger import get_logger
+from .utils.file_utils import read_txt
+
+
+logger = get_logger()
+
+class Vocabulary(object):
+    """Simple vocabulary wrapper."""
+
+    def __init__(self):
+        self.word2idx = {}
+        self.idx2word = {}
+        self.idx = 0
+
+    def add_word(self, word):
+        if word not in self.word2idx:
+            self.word2idx[word] = self.idx
+            self.idx2word[self.idx] = word
+            self.idx += 1
+
+    def get_word(self, idx):
+        if idx in self.idx2word:
+            return self.idx2word[idx]
+        else:
+            return '<unk>'
+
+    def __call__(self, word):
+        if word not in self.word2idx:
+            return self.word2idx['<unk>']
+        return self.word2idx[word]
+
+    def __len__(self):
+        return len(self.word2idx)
 
 
 class Tokenizer(object):
@@ -7,41 +48,111 @@ class Tokenizer(object):
     """
 
     def __init__(
-        self, word_level=True, 
-        char_level=True, vocab_path=None
-    ):  
-        self.word_level = word_level 
-        self.char_level = char_level 
+        self, vocab_path=None, char_level=False, 
+        maxlen=None, download_tokenizer=False
+    ):
+        # Create a vocab wrapper and add some special tokens.
+        self.char_level = char_level
+        self.maxlen = maxlen
         
-        if word_level:
-            self.word_tokenizer = WordTokenizer() 
-            if vocab_path is not None:
-                self.word_tokenizer = self.load(vocab_path)
-        
+        vocab = Vocabulary()
+        vocab.add_word('<pad>')
+        vocab.add_word('<unk>')
+
         if char_level:
-            self.char_tokenizer = lambda x: x
+            vocab.add_word(' ') # Space is allways #2
+
+        # vocab.add_word('<start>')
+        # vocab.add_word('<end>')
+        self.vocab = vocab
+
+        if download_tokenizer:
+            nltk.download('punkt')
+
+        if vocab_path is not None:
+            self.load(vocab_path)
+
+        logger.debug(f'Created tokenizer with init {len(self.vocab)} tokens.')
+
+    def fit_on_files(self, txt_files):
+        logger.debug('Fit on files.')
+        for file in txt_files:
+            logger.info(f'Updating vocab with {file}')
+            sentences = read_txt(file)
+            self.fit(sentences)
+
+    def fit(self, sentences, threshold=4):
+        logger.debug(
+            f'Fit word vocab on {len(sentences)} and t={threshold}'
+        )
+        counter = Counter()
+
+        for tokens in tqdm(sentences, total=len(sentences)):
+            if not self.char_level:
+                tokens = self.split_sentence(tokens)
+            counter.update(tokens)
+
+        # Discard if the occurrence of the word is less than threshold
+        tokens = [
+            token for token, cnt in counter.items()
+            if cnt >= threshold
+        ]
+
+        # Add words to the vocabulary.
+        for token in tokens:
+            self.vocab.add_word(token)
+        
+        logger.info(f'Vocab built. Tokens found {len(self.vocab)}')
+        return self.vocab
 
     def save(self, outpath):
-        if self.word_level:
-            self.word_tokenizer.save(outpath)
+        logger.debug(f'Saving vocab to {outpath}')
+
+        with open(outpath, "w") as f:
+            json.dump(self.vocab.word2idx, f)
+
+        logger.info(
+            f'Vocab stored into {outpath} with {len(self.vocab)} tokens.'
+        )
     
     def load(self, path):
-        self.word_tokenizer = self.word_tokenizer.load(path)
-        return self.word_tokenizer
+        logger.debug(f'Loading vocab from {path}')
+        with open(path) as f:
+            word2idx = json.load(f)
+        vocab = Vocabulary()
+        vocab.word2idx = word2idx
+        vocab.idx2word = {v: k for k, v in vocab.word2idx.items()}
+        vocab.idx = max(vocab.idx2word)
+        self.vocab = vocab
+        logger.info(f'Loaded vocab containing {len(self.vocab)} tokens')
+        return self
     
-    def get_nb_words(self, ):
-        return len(self.word_tokenizer)
+    def split_sentence(self, sentence):
+        tokens = nltk.tokenize.word_tokenize(
+            sentence.lower()
+        )
+        return tokens
+
+    def tokens_to_int(self, tokens):
+        return [self.vocab(token) for token in tokens]
 
     def tokenize(self, sentence):
-        word = None
-        char = None
-
-        if self.word_level:
-            word = self.word_tokenizer.tokenize(sentence)
+        tokens = self.split_sentence(sentence)
         if self.char_level:
-            char = self.char_tokenizer.tokenize(sentence)
-            
-        return word, char
+            tokens = ' '.join(tokens)
+        tokens = self.tokens_to_int(tokens) 
+        return torch.LongTensor(tokens)
+
+    def decode_tokens(self, tokens):
+        logger.debug(f'Decode tokens {tokens}')
+        join_char = '' if self.char_level else ' '
+        text = join_char.join([
+            self.vocab.get_word(token) for token in tokens
+        ])
+        return text
+
+    def __len__(self):
+        return len(self.vocab)
 
     def __call__(self, sentence):
         return self.tokenize(sentence)

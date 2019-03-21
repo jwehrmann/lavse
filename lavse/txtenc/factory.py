@@ -17,6 +17,12 @@ __text_encoders__ = {
             'use_bi_gru': True,
         },
     },
+    'liwe_gru': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+        },
+    },
 }
 
 

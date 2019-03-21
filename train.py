@@ -217,7 +217,7 @@ if __name__ == '__main__':
         txtenc_name=args.text_encoder,
         latent_size=args.latent_size,
         img_dim=train_loader.dataset.get_img_dim(),
-        num_embeddings=train_loader.dataset.tokenizer.get_nb_words(),
+        num_embeddings=len(train_loader.dataset.tokenizer),
         embed_dim=args.embed_dim,
         txt_pooling=args.text_pooling,
     )

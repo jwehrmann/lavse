@@ -7,6 +7,7 @@ from torch.nn.utils.rnn import pack_padded_sequence
 from torch.nn.utils.rnn import pad_packed_sequence
 
 from ..layers import attention, convblocks
+from .embedding import PartialConcat
 
 # RNN Based Language Model
 class RNNEncoder(nn.Module):
@@ -154,3 +155,56 @@ class ConvGRU(nn.Module):
             cap_emb = l2norm(cap_emb, dim=-1)
 
         return cap_emb, lengths
+
+
+class LiweGRU(nn.Module):
+    
+    def __init__(
+        self, 
+        num_embeddings, embed_dim, latent_size,
+        num_layers=1, use_bi_gru=True, no_txtnorm=False, 
+        rnn_cell=nn.GRU, partial_class=PartialConcat,
+        liwe_neurons=[128, 256], liwe_dropout=0.0,
+        liwe_wnorm=True, liwe_char_dim=24,
+    ):
+
+        super(LiweGRU, self).__init__()
+        
+        __max_char_in_words = 30
+        self.latent_size = latent_size
+        self.embed_dim = embed_dim
+        self.no_txtnorm = no_txtnorm
+
+        self.embed = partial_class(
+            num_embeddings=num_embeddings, embed_dim=embed_dim,
+            liwe_neurons=liwe_neurons, liwe_dropout=liwe_dropout,
+            liwe_wnorm=liwe_wnorm, liwe_char_dim=liwe_char_dim,
+        )
+
+        # caption embedding
+        self.use_bi_gru = True
+        self.rnn = nn.GRU(
+            embed_dim, latent_size, 1, 
+            batch_first=True, bidirectional=True
+        )
+ 
+    def forward(self, x, lens=None):
+        
+        B, W, Ct = x.size()
+    
+        word_embed = self.embed(x).contiguous()
+        x = word_embed.permute(0, 2, 1).contiguous()
+
+        # Forward propagate RNN
+        cap_emb, _ = self.rnn(x)
+
+        # Reshape *final* output to (batch_size, hidden_size)
+
+        if self.use_bi_gru:
+            b, t, d = cap_emb.shape
+            cap_emb = cap_emb.view(b, t, 2, d//2).mean(-2)
+        
+        if not self.no_txtnorm:
+            cap_emb = l2norm(cap_emb, dim=-1)
+        
+        return cap_emb, lens

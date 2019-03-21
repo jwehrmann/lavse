@@ -68,9 +68,9 @@ class PrecompDataset(Dataset):
         image = torch.FloatTensor(image)
 
         caption = self.captions[index]
-        words, chars = self.tokenizer(caption)
+        tokens = self.tokenizer(caption)
 
-        return image, words, chars, index, img_id
+        return image, tokens, index, img_id
 
     def __len__(self):
         return self.length
@@ -130,10 +130,10 @@ class CrossLanguageLoader(Dataset):
         caption_a = self.lang_a[index]
         caption_b = self.lang_b[index]
         
-        target_a, char_a = self.tokenizer(caption_a)
-        target_b, char_b = self.tokenizer(caption_b)
+        target_a = self.tokenizer(caption_a)
+        target_b = self.tokenizer(caption_b)
 
-        return target_a, char_a, target_b, char_b, index
+        return target_a, target_b, index
 
     def __len__(self):
         return self.length

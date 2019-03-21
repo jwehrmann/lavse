@@ -1,7 +1,7 @@
 import argparse
 from lavse.utils.logger import create_logger
 from lavse.data import get_loaders
-from lavse.tokenizers import WordTokenizer
+from lavse.tokenizer import Tokenizer
 from pathlib import Path
 
 
@@ -9,6 +9,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--data_path',
+    )
+    parser.add_argument(
+        '--char_level',
+        action='store_true',
     )
     parser.add_argument(
         '--data_name',
@@ -26,7 +30,11 @@ if __name__ == '__main__':
     outpath = Path(args.outpath)
     
     files = []
-    tokenizer = WordTokenizer(download_tokenizer=True)
+    tokenizer = Tokenizer(
+        download_tokenizer=True, 
+        char_level=args.char_level
+    )
+
     for data_name in args.data_name:
         data_name, lang = data_name.split('.')
         files.extend([
