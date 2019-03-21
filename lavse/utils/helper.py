@@ -34,13 +34,15 @@ def save_checkpoint(
 
 def restore_checkpoint(path, model=None, optimizer=None):
     state_dict = torch.load(path,  map_location=lambda storage, loc: storage)
-        
-    model.load_state_dict(state_dict['model'])
+    
+    if model is not None:
+        model.load_state_dict(state_dict['model'])
+    
     if optimizer is not None:
         optimizer.load_state_dict(state_dict['optimizer'])
 
     return {
-        'model': model,
+        'model': state_dict['model'],
         'optimizer': optimizer,
         'args': state_dict['args'],
         'epoch': state_dict['epoch'],
