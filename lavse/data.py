@@ -185,7 +185,7 @@ __text_representation__ = {
     },
     'liwe': {
         'collate_fn': collate_fns.collate_fn_liwe,
-        'collate_fn_lang': collate_fns.collate_lang_word,
+        'collate_fn_lang': collate_fns.collate_lang_liwe,
         'tokenizer_args': {'char_level': True},
     },
 }
