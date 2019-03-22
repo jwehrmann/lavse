@@ -105,5 +105,3 @@ if __name__ == '__main__':
         path=args.outpath,
         obj=result,
     )
-
-    

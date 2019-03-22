@@ -1,6 +1,14 @@
 # Single dataset
 python train.py \
 --data_path $DATA_PATH \
+--train_data jap_precomp.jt \
+--val_data jap_precomp.jt \
+--profile vsepp \
+--outpath $OUT_PATH/lavse/vsepp/jap_precomp.jt/
+
+
+python train.py \
+--data_path $DATA_PATH \
 --train_data f30k_precomp.en \
 --val_data f30k_precomp.en \
 --profile vsepp \
@@ -13,14 +21,6 @@ python train.py \
 --val_data m30k_precomp.de \
 --profile vsepp \
 --outpath $OUT_PATH/lavse/vsepp/m30k_precomp.de/
-
-
-python train.py \
---data_path $DATA_PATH \
---train_data jap_precomp.jt \
---val_data jap_precomp.jt \
---profile vsepp \
---outpath $OUT_PATH/lavse/vsepp/jap_precomp.jt/
 
 
 python train.py \

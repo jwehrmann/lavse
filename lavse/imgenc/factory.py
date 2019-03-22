@@ -10,6 +10,10 @@ __image_encoders__ = {
         'class': precomp.SCANImagePrecomp, 
         'args': {},
     },
+    'vsepp_precomp': {
+        'class': precomp.VSEImageEncoder, 
+        'args': {},
+    },
 }
 
 
