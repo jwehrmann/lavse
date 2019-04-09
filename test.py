@@ -21,6 +21,10 @@ if __name__ == '__main__':
         '--data_path',
     )
     parser.add_argument(
+        '--split',
+        default='test',
+    )
+    parser.add_argument(
         '--val_data', default=['f30k_precomp.en'], nargs='+',
         help=(
             'Data used for evaluation during training.'
@@ -77,7 +81,7 @@ if __name__ == '__main__':
                 batch_size=args.batch_size,
                 workers=args.workers,
                 text_repr=args.text_repr,
-                data_split='dev',
+                data_split=args.split,
                 lang=lang,
             )
         )
