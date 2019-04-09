@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, dataset
 from tqdm import tqdm
 
 from .utils import helper, logger, layers
-from .loss import cosine_sim_numpy
+from .loss import cosine_sim_numpy, cosine_sim
 from .evaluation import i2t, t2i
 from .data import DataIterator, prepare_mm_data, prepare_ml_data
 
@@ -245,11 +245,23 @@ class Trainer:
         return img_embeddings, text_embeddings
     
     def evaluate(self, loader,):      
-
+        # from timeit import default_timer as dt 
         _metrics_ = ('r1', 'r5', 'r10', 'medr', 'meanr')
 
+        # b1 = dt()
         img_emb, txt_emb = self.predict_loader(loader)
+        # b2 = dt()
         sims = cosine_sim_numpy(img_emb, txt_emb)
+
+        # img_emb = torch.Tensor(img_emb)
+        # txt_emb = torch.Tensor(txt_emb)
+        # b3 = dt()
+        # sims = cosine_sim(img_emb, txt_emb)
+
+        # e = dt()
+        # self.sysoutlog(f'Prediction {e-b1}')
+        # self.sysoutlog(f'Similarity {e-b2}')
+        # self.sysoutlog(f'Pred gpu   {e-b3}')
 
         i2t_metrics = i2t(sims)
         t2i_metrics = t2i(sims)
