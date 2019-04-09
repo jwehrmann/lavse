@@ -9,3 +9,9 @@ def save_json(path, obj):
     import json 
     with open(path, 'w') as fp:
         json.dump(obj, fp)
+
+
+def load_json(path):
+    import json 
+    with open(path, 'w') as fp:
+        return json.load(fp)
