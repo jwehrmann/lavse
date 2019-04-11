@@ -47,7 +47,7 @@ class SelfAttention(nn.Module):
         # B X (N) X (N) 
         attention = self.softmax(energy) 
         # B X C X N
-        proj_value = self.value_conv(x).view(B, -1, T) 
+        proj_value = self.value_conv(x).view(B, -1, T)
 
         out = torch.bmm(proj_value, attention.permute(0, 2, 1))
         out = out.view(B, C, T)

@@ -1,8 +1,9 @@
 import torch 
 import torch.nn as nn
 
-from .imgenc import get_image_encoder
+from .imgenc import get_image_encoder, get_img_pooling
 from .txtenc import get_text_encoder, get_txt_pooling
+from .similarity import Similarity
 from .utils.layers import l2norm
 from .utils.logger import get_logger
 
@@ -15,7 +16,9 @@ class LAVSE(nn.Module):
         self, imgenc_name, txtenc_name, 
         num_embeddings, embed_dim=300,
         latent_size=1024, img_dim=2048,
-        txt_pooling='lens',
+        txt_pooling='lens', img_pooling='mean',
+        similarity_name='cosine',
+        device=None, **kwargs
     ):
         super(LAVSE, self).__init__()
 
@@ -38,11 +41,20 @@ class LAVSE(nn.Module):
             num_embeddings=num_embeddings,
         )
         self.txt_pool = get_txt_pooling(txt_pooling)
+        self.img_pool = get_img_pooling(img_pooling)
 
         logger.info((
             'Text encoder created\n'
             f'{self.txt_enc}'
         ))
+
+        self.similarity = Similarity(
+            similarity_name=similarity_name, 
+            device=device, 
+            latent_size=latent_size,
+            **kwargs
+        )
+        logger.info(f'Using similarity: {similarity_name}')
     
     def extract_caption_features(
         self, captions, lengths,
@@ -58,7 +70,7 @@ class LAVSE(nn.Module):
         return self.txt_pool(cap_features, lengths)
 
     def embed_image_features(self, img_features):
-        return img_features.mean(1)
+        return self.img_pool(img_features)
     
     def embed_images(self, images):
         img_tensor = self.extract_image_features(images)
@@ -79,3 +91,14 @@ class LAVSE(nn.Module):
         txt_embed = self.embed_captions(captions, lengths)
 
         return img_embed, txt_embed
+    
+    def get_sim_matrix(self, embed_a, embed_b, lens=None):
+        return self.similarity(embed_a, embed_b, lens)
+
+    def get_sim_matrix_shared(
+        self, embed_a, embed_b, lens=None, shared_size=128
+    ):
+        return self.similarity.forward_shared(
+            embed_a, embed_b, lens, 
+            shared_size=shared_size
+        )

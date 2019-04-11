@@ -9,7 +9,7 @@ from lavse import imgenc, loss, train, txtenc
 from lavse.data import get_loader, get_loaders
 from lavse.model import LAVSE
 from lavse.utils.logger import create_logger
-
+from lavse import similarity
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -54,6 +54,10 @@ if __name__ == '__main__':
         help='Device to run the model.',
     )
     parser.add_argument(
+        '--sim', default='cosine', type=str,
+        help='Similarity.', choices=similarity.get_sim_names(),
+    )
+    parser.add_argument(
         '--batch_size', default=128, type=int,
         help='Size of a training mini-batch.',
     )
@@ -85,12 +89,17 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--text_pooling', default='lens',
-        choices=['mean', 'max', 'lens'],
+        choices=['mean', 'max', 'lens', 'none'],
         help='Path to save logs and models.',
     )
     parser.add_argument(
         '--image_encoder', default='scan',
         choices=imgenc.get_available_imgenc(),
+        help='Path to save logs and models.',
+    )
+    parser.add_argument(
+        '--image_pooling', default='mean',
+        choices=['mean', 'max', 'lens', 'none'],
         help='Path to save logs and models.',
     )
     parser.add_argument(
@@ -143,12 +152,19 @@ if __name__ == '__main__':
         help='Initial value for k hyper-parameter (used when not --max_violation)',
     )
     parser.add_argument(
+        '--beta', default=0.995, type=float,
+        help='Initial value for k hyper-parameter (used when not --max_violation)',
+    )
+    parser.add_argument(
         '--log_level', default='info',
         choices=['debug', 'info'],
         help='Log/verbosity level.',
     )
+    parser.add_argument(
+        '--eval_before_training', action='store_true',
+        help='Performs complete eval before training',
+    )
 
-    
     args = parser.parse_args()
     args = Dict(vars(args))
     
@@ -220,6 +236,9 @@ if __name__ == '__main__':
         num_embeddings=len(train_loader.dataset.tokenizer),
         embed_dim=args.embed_dim,
         txt_pooling=args.text_pooling,
+        img_pooling=args.image_pooling,
+        similarity_name=args.sim,
+        device=device,
     )
 
     model = LAVSE(**model_params).to(device)
@@ -235,17 +254,18 @@ if __name__ == '__main__':
         device=device,
         margin=args.margin,
         max_violation=args.max_violation,
-        weight=1., 
-        initial_k=args.initial_k, 
-        increase_k=args.increase_k,
+        weight=1.,
+        beta=args.beta,
+        # initial_k=args.initial_k, 
+        # increase_k=args.increase_k,
     )
 
     multilanguage_criterion = loss.ContrastiveLoss(
         device=device,
         margin=args.margin,
         max_violation=args.max_violation,
-        weight=1., 
-        initial_k=args.initial_k, 
+        weight=1.,
+        # initial_k=args.initial_k, 
     )
 
     trainer.setup_optim(
@@ -255,10 +275,10 @@ if __name__ == '__main__':
         lr_decay_rate=args.lr_decay_rate, 
         lr_decay_interval=args.lr_decay_interval,
     )
-
-    result, rs = trainer.evaluate_loaders(
-        val_loaders
-    )
+    if args.eval_before_training:
+        result, rs = trainer.evaluate_loaders(
+            val_loaders
+        )
 
     trainer.fit(
         train_loader=train_loader, 

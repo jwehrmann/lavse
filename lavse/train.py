@@ -23,7 +23,7 @@ class Trainer:
         self, model=None, device='cuda:0',
         args=None, sysoutlog=tqdm.write
     ):
-                
+
         self.device = torch.device(device)
         self.model = model.to(self.device)        
         self.train_logger = logger.LogCollector()
@@ -92,9 +92,8 @@ class Trainer:
 
             # Update epoch for correct k calculation 
             # Record k values for monitoring 
-            self.mm_criterion.update_epoch()
-            k = self.mm_criterion.update_k()
-            self.train_logger.update('k', k, 0)
+            # self.mm_criterion.update_epoch()
+            # k = self.mm_criterion.update_k()
             
             # Train a single epoch
             self.train_epoch(
@@ -141,7 +140,8 @@ class Trainer:
         self.optimizer.zero_grad()            
 
         img_emb, cap_emb = self.model(images, captions, lens)
-        loss = self.mm_criterion(img_emb, cap_emb, )
+        sim_matrix = self.model.get_sim_matrix(img_emb, cap_emb, lens)
+        loss = self.mm_criterion(sim_matrix)
 
         return loss
     
@@ -151,8 +151,10 @@ class Trainer:
 
         cap_a_embed = self.model.embed_captions(captions_a, lens_a)
         cap_b_embed = self.model.embed_captions(captions_b, lens_b)
+        
+        sim_matrix = self.model.get_sim_matrix(cap_a_embed, cap_b_embed)
+        loss = self.ml_criterion(sim_matrix)
 
-        loss = self.ml_criterion(cap_a_embed, cap_b_embed)
         return loss
 
     def train_epoch(
@@ -187,6 +189,7 @@ class Trainer:
             
             iteration = len(train_loader) * (epoch) + self.pbar.n
             self.train_logger.update('iteration', iteration, 0)
+            self.train_logger.update('k', self.mm_criterion.k, 0)
             
             # Update progress bar
             self.pbar.update(1)
@@ -219,19 +222,49 @@ class Trainer:
     def predict_loader(self, loader):
         self.model.eval()
 
-        n = loader.dataset.length
-        img_embeddings = np.zeros((n, self.model.latent_size))
-        text_embeddings = np.zeros((n, self.model.latent_size))
+        n = loader.dataset.length        
 
         test_iter = DataIterator(loader, device=self.device)
+
+        images, captions, lens, ids = test_iter.next()
+        img_emb, txt_emb = self.model(images, captions, lens)
+
+        maxlen = max([len(x) for x in loader.dataset.captions])
+        assert len(img_emb.shape) == len(txt_emb.shape)
+
+        all_lens = []
+        if len(img_emb.shape) == 3:
+            img_embeddings = torch.zeros(n, *img_emb.shape[1:])
+            text_embeddings = torch.zeros(n, maxlen, txt_emb.shape[-1])            
+
+            # Assign first batch
+            img_embeddings[ids] = img_emb.cpu()
+            for cap, id, l in zip(txt_emb, ids, lens):
+                text_embeddings[id,:l] = cap.cpu()[:l]
+            all_lens.extend(lens)
+
+        elif len(img_emb.shape) == 2:
+            img_embeddings = torch.zeros(n, img_emb.shape[-1])
+            text_embeddings = torch.zeros(n, txt_emb.shape[-1])
+
+            img_embeddings[ids] = img_emb.cpu()
+            text_embeddings[ids] = txt_emb.cpu()            
+        else: 
+            print(f'FATAL: wrong embedding shape {img_emb.shape}')
+            exit()
 
         with torch.no_grad():
            while True:
                 try:
                     images, captions, lens, ids = test_iter.next()
                     img_emb, txt_emb = self.model(images, captions, lens)
-                    img_embeddings[ids] = layers.tensor_to_numpy(img_emb)
-                    text_embeddings[ids] = layers.tensor_to_numpy(txt_emb)
+                    img_embeddings[ids] = img_emb.cpu()
+                    if len(img_embeddings.shape) == 3:
+                        for cap, id, l in zip(txt_emb, ids, lens):
+                            text_embeddings[id,:l] = cap.cpu()[:l]
+                    else:
+                        text_embeddings[ids] = txt_emb.cpu()
+                    all_lens.extend(lens)
                 except StopIteration:
                     break
         # Remove image feature redundancy
@@ -242,17 +275,25 @@ class Trainer:
                     stop=img_embeddings.shape[0], 
                     step=5).astype(np.int),
             ]
-        return img_embeddings, text_embeddings
+        return img_embeddings, text_embeddings, all_lens
     
     def evaluate(self, loader,):      
         # from timeit import default_timer as dt 
         _metrics_ = ('r1', 'r5', 'r10', 'medr', 'meanr')
 
         # b1 = dt()
-        img_emb, txt_emb = self.predict_loader(loader)
+        img_emb, txt_emb, lengths = self.predict_loader(loader)
         # b2 = dt()
-        sims = cosine_sim_numpy(img_emb, txt_emb)
-
+        with torch.no_grad():
+            sims = self.model.get_sim_matrix_shared(
+                embed_a=img_emb, embed_b=txt_emb, 
+                lens=lengths, shared_size=256
+            )
+            # sims = self.model.get_sim_matrix(
+            #     embed_a=img_emb, embed_b=txt_emb, 
+            #     lens=lengths,
+            # )
+            sims = layers.tensor_to_numpy(sims)
         # img_emb = torch.Tensor(img_emb)
         # txt_emb = torch.Tensor(txt_emb)
         # b3 = dt()

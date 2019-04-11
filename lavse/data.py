@@ -107,6 +107,7 @@ def get_loader(
         shuffle=(data_split == 'train'),
         pin_memory=True,
         collate_fn=collate_fn,
+        num_workers=0,
     )
     logger.debug(f'Loader built: {loader}')
 

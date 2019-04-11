@@ -42,10 +42,11 @@ def get_text_encoder(model_name, **kwargs):
 
 def get_txt_pooling(pool_name):
 
-    __pooling__ = {
+    _pooling = {
         'mean': pooling.mean_pooling,
         'max': pooling.max_pooling,
         'lens': pooling.last_hidden_state_pool,
+        'none': pooling.none,
     }
 
-    return __pooling__[pool_name]
+    return _pooling[pool_name]

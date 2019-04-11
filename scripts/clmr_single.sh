@@ -1,4 +1,7 @@
-# Single dataset
+export DATA_PATH=/home/jonatas/data/lavse/
+export OUT_PATH=runs/temp/
+
+# Single dataset: 
 python train.py \
 --data_path $DATA_PATH \
 --train_data f30k_precomp.en \
