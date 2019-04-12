@@ -70,10 +70,9 @@ class LogCollector(object):
                 v = metric_val
 
             self.update(
-                k=f'val_{metric_name}', v=v, n=0
+                k=f'{metric_name}', v=v, n=0
             )
-        self.update(k='epoch', v=epoch, n=0)
-        self.update(k='count', v=count, n=0)
+        self.update(k='valid/count', v=count, n=0)
 
 
 def create_logger(level='info'):

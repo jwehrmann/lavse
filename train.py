@@ -11,6 +11,7 @@ from lavse.model import LAVSE
 from lavse.utils.logger import create_logger
 from lavse import similarity
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(

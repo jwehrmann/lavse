@@ -136,13 +136,15 @@ class AdaptiveEmbedding(nn.Module):
         
         self.device = device
 
-        self.fc = nn.Conv1d(latent_size, latent_size*2, 1).to(device)
+        # self.fc = nn.Conv1d(latent_size, latent_size*2, 1).to(device)
+        self.fc = nn.Linear(latent_size, latent_size*2).to(device)
         self.bn = nn.BatchNorm1d(latent_size)
 
         # self.alpha = nn.Parameter(torch.ones(1))
         # self.beta = nn.Parameter(torch.zeros(1))
 
         self.softmax = nn.Softmax(dim=-1)
+        self.norm = ClippedL2Norm()
 
     def forward(self, img_embed, cap_embed, lens, **kwargs):        
         '''
@@ -153,23 +155,29 @@ class AdaptiveEmbedding(nn.Module):
         cap_embed = cap_embed.permute(0, 2, 1).to(self.device)
         img_embed = img_embed.permute(0, 2, 1).to(self.device)
 
-        sims = torch.zeros(img_embed.shape[0], cap_embed.shape[0]).to(self.device)
+        cap_embed = self.norm(cap_embed)
+        img_embed = self.norm(img_embed)
+
+        sims = torch.zeros(
+            img_embed.shape[0], cap_embed.shape[0]
+        ).to(self.device)
+        
         for i, cap in enumerate(cap_embed):
             n_words = lens[i]
             # cap: 1024, T
             # img: 1024, 36
-            cap = cap[:,:n_words].unsqueeze(0)
-            _, D, T = cap.shape
-            params = self.fc(cap).view(D, T, 2)
+            cap = cap[:,:n_words].mean(-1).unsqueeze(0)
+            _, D = cap.shape
+            params = self.fc(cap).view(D, 2)
             # D, 
-            alphas = params[:,:,0].mean(1).view(1, D, 1)
+            alphas = params[:,0].view(1, D, 1)
             # D, 
-            betas = params[:,:,1].mean(1).view(1, D, 1)            
+            betas = params[:,1].view(1, D, 1)            
             img_output = self.bn(img_embed) * alphas + betas            
             
             img_vector = img_output.mean(-1) 
             img_vector = l2norm(img_vector, dim=-1)
-            cap_vector = cap.mean(-1)
+            cap_vector = cap
             cap_vector = l2norm(cap_vector, dim=-1)            
 
             sim = cosine_sim(img_vector, cap_vector).squeeze(-1)            

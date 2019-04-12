@@ -53,6 +53,73 @@ class RNNEncoder(nn.Module):
         return cap_emb, lengths
 
 
+class SelfAttnGRU(nn.Module):
+
+    def __init__(
+        self, num_embeddings, embed_dim, latent_size,
+        num_layers=1, use_bi_gru=True, no_txtnorm=False, 
+        rnn_cell=nn.GRU, activation=nn.LeakyReLU(0.1),
+    ):
+
+        super(SelfAttnGRU, self).__init__()
+        self.latent_size = latent_size
+        self.no_txtnorm = no_txtnorm
+
+        # word embedding
+        self.embed = nn.Embedding(num_embeddings, embed_dim)
+
+        # caption embedding
+        self.use_bi_gru = use_bi_gru
+        self.rnn = rnn_cell(
+            embed_dim, latent_size, num_layers, 
+            batch_first=True, bidirectional=use_bi_gru
+        )
+                
+        self.sa1 = attention.SelfAttention(latent_size, activation)
+
+        self.fc = nn.Sequential(*[
+            nn.Conv1d(1024, latent_size, 1,),
+            # nn.LeakyReLU(0.1, ),
+        ])
+
+        # self.init_weights()
+        self.apply(default_initializer)
+
+    # def init_weights(self):
+    #     self.embed.weight.data.uniform_(-0.1, 0.1)
+
+    def forward(self, x, lengths):
+        """Handles variable size captions
+        """
+        # Embed word ids to vectors
+        x = self.embed(x)
+        b, t, e = x.shape
+        # Forward propagate RNN
+        # packed = pack_padded_sequence(x, lengths, batch_first=True)
+
+        # Forward propagate RNN
+        cap_emb, _ = self.rnn(x)
+
+        # Reshape *final* output to (batch_size, hidden_size)
+        # padded = pad_packed_sequence(out, batch_first=True)
+        # cap_emb, cap_len = padded
+
+        if self.use_bi_gru:
+            b, t, d = cap_emb.shape
+            cap_emb = cap_emb.view(b, t, 2, d//2).mean(-2)
+
+        cap_emb = cap_emb.permute(0, 2, 1)
+        cap_emb = self.sa1(cap_emb)
+        
+        cap_emb = self.fc(cap_emb)
+        cap_emb = cap_emb.permute(0, 2, 1)
+        
+        # normalization in the joint embedding space        
+        if not self.no_txtnorm:
+            cap_emb = l2norm(cap_emb, dim=-1)
+
+        return cap_emb, lengths
+
 
 class ConvGRU(nn.Module):
 

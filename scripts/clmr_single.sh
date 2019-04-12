@@ -7,7 +7,7 @@ python train.py \
 --train_data f30k_precomp.en \
 --val_data f30k_precomp.en \
 --profile clmr \
---outpath $OUT_PATH/lavse/clmr/f30k_precomp.en/
+--outpath $OUT_PATH/lavse/clmr/f30k_precomp.en/ \
 
 
 python train.py \

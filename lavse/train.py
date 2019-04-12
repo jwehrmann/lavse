@@ -3,6 +3,7 @@ import logging
 import os
 from pathlib import Path
 from random import shuffle
+from timeit import default_timer as dt
 
 import numpy as np
 import torch
@@ -11,10 +12,10 @@ from numpy.polynomial.polynomial import polyfit
 from torch.utils.data import DataLoader, dataset
 from tqdm import tqdm
 
-from .utils import helper, logger, layers
-from .loss import cosine_sim_numpy, cosine_sim
+from .data import DataIterator, prepare_ml_data, prepare_mm_data
 from .evaluation import i2t, t2i
-from .data import DataIterator, prepare_mm_data, prepare_ml_data
+from .loss import cosine_sim, cosine_sim_numpy
+from .utils import helper, layers, logger
 
 
 class Trainer:
@@ -122,10 +123,10 @@ class Trainer:
             )
             # Update train and validation metrics on tensorboard
             self.train_logger.tb_log(
-                tb_writer, step=epoch, prefix='train/'
+                tb_writer, step=epoch, prefix='train/',
             )
             self.val_logger.tb_log(
-                tb_writer, step=epoch, prefix='valid/'
+                tb_writer, step=epoch, prefix='',
             )
 
             # Early stop
@@ -195,6 +196,7 @@ class Trainer:
             self.pbar.update(1)
             self.optimizer.zero_grad()
 
+            begin_forward = dt()
             images, captions, lens, ids = instance
             multimodal_loss = self._forward_multimodal_loss(
                 images, captions, lens
@@ -209,12 +211,17 @@ class Trainer:
                 lang_loss = self._forward_multilanguage_loss(*lang_data)
                 total_lang_loss += lang_loss
                 self.train_logger.update(f'train_loss_{str(lang_iter)}', lang_loss, 1)
-
+            
             self.train_logger.update('train_loss', multimodal_loss, 1)
             
             total_loss = multimodal_loss + total_lang_loss
             total_loss.backward()
             self.optimizer.step()
+            end_backward = dt()
+
+            self.train_logger.update(
+                'batch_time', end_backward-begin_forward, 1
+            )
 
             if self.pbar.n % log_interval == 0:
                 self.sysoutlog(f'{self.train_logger}')
@@ -277,13 +284,12 @@ class Trainer:
             ]
         return img_embeddings, text_embeddings, all_lens
     
-    def evaluate(self, loader,):      
-        # from timeit import default_timer as dt 
+    def evaluate(self, loader,):        
         _metrics_ = ('r1', 'r5', 'r10', 'medr', 'meanr')
 
-        # b1 = dt()
+        begin_pred = dt()
         img_emb, txt_emb, lengths = self.predict_loader(loader)
-        # b2 = dt()
+        end_pred = dt()
         with torch.no_grad():
             sims = self.model.get_sim_matrix_shared(
                 embed_a=img_emb, embed_b=txt_emb, 
@@ -294,15 +300,7 @@ class Trainer:
             #     lens=lengths,
             # )
             sims = layers.tensor_to_numpy(sims)
-        # img_emb = torch.Tensor(img_emb)
-        # txt_emb = torch.Tensor(txt_emb)
-        # b3 = dt()
-        # sims = cosine_sim(img_emb, txt_emb)
-
-        # e = dt()
-        # self.sysoutlog(f'Prediction {e-b1}')
-        # self.sysoutlog(f'Similarity {e-b2}')
-        # self.sysoutlog(f'Pred gpu   {e-b3}')
+        end_sim = dt()
 
         i2t_metrics = i2t(sims)
         t2i_metrics = t2i(sims)
@@ -311,9 +309,11 @@ class Trainer:
 
         i2t_metrics = {f'i2t_{k}': v for k, v in zip(_metrics_, i2t_metrics)}
         t2i_metrics = {f't2i_{k}': v for k, v in zip(_metrics_, t2i_metrics)}
-        # print(i2t_metrics)
-        # print(t2i_metrics)
-        metrics = {}
+        
+        metrics = {
+            'pred_time': end_pred-begin_pred,
+            'sim_time': end_sim-end_pred,
+        }        
         metrics.update(i2t_metrics)
         metrics.update(t2i_metrics)
         metrics['rsum'] = rsum
@@ -335,12 +335,12 @@ class Trainer:
             for k, v in result.items():
                 self.sysoutlog(f'{k:<10s}: {v:>6.1f}')
             result = {
-                f'{loader_name}.{metric_name}': v 
+                f'{loader_name}/{metric_name}': v 
                 for metric_name, v in result.items()
             }
             
             loader_metrics.update(result)
-            final_sum += result[f'{loader_name}.rsum']
+            final_sum += result[f'{loader_name}/rsum']
         
         return loader_metrics, final_sum/float(nb_loaders)
 

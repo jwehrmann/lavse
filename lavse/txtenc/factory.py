@@ -9,6 +9,15 @@ __text_encoders__ = {
         'args': {
             'use_bi_gru': True,
             'rnn_type': nn.GRU,
+            
+        },
+    },
+    'attngru': {
+        'class': txtenc.SelfAttnGRU,
+        'args': {
+            'use_bi_gru': True,            
+            'no_txtnorm': True,
+            
         },
     },
     'convgru_sa': {
