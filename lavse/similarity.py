@@ -12,6 +12,46 @@ from .utils.logger import get_logger
 logger = get_logger()
 
 
+class XAttn(nn.Module):
+
+    def __init__(self, dim=1024, k=8, smooth=4):
+        super().__init__()
+        self.dim = dim
+        self.k = k 
+        self.gamma = nn.Parameter(torch.zeros(1))
+        self.smooth = smooth
+
+    def forward(self, query_a, value_a, key_b, value_b):
+        '''
+            When it is a caption:
+                query_a: torch.Size([128, 4, 128])
+                value_a: torch.Size([128, 1024, 4])
+                key_b  : torch.Size([128, 128, 36])
+                x attn : torch.Size([128, 4, 36])
+                output : torch.Size([128, 1024, 36])
+
+            When it is an image:
+                query_a: torch.Size([128, 36, 128])
+                value_a: torch.Size([128, 1024, 36])
+                key_b  : torch.Size([128, 128, 4])
+                x attn : torch.Size([128, 36, 4])
+                output : torch.Size([128, 1024, 4])
+
+        '''        
+        # print('\n\n\n')        
+        # print('query_a:', query_a.shape)
+        # print('value_a:', value_a.shape)
+        # print('key_b  :', key_b.shape)
+        
+        energy_cross = torch.bmm(query_a, key_b)
+        cross_attention = nn.Softmax(dim=-1)(energy_cross * self.smooth)        
+
+        output = torch.bmm(value_a, cross_attention)
+        output = self.gamma + output + value_b
+
+        return output
+
+
 class CrossAttn(nn.Module):
 
     def __init__(
@@ -79,6 +119,7 @@ class CrossAttn(nn.Module):
         self.beta = nn.Parameter(torch.zeros(1))
 
         self.softmax = nn.Softmax(dim=-1)
+        self.i2t_attention = XAttn(dim=latent_size, k=k)
 
     def forward(self, img_embed, cap_embed, lens, **kwargs):
         # B, 1024, 36
@@ -104,47 +145,180 @@ class CrossAttn(nn.Module):
         
         sims = torch.zeros(img_embed.shape[0], cap_embed.shape[0]).to(self.device)
         for i, cap in enumerate(cap_embed):
+            # n_words = lens[i]
+            # # cap: 1024, T
+            # cap = cap[:,:n_words]
+            # query_t = query_txt[i][:n_words]
+            # query_t = torch.stack([query_t] * len(key_img), 0)
+            # # energy   : B, T, 36
+            # energy_cross = torch.bmm(query_t, key_img) * self.alpha + self.beta
+            # cross_attention = self.softmax(energy_cross)
+            # value_t = torch.stack([value_txt[i][:,:n_words]] * len(key_img), 0)            
+
+            # img_output = torch.bmm(value_t, cross_attention)
+            # img_output = self.gamma_img * img_output + value_img
+
             n_words = lens[i]
-            # cap: 1024, T
+            # # cap: 1024, T
             cap = cap[:,:n_words]
             query_t = query_txt[i][:n_words]
+            value_t = value_txt[i][:,:n_words]
+            key_t = key_txt[i][:,:n_words]
             query_t = torch.stack([query_t] * len(key_img), 0)
-            # energy   : B, T, 36
-            energy_cross = torch.bmm(query_t, key_img) * self.alpha + self.beta
-            cross_attention = self.softmax(energy_cross)
-            value_t = torch.stack([value_txt[i][:,:n_words]] * len(key_img), 0)            
+            value_t = torch.stack([value_t] * len(key_img), 0)
+            key_t = torch.stack([key_t] * len(key_img), 0)
+            # # energy   : B, T, 36
+            # energy_cross = torch.bmm(query_t, key_img) * self.alpha + self.beta
+            # cross_attention = self.softmax(energy_cross)
 
-            img_output = torch.bmm(value_t, cross_attention)
-            img_output = self.gamma_img * img_output + value_img
+            # img_output = torch.bmm(value_t, cross_attention)
+            # img_output = self.gamma_img * img_output + value_img
 
+            img_output = self.i2t_attention(
+                query_a=query_t, value_a=value_t, 
+                key_b=key_img, value_b=value_img
+            )
+            txt_output = self.i2t_attention(
+                query_a=query_img, value_a=value_img, 
+                key_b=key_t, value_b=value_t
+            )[0]
+            
             img_vector = img_output.mean(-1)
             img_vector = l2norm(img_vector, dim=-1)
-            cap_vector = cap[:,:n_words].mean(1)
+            cap_vector = txt_output.mean(-1).unsqueeze(0)
             cap_vector = l2norm(cap_vector, dim=-1)
-            sim = cosine_sim(img_vector, cap_vector.unsqueeze(0)).squeeze(-1)            
+            sim = cosine_sim(img_vector, cap_vector).squeeze()
             sims[:,i] = sim
 
         return sims
 
 
+class CondBatchNorm1d(nn.Module):
+
+    def __init__(self, in_features, k):
+        super().__init__()
+
+        self.bn = nn.BatchNorm1d(in_features, affine=False)
+
+        self.fc_gamma = nn.Sequential(
+            nn.Linear(in_features, in_features//k),
+            nn.ReLU(inplace=True),
+            nn.Linear(in_features//k, in_features),
+        )
+
+        self.fc_beta = nn.Sequential(
+            nn.Linear(in_features, in_features//k),
+            nn.ReLU(inplace=True),
+            nn.Linear(in_features//k, in_features),
+        )
+    
+    def forward(self, feat_matrix, cond_vector):
+        '''
+        Forward conditional bachnorm using 
+        predicted gamma and beta returning 
+        the normalized input matrix
+        
+        Arguments:
+            feat_matrix {torch.FloatTensor} 
+                -- shape: batch, features, timesteps
+            cond_vector {torch.FloatTensor} 
+                -- shape: batch, features
+        
+        Returns:
+            torch.FloatTensor 
+                -- shape: batch, features, timesteps
+        '''
+
+        _, D = cond_vector.shape
+        
+        gammas = self.fc_gamma(cond_vector).view(1, D, 1)
+        betas  = self.fc_beta(cond_vector).view(1, D, 1)
+
+        norm_feat = self.bn(feat_matrix)            
+        normalized = norm_feat * (gammas + 1) + betas
+        return normalized
+
+
 class AdaptiveEmbedding(nn.Module):
 
     def __init__(
-            self, device, latent_size=1024
+            self, device, latent_size=1024, k=8,
         ):
         super().__init__()
         
         self.device = device
 
-        # self.fc = nn.Conv1d(latent_size, latent_size*2, 1).to(device)
-        self.fc = nn.Linear(latent_size, latent_size*2).to(device)
-        self.bn = nn.BatchNorm1d(latent_size)
+        # self.fc = nn.Conv1d(latent_size, latent_size*2, 1).to(device)        
+
+        self.cbn_img = CondBatchNorm1d(latent_size, k)
+        # self.cbn_txt = CondBatchNorm1d(latent_size, k)
 
         # self.alpha = nn.Parameter(torch.ones(1))
         # self.beta = nn.Parameter(torch.zeros(1))
 
         self.softmax = nn.Softmax(dim=-1)
         self.norm = ClippedL2Norm()
+
+    def forward(self, img_embed, cap_embed, lens, **kwargs):
+        '''
+            img_embed: (B, 36, latent_size)
+            cap_embed: (B, T, latent_size)
+        '''
+        # (B, 1024, T)
+        cap_embed = cap_embed.permute(0, 2, 1).to(self.device)
+        img_embed = img_embed.permute(0, 2, 1).to(self.device)
+        
+        # img_vector = img_embed.mean(-1)
+
+        # cap_embed = self.norm(cap_embed)
+        # img_embed = self.norm(img_embed)
+
+        sims = torch.zeros(
+            img_embed.shape[0], cap_embed.shape[0]
+        ).to(self.device)
+
+        for i, cap in enumerate(cap_embed):
+            n_words = lens[i]
+            # cap: 1024, T
+            # img: 1024, 36
+            cap = cap[:,:n_words].mean(-1).unsqueeze(0)
+
+            img_output = self.cbn_img(img_embed, cap)
+            img_vector = img_output.mean(-1)
+            img_vector = l2norm(img_vector, dim=-1)
+            cap_vector = cap
+            cap_vector = l2norm(cap_vector, dim=-1)
+
+            sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
+            sims[:,i] = sim
+
+        return sims
+
+
+class ExcEmbedding(nn.Module):
+
+    def __init__(
+            self, device, latent_size=1024, k=8,
+        ):
+        super().__init__()
+        
+        self.device = device
+
+        self.squeeze = nn.Sequential(*[
+            nn.Linear(latent_size, latent_size//k),
+            # nn.BatchNorm1d(latent_size//k),
+            nn.ReLU(inplace=True),
+        ])
+        
+        self.excite = nn.Sequential(*[
+            nn.Linear(latent_size//k, latent_size),
+            nn.Sigmoid(),
+        ])
+
+        self.beta = nn.Parameter(torch.ones(1))
+        self.beta1 = nn.Parameter(torch.ones(1))
+        self.norm = ClippedL2Norm()
+
 
     def forward(self, img_embed, cap_embed, lens, **kwargs):        
         '''
@@ -158,24 +332,20 @@ class AdaptiveEmbedding(nn.Module):
         cap_embed = self.norm(cap_embed)
         img_embed = self.norm(img_embed)
 
+        img_vectors = img_embed.mean(-1)
+
         sims = torch.zeros(
             img_embed.shape[0], cap_embed.shape[0]
         ).to(self.device)
-        
+
         for i, cap in enumerate(cap_embed):
             n_words = lens[i]
             # cap: 1024, T
             # img: 1024, 36
             cap = cap[:,:n_words].mean(-1).unsqueeze(0)
-            _, D = cap.shape
-            params = self.fc(cap).view(D, 2)
-            # D, 
-            alphas = params[:,0].view(1, D, 1)
-            # D, 
-            betas = params[:,1].view(1, D, 1)            
-            img_output = self.bn(img_embed) * alphas + betas            
-            
-            img_vector = img_output.mean(-1) 
+            gate = self.excite(self.squeeze(cap))
+            img_vector = img_vectors * gate + self.beta
+                        
             img_vector = l2norm(img_vector, dim=-1)
             cap_vector = cap
             cap_vector = l2norm(cap_vector, dim=-1)            
@@ -328,7 +498,7 @@ class StackedAttention(nn.Module):
         return similarities
 
     def __repr__(self, ):        
-        return((
+        return (
             f'StackedAttention(task: {self.task},'
             f'i2t: {self.i2t}, '
             f'agg_function: {self.aggregate_function}, '
@@ -339,7 +509,7 @@ class StackedAttention(nn.Module):
             f'lambda_lse: {self.lambda_lse}, '
             f'smooth: {self.smooth}, '
             f'kwargs: {self.kwargs})'
-        ))
+        )
 
 
 def attn_softmax(attn):
@@ -425,6 +595,10 @@ _similarities = {
     'order': None,
     'cross': {
         'class': CrossAttn,
+        'args': Dict(k=8,),
+    },
+    'squeeze': {
+        'class': ExcEmbedding,
         'args': Dict(k=8,),
     },
     'scan_i2t': {

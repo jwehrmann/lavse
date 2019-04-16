@@ -49,8 +49,7 @@ _profiles = {
         'lr_decay_interval': 15,
         'lr_decay_rate': 0.1,
         'early_stop': 30,
-        'nb_epochs': 30,
-        'max_violation': True,
+        'nb_epochs': 30,        
         'vocab_path': 'vocab/complete.json',
     },
     'clmr': {

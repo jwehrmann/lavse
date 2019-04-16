@@ -67,7 +67,7 @@ class Trainer:
         # Set up tensorboard logger
         tb_writer = helper.get_tb_writer(path)
         path = tb_writer.file_writer.get_logdir()
-
+        self.tb_writer = tb_writer
         # Path to store the best models
         self.best_model_path = Path(path) / Path('best_model.pkl')
         
@@ -216,6 +216,16 @@ class Trainer:
             
             total_loss = multimodal_loss + total_lang_loss
             total_loss.backward()
+            
+            for k, p in self.model.named_parameters():
+                if p.grad is None:
+                    continue
+                self.tb_writer.add_scalar(
+                    f'params/{k}', 
+                    p.grad.data.norm(2).item(), 
+                    self.ml_criterion.iteration,
+                )
+
             self.optimizer.step()
             end_backward = dt()
 

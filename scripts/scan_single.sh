@@ -9,4 +9,3 @@ python train.py \
 --profile scan \
 --sim scan_i2t \
 --outpath $OUT_PATH/lavse/vsepp/f30k_precomp.en/
-
