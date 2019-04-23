@@ -61,13 +61,13 @@ class PrecompDataset(Dataset):
         print('Image div', self.im_div)        
         
         logger.info('Precomputing captions')
-        self.precomp_captions =  [
-            self.tokenizer(x)
-            for x in self.captions
-        ]
+        # self.precomp_captions =  [
+        #     self.tokenizer(x)
+        #     for x in self.captions
+        # ]
 
-        self.maxlen = max([len(x) for x in self.precomp_captions])
-        logger.info(f'Maxlen {self.maxlen}')
+        # self.maxlen = max([len(x) for x in self.precomp_captions])
+        # logger.info(f'Maxlen {self.maxlen}')
         
         logger.info((
             f'Loaded PrecompDataset {self.data_name}/{self.data_split} with '
@@ -83,10 +83,11 @@ class PrecompDataset(Dataset):
         image = self.images[img_id]
         image = torch.FloatTensor(image)
         
-        caption = self.precomp_captions[index]
-        # tokens = self.tokenizer(caption)
+        # caption = self.precomp_captions[index]
+        caption = self.captions[index]
+        tokens = self.tokenizer(caption)
 
-        return image, caption, index, img_id
+        return image, tokens, index, img_id
 
     def __len__(self):
         return self.length

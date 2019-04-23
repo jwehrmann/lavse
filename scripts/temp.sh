@@ -2,21 +2,37 @@ export DATA_PATH=/home/jonatas/data/lavse/
 export OUT_PATH=runs/temp/
 
 
-# pythlocal
+# # pythlocal
+
+# python train.py \
+# --data_path $DATA_PATH \
+# --train_data f30k_precomp.en \
+# --val_data f30k_precomp.en \
+# --outpath $OUT_PATH/cross/lr_5e-4/f30k_precomp.en/ \
+# --sim cross \
+# --val_step 100 \
+# --workers 0 \
+# --image_encoder hierarchical \
+# --text_encoder attngru \
+# --text_pooling none \
+# --image_pooling none \
+# --lr 5e-4 \
+# --beta 0.999 \
+# --eval_before_training \
+
 
 python train.py \
 --data_path $DATA_PATH \
 --train_data f30k_precomp.en \
 --val_data f30k_precomp.en \
---outpath $OUT_PATH/cross/lr_5e-4/f30k_precomp.en/ \
---sim cross \
---val_step 100 \
+--outpath runs/region/f30k_precomp.en/ \
+--sim region \
 --workers 0 \
 --image_encoder hierarchical \
---text_encoder attngru \
+--text_encoder convgru_sa \
 --text_pooling none \
 --image_pooling none \
---lr 5e-4 \
+--lr 6e-4 \
 --beta 0.999 \
 --eval_before_training \
 
@@ -26,15 +42,14 @@ python train.py \
 # --data_path $DATA_PATH \
 # --train_data f30k_precomp.en \
 # --val_data f30k_precomp.en \
-# --outpath $OUT_PATH/sa/f30k_precomp.en/ \
-# --sim cosine \
-# --val_step 100 \
+# --outpath runs/cross/f30k_precomp.en/ \
+# --sim cross \
 # --workers 0 \
 # --image_encoder hierarchical \
-# --text_encoder sa \
-# --text_pooling mean \
-# --image_pooling mean \
-# --lr 5e-4 \
+# --text_encoder attngru \
+# --text_pooling none \
+# --image_pooling none \
+# --lr 2e-4 \
 # --beta 0.999 \
 # --eval_before_training \
 

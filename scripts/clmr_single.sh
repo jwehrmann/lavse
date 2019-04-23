@@ -8,6 +8,7 @@ python train.py \
 --val_data f30k_precomp.en \
 --profile clmr \
 --outpath $OUT_PATH/lavse/clmr/f30k_precomp.en/ \
+--eval_before_training
 
 
 python train.py \

@@ -26,7 +26,6 @@ import random
 random.seed(0, version=2)
 
 
-
 class Trainer:
 
     def __init__(
@@ -71,7 +70,6 @@ class Trainer:
         self.count = early_stop
         self.early_stop = early_stop
 
-
     def fit(
         self, train_loader, valid_loaders, lang_loaders=[],
         nb_epochs=2000, path='runs/',
@@ -107,11 +105,6 @@ class Trainer:
                 epoch=epoch,
             )
             self.train_logger.update('lr', lr, 0)
-
-            # Update epoch for correct k calculation 
-            # Record k values for monitoring 
-            # self.mm_criterion.update_epoch()
-            # k = self.mm_criterion.update_k()
             
             # Train a single epoch
             self.train_epoch(
@@ -124,8 +117,7 @@ class Trainer:
                 path=path,
             )
 
-            
-
+    
     def _forward_multimodal_loss(
         self, images, captions, lens
     ):
@@ -296,8 +288,8 @@ class Trainer:
                 #     tb_writer, step=epoch, prefix='train/',
                 # )
                 self.val_logger.tb_log(
-                    self.tb_writer, 
-                    step=self.mm_criterion.iteration, 
+                    self.tb_writer,
+                    step=self.mm_criterion.iteration,
                     prefix='',
                 )
 
@@ -308,7 +300,6 @@ class Trainer:
             
     def predict_loader(self, data_loader):
         self.model.eval()
-
 
         # np array to keep all the embeddings
         img_embs = None
@@ -327,7 +318,7 @@ class Trainer:
             img_emb, cap_emb = self.model(images, captions, lengths)
             
             if img_embs is None:
-                if img_emb.dim() == 3:
+                if len(img_emb.shape) == 3:
                     img_embs = np.zeros((len(data_loader.dataset), img_emb.size(1), img_emb.size(2)))
                 else:
                     img_embs = np.zeros((len(data_loader.dataset), img_emb.size(1)))
@@ -347,7 +338,8 @@ class Trainer:
                 np.arange(
                     start=0,
                     stop=img_embs.shape[0], 
-                    step=5).astype(np.int),
+                    step=5
+                ).astype(np.int),
             ]
 
         return img_embs, cap_embs, cap_lens
