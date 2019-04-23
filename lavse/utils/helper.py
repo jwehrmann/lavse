@@ -80,3 +80,13 @@ def get_device(gpu_id):
         device = torch.device('cpu')
 
     return device
+    
+
+def reset_pbar(pbar):
+    from time import time
+    pbar.n = 0
+    pbar.last_print_n = 0
+    pbar.start_t = time()
+    pbar.last_print_t = time()
+    pbar.update()
+    return pbar

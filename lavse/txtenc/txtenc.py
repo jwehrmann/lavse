@@ -9,6 +9,56 @@ from torch.nn.utils.rnn import pad_packed_sequence
 from ..layers import attention, convblocks
 from .embedding import PartialConcat
 
+import numpy as np 
+
+
+# RNN Based Language Model
+class EncoderText(nn.Module):
+
+    def __init__(self, num_embeddings, embed_dim, latent_size, num_layers,
+                 use_bi_gru=False, no_txtnorm=False):
+        super(EncoderText, self).__init__()
+        self.latent_size = latent_size
+        self.no_txtnorm = no_txtnorm
+
+        # word embedding
+        self.embed = nn.Embedding(num_embeddings, embed_dim)
+
+        # caption embedding
+        self.use_bi_gru = use_bi_gru
+        self.rnn = nn.GRU(embed_dim, latent_size, num_layers, batch_first=True, bidirectional=use_bi_gru)
+
+        self.init_weights()
+
+    def init_weights(self):
+        self.embed.weight.data.uniform_(-0.1, 0.1)
+
+    def forward(self, x, lengths):
+        """Handles variable size captions
+        """
+        # Embed word ids to vectors
+    
+        x = self.embed(x)        
+        packed = pack_padded_sequence(x, lengths, batch_first=True)
+
+        # Forward propagate RNN
+        out, _ = self.rnn(packed)
+
+        # Reshape *final* output to (batch_size, hidden_size)
+        padded = pad_packed_sequence(out, batch_first=True)
+        cap_emb, cap_len = padded
+
+        if self.use_bi_gru:
+            cap_emb = (
+                cap_emb[:,:,:cap_emb.size(2)//2] + cap_emb[:,:,cap_emb.size(2)//2:]
+            )/2
+
+        # normalization in the joint embedding space
+        if not self.no_txtnorm:
+            cap_emb = l2norm(cap_emb, dim=-1)
+
+        return cap_emb, cap_len
+
 # RNN Based Language Model
 class RNNEncoder(nn.Module):
 
@@ -119,6 +169,87 @@ class SelfAttnGRU(nn.Module):
             cap_emb = l2norm(cap_emb, dim=-1)
 
         return cap_emb, lengths
+
+
+
+class SelfAttn(nn.Module):
+
+    def __init__(
+        self, num_embeddings, embed_dim, latent_size,
+        num_layers=1, use_bi_gru=True, no_txtnorm=False, 
+        rnn_cell=nn.GRU, activation=nn.LeakyReLU(0.1),
+    ):
+
+        super(SelfAttn, self).__init__()
+        self.latent_size = latent_size
+        self.no_txtnorm = no_txtnorm
+
+        # word embedding
+        self.embed = nn.Embedding(num_embeddings, embed_dim)
+
+        self.conv0 = nn.ConvBlock(
+            in_channels=embed_dim, 
+            out_channel=latent_size,
+            kernel_size=1,
+            padding=0,
+        )
+
+        self.sa0 = attention.SelfAttention(latent_size, activation)
+
+        self.conv1 = convblocks.ParallelBlock(
+            in_channels=embed_dim, 
+            out_channels=[512, 512],
+            kernel_sizes=[1, 2,],
+            paddings=[0, 1,],
+        )
+        self.sa1 = attention.SelfAttention(latent_size, activation)
+
+        self.conv2 = convblocks.ParallelBlock(
+            in_channels=latent_size,
+            out_channels=[512, 512],
+            kernel_sizes=[1, 2,],
+            paddings=[0, 1,],
+        )
+        self.sa2 = attention.SelfAttention(latent_size, activation)
+        
+        self.conv3 = convblocks.ParallelBlock(
+            in_channels=latent_size,
+            out_channels=[512, 512],
+            kernel_sizes=[1, 2],
+            paddings=[0, 1,],
+        )
+        self.projection = nn.Conv1d(latent_size*3, latent_size, 1)
+        # self.sa3 = attention.SelfAttention(latent_size, activation)
+
+        # self.init_weights()
+        self.apply(default_initializer)
+
+    def forward(self, x, lengths):
+        # Embed word ids to vectors
+        x = self.embed(x)
+        b, t, e = x.shape
+        x = x.permute(0, 2, 1)
+        # Forward propagate RNN
+        # packed = pack_padded_sequence(x, lengths, batch_first=True)
+        # print(x.shape)
+        a = self.sa1(self.conv1(x))
+        # print(x.shape)
+
+        b = self.sa2(self.conv2(a))
+        # print(x.shape)
+        # b = b + a
+
+        c = self.conv3(b)
+        # x = c + b
+        x = torch.cat([a, b, c], dim=1)
+        x = self.projection(x)
+        x = x.permute(0, 2, 1)
+        
+        # normalization in the joint embedding space        
+        if not self.no_txtnorm:
+            x = l2norm(x, dim=-1)
+
+        return x, lengths
 
 
 class ConvGRU(nn.Module):

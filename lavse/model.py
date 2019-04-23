@@ -75,13 +75,13 @@ class LAVSE(nn.Module):
     def embed_images(self, images):
         img_tensor = self.extract_image_features(images)
         img_embed  = self.embed_image_features(img_tensor)
-        img_embed = l2norm(img_embed, dim=1)
+        # img_embed = l2norm(img_embed, dim=1)
         return img_embed
 
     def embed_captions(self, captions, lengths):
         txt_tensor, lengths = self.extract_caption_features(captions, lengths)
-        txt_embed  = self.embed_caption_features(txt_tensor, lengths)
-        txt_embed = l2norm(txt_embed, dim=1)
+        txt_embed = self.embed_caption_features(txt_tensor, lengths)
+        # txt_embed = l2norm(txt_embed, dim=1)
         return txt_embed
 
     def forward(

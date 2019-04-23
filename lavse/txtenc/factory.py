@@ -12,6 +12,17 @@ __text_encoders__ = {
             
         },
     },
+    'scan': {
+        'class': txtenc.EncoderText, 
+        'args': {
+            'use_bi_gru': True,
+            'num_layers': 1,            
+        },
+    },
+    'sa': {
+        'class': txtenc.SelfAttn, 
+        'args': {},
+    },
     'attngru': {
         'class': txtenc.SelfAttnGRU,
         'args': {

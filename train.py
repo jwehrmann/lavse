@@ -117,7 +117,7 @@ if __name__ == '__main__':
         help='Number of epochs to update the learning rate.',
     )
     parser.add_argument(
-        '--lr_decay_rate', default=0.1, type=int,
+        '--lr_decay_rate', default=0.1, type=float,
         help='Number of epochs to update the learning rate.',
     )
     parser.add_argument(
@@ -137,7 +137,7 @@ if __name__ == '__main__':
         help='Early stop patience.',
     )
     parser.add_argument(
-        '--val_step', default=500, type=int,
+        '--valid_interval', default=500, type=int,
         help='Number of steps to run validation.',
     )
     parser.add_argument(
@@ -275,6 +275,8 @@ if __name__ == '__main__':
         ml_criterion=multilanguage_criterion,
         lr_decay_rate=args.lr_decay_rate, 
         lr_decay_interval=args.lr_decay_interval,
+        clip_grad=args.grad_clip,
+        early_stop=args.early_stop,
     )
     if args.eval_before_training:
         result, rs = trainer.evaluate_loaders(
@@ -282,10 +284,11 @@ if __name__ == '__main__':
         )
 
     trainer.fit(
-        train_loader=train_loader, 
-        valid_loaders=val_loaders, 
+        train_loader=train_loader,
+        # train_loader=val_loaders[0],
+        valid_loaders=val_loaders,
         lang_loaders=adapt_loaders,
-        nb_epochs=args.nb_epochs, 
-        early_stop=args.early_stop,
+        nb_epochs=args.nb_epochs,
         path=args.outpath,
+        valid_interval=args.valid_interval,
     )

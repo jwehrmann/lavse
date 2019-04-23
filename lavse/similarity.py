@@ -363,14 +363,19 @@ class Cosine(nn.Module):
         self.device = device
 
     def forward(self, img_embed, cap_embed, *args, **kwargs):
+        img_embed = l2norm(img_embed, dim=1)
+        cap_embed = l2norm(cap_embed, dim=1)
         return cosine_sim(img_embed, cap_embed)
 
 
+from timeit import default_timer as dt
+
 class Similarity(nn.Module): 
 
-    def __init__(self, similarity_name='cosine', **kwargs):
+    def __init__(self, device, similarity_name='cosine', **kwargs):
         super().__init__()
-        self.similarity = get_similarity_object(similarity_name, **kwargs)
+        self.device = device
+        self.similarity = get_similarity_object(similarity_name, device=device, **kwargs)
         logger.info(f'Created similarity: {similarity_name} with fn: {self.similarity}')
     
     def forward(self, img_embed, cap_embed, lens, shared=False):
@@ -381,11 +386,15 @@ class Similarity(nn.Module):
         """
         Computer pairwise i2t image-caption distance with locality sharding
         """
+
+        img_embed = img_embed.to(self.device)
+        cap_embed = cap_embed.to(self.device)
+
         import numpy as np
         n_im_shard = (len(img_embed)-1)//shared_size + 1
         n_cap_shard = (len(cap_embed)-1)//shared_size + 1
-
-        logger.debug('Calculating shared similarities')
+                
+        logger.debug('Calculating shared similarities') 
 
         d = torch.zeros(len(img_embed), len(cap_embed))
         for i in range(n_im_shard):
@@ -399,8 +408,16 @@ class Similarity(nn.Module):
                 s = cap_embed[cap_start:cap_end]
                 l = lens[cap_start:cap_end]
                 sim = self.forward(im, s, l)
+                np_sim = sim.data.cpu().numpy()                
+                
                 d[im_start:im_end, cap_start:cap_end] = sim
         logger.debug('Done computing shared similarities.')
+        np_d = d.data.cpu().numpy()
+        # print('Total Sim: {:9.5f} {:9.5f} {:9.5f} {:9.5f}'.format(
+        #     np_d.mean(), np_d.min(), np_d.max(), np_d.std())
+        # )
+
+
         return d
 
 
@@ -429,7 +446,7 @@ class StackedAttention(nn.Module):
     def __init__(
             self, i2t=True, agg_function='Mean',
             feature_norm='softmax', lambda_lse=None,
-            smooth=9, **kwargs,
+            smooth=4, **kwargs,
         ):
         super().__init__()
         self.i2t = i2t
@@ -466,6 +483,7 @@ class StackedAttention(nn.Module):
         similarities = []
         n_image = images.size(0)
         n_caption = captions.size(0)
+
         for i in range(n_caption):
             # Get the i-th text description
             n_word = cap_lens[i]

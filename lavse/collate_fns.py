@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 
+
 def default_padding(captions):
     lengths = [len(cap) for cap in captions]
     targets = torch.zeros(len(captions), max(lengths)).long()

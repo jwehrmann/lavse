@@ -17,6 +17,15 @@ from .evaluation import i2t, t2i
 from .loss import cosine_sim, cosine_sim_numpy
 from .utils import helper, layers, logger
 
+from torch.nn.utils.clip_grad import clip_grad_norm_
+import torch
+torch.manual_seed(0)
+
+
+import random 
+random.seed(0, version=2)
+
+
 
 class Trainer:
 
@@ -44,20 +53,31 @@ class Trainer:
         lr=1e-3, 
         lr_decay_rate=0.1, 
         lr_decay_interval=15,
+        clip_grad=2.,
+        log_histograms=True,
+        early_stop=50,
+        **kwargs
     ):
-        self.optimizer = optimizer(self.model.parameters(), lr)
+        self.optimizer = optimizer(self.model.parameters(), lr, **kwargs)
         self.mm_criterion = mm_criterion
         self.ml_criterion = ml_criterion
         self.initial_lr = lr
         self.lr_decay_rate = lr_decay_rate 
         self.lr_decay_interval = lr_decay_interval
+        self.clip_grad = clip_grad
+        self.log_histograms = log_histograms
+                
+        self.best_val = 0
+        self.count = early_stop
+        self.early_stop = early_stop
+
 
     def fit(
         self, train_loader, valid_loaders, lang_loaders=[],
-        nb_epochs=2000, early_stop=50, path='runs/',
-        log_interval=50,
+        nb_epochs=2000, path='runs/',
+        log_interval=50, valid_interval=500
     ):
-
+        self.path = path
         if self.optimizer is None:
             print('You forgot to setup_optim.')
             exit()
@@ -70,9 +90,6 @@ class Trainer:
         self.tb_writer = tb_writer
         # Path to store the best models
         self.best_model_path = Path(path) / Path('best_model.pkl')
-        
-        best_val = 0
-        count = early_stop
 
         self.train_iter = None 
         self.lang_iters = {}
@@ -99,51 +116,25 @@ class Trainer:
             # Train a single epoch
             self.train_epoch(
                 train_loader=train_loader,
-                lang_loaders=lang_loaders, 
-                epoch=epoch, 
+                lang_loaders=lang_loaders,
+                epoch=epoch,
                 log_interval=log_interval,
+                valid_loaders=valid_loaders,
+                valid_interval=valid_interval,
+                path=path,
             )
 
-            # Run evaluation
-            metrics, val_metric = self.evaluate_loaders(valid_loaders)
-
-            # Update early stop variables 
-            # and save checkpoint
-            if val_metric < best_val:
-                count -= 1
-            else:
-                count = early_stop
-                best_val = val_metric
-                self.save(path=path, is_best=True, args=self.args)
-            
-            # Log updates
-            self.train_logger.update('countdown', count, 0)
-            self.val_logger.update_dict(
-                metrics, epoch, count, path
-            )
-            # Update train and validation metrics on tensorboard
-            self.train_logger.tb_log(
-                tb_writer, step=epoch, prefix='train/',
-            )
-            self.val_logger.tb_log(
-                tb_writer, step=epoch, prefix='',
-            )
-
-            # Early stop
-            if count == 0:
-                self.sysoutlog('Early stop')
-                break
             
 
     def _forward_multimodal_loss(
         self, images, captions, lens
     ):
-        self.optimizer.zero_grad()            
+        self.optimizer.zero_grad()        
 
         img_emb, cap_emb = self.model(images, captions, lens)
+        
         sim_matrix = self.model.get_sim_matrix(img_emb, cap_emb, lens)
         loss = self.mm_criterion(sim_matrix)
-
         return loss
     
     def _forward_multilanguage_loss(
@@ -160,10 +151,11 @@ class Trainer:
 
     def train_epoch(
         self, train_loader, lang_loaders, 
-        epoch, log_interval=50
+        epoch, valid_loaders=[], log_interval=50, 
+        valid_interval=500, path=''
     ):
 
-        self.model.train()
+        # self.model.train()
         train_iter = DataIterator(
             loader=train_loader, 
             device=self.device,
@@ -177,27 +169,21 @@ class Trainer:
             for loader in lang_loaders
         ]
 
-        self.pbar.clear()
+        pbar = helper.reset_pbar(self.pbar)
         
-        while True:
-            
-            # Image-Caption Alignment update
-            try:
-                instance = train_iter.next()
-            # End of epoch
-            except StopIteration:
-                return True
-            
-            iteration = len(train_loader) * (epoch) + self.pbar.n
-            self.train_logger.update('iteration', iteration, 0)
-            self.train_logger.update('k', self.mm_criterion.k, 0)
-            
+        for instance in train_loader:
+            self.model.train()
+                    
             # Update progress bar
             self.pbar.update(1)
             self.optimizer.zero_grad()
 
             begin_forward = dt()
             images, captions, lens, ids = instance
+            
+            images = images.to(self.device)
+            captions = captions.to(self.device)
+            
             multimodal_loss = self._forward_multimodal_loss(
                 images, captions, lens
             )
@@ -210,25 +196,60 @@ class Trainer:
             
                 lang_loss = self._forward_multilanguage_loss(*lang_data)
                 total_lang_loss += lang_loss
-                self.train_logger.update(f'train_loss_{str(lang_iter)}', lang_loss, 1)
-            
-            self.train_logger.update('train_loss', multimodal_loss, 1)
+                self.train_logger.update(
+                    f'train_loss_{str(lang_iter)}', lang_loss, 1
+                )
             
             total_loss = multimodal_loss + total_lang_loss
             total_loss.backward()
-            
+
             for k, p in self.model.named_parameters():
                 if p.grad is None:
                     continue
                 self.tb_writer.add_scalar(
-                    f'params/{k}', 
+                    f'grads/{k}', 
                     p.grad.data.norm(2).item(), 
-                    self.ml_criterion.iteration,
+                    self.mm_criterion.iteration,
                 )
 
+            # print('Iter s{}'.format(self.mm_criterion.iteration))
+            # for k, v in self.model.txt_enc.named_parameters():
+            #     print('{:35s}: {:8.5f}, {:8.5f}, {:8.5f}, {:8.5f}'.format(
+            #         k, v.data.cpu().min().numpy(), 
+            #         v.data.cpu().mean().numpy(),
+            #         v.data.cpu().max().numpy(),
+            #         v.data.cpu().std().numpy(),
+            #     ))
+            # for k, v in self.model.img_enc.named_parameters():
+            #     print('{:35s}: {:8.5f}, {:8.5f}, {:8.5f}, {:8.5f}'.format(                k, v.data.cpu().min().numpy(), 
+            #         v.data.cpu().mean().numpy(),
+            #         v.data.cpu().max().numpy(),
+            #         v.data.cpu().std().numpy(),
+            #     ))
+            # for k, p in self.model.txt_enc.named_parameters():
+            #     if p.grad is None:
+            #         continue
+            #     print('{:35s}: {:8.5f}'.format(k, p.grad.data.norm(2).item(),))
+            
+            # for k, p in self.model.img_enc.named_parameters():
+            #     if p.grad is None:
+            #         continue
+            #     print('{:35s}: {:8.5f}'.format(k, p.grad.data.norm(2).item(),))
+
+            # print('\n\n')
+
+            if self.clip_grad > 0:
+                clip_grad_norm_(self.model.parameters(), self.clip_grad)                    
+            
             self.optimizer.step()
             end_backward = dt()
 
+            self.train_logger.update('train_loss', multimodal_loss, 1)
+            self.train_logger.update('total_loss', total_loss, 1)
+            self.train_logger.update(
+                'iteration', self.mm_criterion.iteration, 0
+            )
+            self.train_logger.update('k', self.mm_criterion.k, 0)
             self.train_logger.update(
                 'batch_time', end_backward-begin_forward, 1
             )
@@ -236,81 +257,122 @@ class Trainer:
             if self.pbar.n % log_interval == 0:
                 self.sysoutlog(f'{self.train_logger}')
 
-    def predict_loader(self, loader):
+                if self.log_histograms:
+                    for k, p in self.model.named_parameters():
+                        self.tb_writer.add_histogram(
+                            f'params/{k}', 
+                            p.data, 
+                            self.mm_criterion.iteration,
+                        )
+
+            self.train_logger.tb_log(
+                self.tb_writer, 
+                step=self.mm_criterion.iteration, prefix='train/',
+            )
+
+            if self.mm_criterion.iteration % valid_interval == 0:
+                # Run evaluation
+                metrics, val_metric = self.evaluate_loaders(valid_loaders)
+
+                # Update early stop variables 
+                # and save checkpoint
+                if val_metric < self.best_val:
+                    self.count -= 1
+                else:
+                    self.count = self.early_stop
+                    self.best_val = val_metric
+                    self.save(path=self.path, is_best=True, args=self.args)
+                
+                # Log updates
+                self.train_logger.update('countdown', self.count, 0)
+                self.val_logger.update_dict(
+                    metrics,
+                    self.mm_criterion.iteration,
+                    self.mm_criterion.iteration,
+                    self.path,
+                )
+                # Update train and validation metrics on tensorboard
+                # self.train_logger.tb_log(
+                #     tb_writer, step=epoch, prefix='train/',
+                # )
+                self.val_logger.tb_log(
+                    self.tb_writer, 
+                    step=self.mm_criterion.iteration, 
+                    prefix='',
+                )
+
+                # Early stop
+                if self.count == 0:
+                    self.sysoutlog('Early stop')
+                    break
+            
+    def predict_loader(self, data_loader):
         self.model.eval()
 
-        n = loader.dataset.length        
 
-        test_iter = DataIterator(loader, device=self.device)
+        # np array to keep all the embeddings
+        img_embs = None
+        cap_embs = None
+        cap_lens = None
+        
+        max_n_word = 0
+        for i, (images, captions, lengths, ids) in enumerate(data_loader):
+            max_n_word = max(max_n_word, max(lengths))
 
-        images, captions, lens, ids = test_iter.next()
-        img_emb, txt_emb = self.model(images, captions, lens)
-
-        maxlen = max([len(x) for x in loader.dataset.captions])
-        assert len(img_emb.shape) == len(txt_emb.shape)
-
-        all_lens = []
-        if len(img_emb.shape) == 3:
-            img_embeddings = torch.zeros(n, *img_emb.shape[1:])
-            text_embeddings = torch.zeros(n, maxlen, txt_emb.shape[-1])            
-
-            # Assign first batch
-            img_embeddings[ids] = img_emb.cpu()
-            for cap, id, l in zip(txt_emb, ids, lens):
-                text_embeddings[id,:l] = cap.cpu()[:l]
-            all_lens.extend(lens)
-
-        elif len(img_emb.shape) == 2:
-            img_embeddings = torch.zeros(n, img_emb.shape[-1])
-            text_embeddings = torch.zeros(n, txt_emb.shape[-1])
-
-            img_embeddings[ids] = img_emb.cpu()
-            text_embeddings[ids] = txt_emb.cpu()            
-        else: 
-            print(f'FATAL: wrong embedding shape {img_emb.shape}')
-            exit()
-
-        with torch.no_grad():
-           while True:
-                try:
-                    images, captions, lens, ids = test_iter.next()
-                    img_emb, txt_emb = self.model(images, captions, lens)
-                    img_embeddings[ids] = img_emb.cpu()
-                    if len(img_embeddings.shape) == 3:
-                        for cap, id, l in zip(txt_emb, ids, lens):
-                            text_embeddings[id,:l] = cap.cpu()[:l]
-                    else:
-                        text_embeddings[ids] = txt_emb.cpu()
-                    all_lens.extend(lens)
-                except StopIteration:
-                    break
+        for i, (images, captions, lengths, ids) in enumerate(data_loader):
+            
+            images = images.to(self.device)
+            captions = captions.to(self.device)
+            # compute the embeddings
+            img_emb, cap_emb = self.model(images, captions, lengths)
+            
+            if img_embs is None:
+                if img_emb.dim() == 3:
+                    img_embs = np.zeros((len(data_loader.dataset), img_emb.size(1), img_emb.size(2)))
+                else:
+                    img_embs = np.zeros((len(data_loader.dataset), img_emb.size(1)))
+                cap_embs = np.zeros((len(data_loader.dataset), max_n_word, cap_emb.size(2)))
+                cap_lens = [0] * len(data_loader.dataset)
+            # cache embeddings
+            img_embs[ids] = img_emb.data.cpu().numpy().copy()
+            cap_embs[ids,:max(lengths),:] = cap_emb.data.cpu().numpy().copy()
+            for j, nid in enumerate(ids):
+                cap_lens[nid] = lengths[j]
+            
+            del images, captions
+                
         # Remove image feature redundancy
-        if img_embeddings.shape[0] == text_embeddings.shape[0]:
-            img_embeddings = img_embeddings[
+        if img_embs.shape[0] == cap_embs.shape[0]:
+            img_embs = img_embs[
                 np.arange(
                     start=0,
-                    stop=img_embeddings.shape[0], 
+                    stop=img_embs.shape[0], 
                     step=5).astype(np.int),
             ]
-        return img_embeddings, text_embeddings, all_lens
+
+        return img_embs, cap_embs, cap_lens
     
     def evaluate(self, loader,):        
         _metrics_ = ('r1', 'r5', 'r10', 'medr', 'meanr')
 
         begin_pred = dt()
         img_emb, txt_emb, lengths = self.predict_loader(loader)
+
+        img_emb = torch.FloatTensor(img_emb).to(self.device)
+        txt_emb = torch.FloatTensor(txt_emb).to(self.device)
+
         end_pred = dt()
         with torch.no_grad():
             sims = self.model.get_sim_matrix_shared(
                 embed_a=img_emb, embed_b=txt_emb, 
-                lens=lengths, shared_size=256
+                lens=lengths, shared_size=128
             )
             # sims = self.model.get_sim_matrix(
             #     embed_a=img_emb, embed_b=txt_emb, 
             #     lens=lengths,
             # )
             sims = layers.tensor_to_numpy(sims)
-        end_sim = dt()
+        end_sim = dt()        
 
         i2t_metrics = i2t(sims)
         t2i_metrics = t2i(sims)

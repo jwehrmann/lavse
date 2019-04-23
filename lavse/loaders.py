@@ -39,19 +39,35 @@ class PrecompDataset(Dataset):
         img_features_file = self.full_path / f'{data_split}_ims.npy'
         self.images = np.load(img_features_file)
         self.length = len(self.captions)
+        
+        if data_split == 'dev':
+            self.length = 5000
 
         logger.debug(f'Read feature file. Shape: {len(self.images.shape)}')
 
         # Each image must have five captions 
         assert (
-            self.images.shape[0] == self.length 
-            or self.images.shape[0]*5 == self.length
-        ) 
-        # Kiros code has redundancy in img feat
-        if self.images.shape[0] != self.length:
+            self.images.shape[0] == len(self.captions)
+            or self.images.shape[0]*5 == len(self.captions)
+        )         
+        
+        if self.images.shape[0] != len(self.captions):
             self.im_div = 5
         else:
             self.im_div = 1
+        # the development set for coco is large and so validation would be slow
+        if data_split == 'dev':
+            self.length = 5000
+        print('Image div', self.im_div)        
+        
+        logger.info('Precomputing captions')
+        self.precomp_captions =  [
+            self.tokenizer(x)
+            for x in self.captions
+        ]
+
+        self.maxlen = max([len(x) for x in self.precomp_captions])
+        logger.info(f'Maxlen {self.maxlen}')
         
         logger.info((
             f'Loaded PrecompDataset {self.data_name}/{self.data_split} with '
@@ -66,11 +82,11 @@ class PrecompDataset(Dataset):
         img_id = index//self.im_div
         image = self.images[img_id]
         image = torch.FloatTensor(image)
+        
+        caption = self.precomp_captions[index]
+        # tokens = self.tokenizer(caption)
 
-        caption = self.captions[index]
-        tokens = self.tokenizer(caption)
-
-        return image, tokens, index, img_id
+        return image, caption, index, img_id
 
     def __len__(self):
         return self.length

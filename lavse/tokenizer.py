@@ -58,12 +58,12 @@ class Tokenizer(object):
         vocab = Vocabulary()
         vocab.add_word('<pad>')
         vocab.add_word('<unk>')
+        vocab.add_word('<start>')
+        vocab.add_word('<end>')
 
         if char_level:
             vocab.add_word(' ') # Space is allways #2
 
-        # vocab.add_word('<start>')
-        # vocab.add_word('<end>')
         self.vocab = vocab
 
         if download_tokenizer:
@@ -140,7 +140,11 @@ class Tokenizer(object):
         tokens = self.split_sentence(sentence)
         if self.char_level:
             tokens = ' '.join(tokens)
-        tokens = self.tokens_to_int(tokens) 
+        tokens = (
+            [self.vocab('<start>')] 
+            + self.tokens_to_int(tokens) 
+            + [self.vocab('<end>')]
+        )
         return torch.LongTensor(tokens)
 
     def decode_tokens(self, tokens):

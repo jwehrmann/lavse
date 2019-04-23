@@ -11,6 +11,18 @@ _image_encoders = {
             'img_dim': 2048,
         },
     },
+    'sa': {
+        'class': precomp.SAImgEncoder, 
+        'args': {
+            'img_dim': 2048,
+        },
+    },
+    'sagru': {
+        'class': precomp.SAGRUImgEncoder, 
+        'args': {
+            'img_dim': 2048,
+        },
+    },
     'scan': {
         'class': precomp.SCANImagePrecomp, 
         'args': {

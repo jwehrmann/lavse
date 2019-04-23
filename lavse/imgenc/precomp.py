@@ -6,6 +6,8 @@ import torch.nn as nn
 from ..utils.layers import default_initializer, l1norm, l2norm
 from ..layers import attention, convblocks
 
+import numpy as np 
+
 
 def load_state_dict_with_replace(state_dict, own_state):
     new_state = OrderedDict()
@@ -23,12 +25,20 @@ class SCANImagePrecomp(nn.Module):
         self.no_imgnorm = no_imgnorm        
         self.fc = nn.Linear(img_dim, latent_size)
 
-        self.apply(default_initializer)
+        self.init_weights()
+
+    def init_weights(self):
+        """Xavier initialization for the fully connected layer
+        """
+        r = np.sqrt(6.) / np.sqrt(self.fc.in_features +
+                                  self.fc.out_features)
+        self.fc.weight.data.uniform_(-r, r)
+        self.fc.bias.data.fill_(0)
 
     def forward(self, images):
         """Extract image feature vectors."""
         # assuming that the precomputed features are already l2-normalized
-
+        
         features = self.fc(images)
 
         # normalize in the joint embedding space
@@ -137,4 +147,137 @@ class HierarchicalEncoder(nn.Module):
         )
 
         super(HierarchicalEncoder, self).load_state_dict(new_state)
+
+
+
+class SAImgEncoder(nn.Module):
+
+    def __init__(
+            self, img_dim, latent_size,
+        ):
+        super(SAImgEncoder, self).__init__()
+        self.latent_size = latent_size
+        
+        self.sa1 = attention.SelfAttention(img_dim, nn.LeakyReLU(0.1))
+        self.sa2 = attention.SelfAttention(latent_size, nn.LeakyReLU(0.1))
+        self.sa3 = attention.SelfAttention(latent_size, nn.LeakyReLU(0.1))
+        self.sa4 = attention.SelfAttention(latent_size, activation=lambda x: x)
+
+        self.fc1 = nn.Sequential(*[
+            nn.Conv1d(img_dim, latent_size, 1,),
+            nn.LeakyReLU(0.1, ),
+        ])
+        # self.fc2 = nn.Sequential(*[
+        #     nn.Conv1d(latent_size, latent_size, 1,),
+        #     nn.LeakyReLU(0.1, ),
+        # ])
+        # self.fc3 = nn.Sequential(*[
+        #     nn.Conv1d(latent_size, latent_size, 1,),
+        #     nn.LeakyReLU(0.1, ),
+        # ])
+
+        self.apply(default_initializer)
+
+    def forward(self, images):
+        """Extract image feature vectors."""
+        x = images.permute(0, 2, 1)
+
+        a = self.fc1(self.sa1(x))
+        # print(x.shape)
+
+        b = self.sa2(a)
+        # print(x.shape)
+        b = b + a
+        c = self.sa2(b)
+        c = c + b
+        
+        d = self.sa3(b)
+        x = d + c
+        
+        # c = self.fc3(self.sa3(b))
+        # x = c + b
+        
+        x = x.permute(0, 2, 1)
+
+        return x
+
+    def load_state_dict(self, state_dict):
+        """Copies parameters. overwritting the default one to
+        accept state_dict from Full model
+        """
+        new_state = load_state_dict_with_replace(
+            state_dict=state_dict, own_state=self.state_dict()
+        )
+
+        super(SAImgEncoder, self).load_state_dict(new_state)
+
+
+
+class SAGRUImgEncoder(nn.Module):
+
+    def __init__(
+            self, img_dim, latent_size,
+        ):
+        super(SAGRUImgEncoder, self).__init__()
+        self.latent_size = latent_size
+        
+        self.proj = nn.Conv1d(img_dim, latent_size, 1, )
+        self.sa1 = attention.SelfAttention(latent_size, nn.LeakyReLU(0.1))
+        self.sa2 = attention.SelfAttention(latent_size, nn.LeakyReLU(0.1))
+
+        self.gru = nn.GRU(latent_size, latent_size, 1, 
+            batch_first=True, bidirectional=True)
+
+        self.projection = nn.Sequential(*[
+            nn.Conv1d(1024*2, latent_size, 1, ),
+            nn.LeakyReLU(0.1, ),
+        ])
+
+        # self.fc2 = nn.Sequential(*[
+        #     nn.Conv1d(latent_size, latent_size, 1,),
+        #     nn.LeakyReLU(0.1, ),
+        # ])
+        # self.fc3 = nn.Sequential(*[
+        #     nn.Conv1d(latent_size, latent_size, 1,),
+        #     nn.LeakyReLU(0.1, ),
+        # ])
+
+        self.apply(default_initializer)
+
+    def forward(self, images):
+        """Extract image feature vectors."""
+        x = self.proj(images.permute(0, 2, 1))
+        
+        feat = self.sa1(x)
+
+        a, _ = self.gru(feat.permute(0, 2, 1))
+
+        b, t, d = a.shape
+        a = a.view(b, t, 2, d//2).mean(-2)
+
+        a = a.permute(0, 2, 1)
+        # print(x.shape)
+        b = self.sa2(a)
+        
+        x = torch.cat([feat, b], dim=1)
+        x = self.projection(x)
+        # c = self.fc3(self.sa3(b))
+        # x = c + b
+        
+        x = x.permute(0, 2, 1)
+
+        # if not self.no_txtnorm:
+        x = l2norm(x, dim=-1)
+
+        return x
+
+    def load_state_dict(self, state_dict):
+        """Copies parameters. overwritting the default one to
+        accept state_dict from Full model
+        """
+        new_state = load_state_dict_with_replace(
+            state_dict=state_dict, own_state=self.state_dict()
+        )
+
+        super(SAGRUImgEncoder, self).load_state_dict(new_state)
 
