@@ -1,3 +1,5 @@
+from timeit import default_timer as dt
+
 import torch
 from addict import Dict
 from torch import nn
@@ -8,6 +10,9 @@ from .loss import cosine_sim
 from .txtenc.pooling import mean_pooling
 from .utils.layers import l2norm
 from .utils.logger import get_logger
+from .utils import helper
+
+from tqdm import tqdm
 
 logger = get_logger()
 
@@ -17,7 +22,7 @@ class XAttn(nn.Module):
     def __init__(self, dim=1024, k=8, smooth=4):
         super().__init__()
         self.dim = dim
-        self.k = k 
+        self.k = k
         self.gamma = nn.Parameter(torch.zeros(1))
         self.smooth = smooth
 
@@ -37,14 +42,14 @@ class XAttn(nn.Module):
                 x attn : torch.Size([128, 36, 4])
                 output : torch.Size([128, 1024, 4])
 
-        '''        
-        # print('\n\n\n')        
+        '''
+        # print('\n\n\n')
         # print('query_a:', query_a.shape)
         # print('value_a:', value_a.shape)
         # print('key_b  :', key_b.shape)
-        
+
         energy_cross = torch.bmm(query_a, key_b)
-        cross_attention = nn.Softmax(dim=-1)(energy_cross * self.smooth)        
+        cross_attention = nn.Softmax(dim=-1)(energy_cross * self.smooth)
 
         output = torch.bmm(value_a, cross_attention)
         output = self.gamma + output + value_b
@@ -58,29 +63,29 @@ class CrossAttn(nn.Module):
             self, device, latent_size=1024, k=8
         ):
         super().__init__()
-        
+
         self.device = device
 
         self.query_conv_img = nn.Sequential(
             nn.Conv1d(
-                in_channels=latent_size, 
-                out_channels=latent_size//k, 
+                in_channels=latent_size,
+                out_channels=latent_size//k,
                 kernel_size=1,
             ),
             nn.LeakyReLU(0.1, inplace=True),
         )
         self.key_conv_img = nn.Sequential(
             nn.Conv1d(
-                in_channels=latent_size, 
-                out_channels=latent_size//k, 
+                in_channels=latent_size,
+                out_channels=latent_size//k,
                 kernel_size=1,
             ),
             nn.LeakyReLU(0.1, inplace=True),
         )
         self.value_conv_img = nn.Sequential(
             nn.Conv1d(
-                in_channels=latent_size, 
-                out_channels=latent_size, 
+                in_channels=latent_size,
+                out_channels=latent_size,
                 kernel_size=1,
             ),
             nn.LeakyReLU(0.1, inplace=True),
@@ -89,24 +94,24 @@ class CrossAttn(nn.Module):
 
         self.query_conv_txt = nn.Sequential(
             nn.Conv1d(
-                in_channels=latent_size, 
-                out_channels=latent_size//k, 
+                in_channels=latent_size,
+                out_channels=latent_size//k,
                 kernel_size=1,
             ),
             nn.LeakyReLU(0.1, inplace=True),
         )
         self.key_conv_txt = nn.Sequential(
             nn.Conv1d(
-                in_channels=latent_size, 
-                out_channels=latent_size//k, 
+                in_channels=latent_size,
+                out_channels=latent_size//k,
                 kernel_size=1,
             ),
             nn.LeakyReLU(0.1, inplace=True),
         )
         self.value_conv_txt = nn.Sequential(
             nn.Conv1d(
-                in_channels=latent_size, 
-                out_channels=latent_size, 
+                in_channels=latent_size,
+                out_channels=latent_size,
                 kernel_size=1,
             ),
             nn.LeakyReLU(0.1, inplace=True),
@@ -114,7 +119,7 @@ class CrossAttn(nn.Module):
 
         self.gamma_img = nn.Parameter(torch.zeros(1))
         self.gamma_txt = nn.Parameter(torch.zeros(1))
-        
+
         self.alpha = nn.Parameter(torch.ones(1))
         self.beta = nn.Parameter(torch.zeros(1))
 
@@ -124,7 +129,7 @@ class CrossAttn(nn.Module):
         # B, 1024, 36
         img_embed = img_embed.permute(0, 2, 1).to(self.device)
         cap_embed = cap_embed.permute(0, 2, 1).to(self.device)
-        
+
         # B, 36, 128
         query_img = self.query_conv_img(img_embed).permute(0, 2, 1)
         # B, 128, 36
@@ -138,10 +143,10 @@ class CrossAttn(nn.Module):
         key_txt = self.key_conv_img(cap_embed)
 
         # B, 1024, 36
-        value_img = self.value_conv_img(img_embed)        
+        value_img = self.value_conv_img(img_embed)
         # B, 1024, T
         value_txt = self.value_conv_txt(cap_embed)
-        
+
         sims = torch.zeros(img_embed.shape[0], cap_embed.shape[0]).to(self.device)
         for i, cap in enumerate(cap_embed):
             n_words = lens[i]
@@ -152,7 +157,7 @@ class CrossAttn(nn.Module):
             # energy   : B, T, 36
             energy_cross = torch.bmm(query_t, key_img) * self.alpha + self.beta
             cross_attention = self.softmax(energy_cross)
-            value_t = torch.stack([value_txt[i][:,:n_words]] * len(key_img), 0)            
+            value_t = torch.stack([value_txt[i][:,:n_words]] * len(key_img), 0)
 
             img_output = torch.bmm(value_t, cross_attention)
             img_output = self.gamma_img * img_output + value_img
@@ -161,7 +166,7 @@ class CrossAttn(nn.Module):
             img_vector = l2norm(img_vector, dim=-1)
             cap_vector = cap[:,:n_words].mean(1)
             cap_vector = l2norm(cap_vector, dim=-1)
-            sim = cosine_sim(img_vector, cap_vector.unsqueeze(0)).squeeze(-1)            
+            sim = cosine_sim(img_vector, cap_vector.unsqueeze(0)).squeeze(-1)
             sims[:,i] = sim
 
         return sims
@@ -172,29 +177,29 @@ class CrossAttn(nn.Module):
 #             self, device, latent_size=1024, k=8
 #         ):
 #         super().__init__()
-        
+
 #         self.device = device
 
 #         self.query_conv_img = nn.Sequential(
 #             nn.Conv1d(
-#                 in_channels=latent_size, 
-#                 out_channels=latent_size//k, 
+#                 in_channels=latent_size,
+#                 out_channels=latent_size//k,
 #                 kernel_size=1,
 #             ),
 #             nn.LeakyReLU(0.1, inplace=True),
 #         )
 #         self.key_conv_img = nn.Sequential(
 #             nn.Conv1d(
-#                 in_channels=latent_size, 
-#                 out_channels=latent_size//k, 
+#                 in_channels=latent_size,
+#                 out_channels=latent_size//k,
 #                 kernel_size=1,
 #             ),
 #             nn.LeakyReLU(0.1, inplace=True),
 #         )
 #         self.value_conv_img = nn.Sequential(
 #             nn.Conv1d(
-#                 in_channels=latent_size, 
-#                 out_channels=latent_size, 
+#                 in_channels=latent_size,
+#                 out_channels=latent_size,
 #                 kernel_size=1,
 #             ),
 #             nn.LeakyReLU(0.1, inplace=True),
@@ -203,24 +208,24 @@ class CrossAttn(nn.Module):
 
 #         self.query_conv_txt = nn.Sequential(
 #             nn.Conv1d(
-#                 in_channels=latent_size, 
-#                 out_channels=latent_size//k, 
+#                 in_channels=latent_size,
+#                 out_channels=latent_size//k,
 #                 kernel_size=1,
 #             ),
 #             nn.LeakyReLU(0.1, inplace=True),
 #         )
 #         self.key_conv_txt = nn.Sequential(
 #             nn.Conv1d(
-#                 in_channels=latent_size, 
-#                 out_channels=latent_size//k, 
+#                 in_channels=latent_size,
+#                 out_channels=latent_size//k,
 #                 kernel_size=1,
 #             ),
 #             nn.LeakyReLU(0.1, inplace=True),
 #         )
 #         self.value_conv_txt = nn.Sequential(
 #             nn.Conv1d(
-#                 in_channels=latent_size, 
-#                 out_channels=latent_size, 
+#                 in_channels=latent_size,
+#                 out_channels=latent_size,
 #                 kernel_size=1,
 #             ),
 #             nn.LeakyReLU(0.1, inplace=True),
@@ -228,7 +233,7 @@ class CrossAttn(nn.Module):
 
 #         self.gamma_img = nn.Parameter(torch.zeros(1))
 #         self.gamma_txt = nn.Parameter(torch.zeros(1))
-        
+
 #         self.alpha = nn.Parameter(torch.ones(1))
 #         self.beta = nn.Parameter(torch.zeros(1))
 
@@ -239,7 +244,7 @@ class CrossAttn(nn.Module):
 #         # B, 1024, 36
 #         img_embed = img_embed.permute(0, 2, 1).to(self.device)
 #         cap_embed = cap_embed.permute(0, 2, 1).to(self.device)
-        
+
 #         # B, 36, 128
 #         query_img = self.query_conv_img(img_embed).permute(0, 2, 1)
 #         # B, 128, 36
@@ -253,10 +258,10 @@ class CrossAttn(nn.Module):
 #         key_txt = self.key_conv_img(cap_embed)
 
 #         # B, 1024, 36
-#         value_img = self.value_conv_img(img_embed)        
+#         value_img = self.value_conv_img(img_embed)
 #         # B, 1024, T
 #         value_txt = self.value_conv_txt(cap_embed)
-        
+
 #         sims = torch.zeros(img_embed.shape[0], cap_embed.shape[0]).to(self.device)
 #         for i, cap in enumerate(cap_embed):
 #             # n_words = lens[i]
@@ -267,7 +272,7 @@ class CrossAttn(nn.Module):
 #             # # energy   : B, T, 36
 #             # energy_cross = torch.bmm(query_t, key_img) * self.alpha + self.beta
 #             # cross_attention = self.softmax(energy_cross)
-#             # value_t = torch.stack([value_txt[i][:,:n_words]] * len(key_img), 0)            
+#             # value_t = torch.stack([value_txt[i][:,:n_words]] * len(key_img), 0)
 
 #             # img_output = torch.bmm(value_t, cross_attention)
 #             # img_output = self.gamma_img * img_output + value_img
@@ -289,14 +294,14 @@ class CrossAttn(nn.Module):
 #             # img_output = self.gamma_img * img_output + value_img
 
 #             img_output = self.i2t_attention(
-#                 query_a=query_t, value_a=value_t, 
+#                 query_a=query_t, value_a=value_t,
 #                 key_b=key_img, value_b=value_img
 #             )
 #             txt_output = self.i2t_attention(
-#                 query_a=query_img, value_a=value_img, 
+#                 query_a=query_img, value_a=value_img,
 #                 key_b=key_t, value_b=value_t
 #             )[0]
-            
+
 #             img_vector = img_output.mean(-1)
 #             img_vector = l2norm(img_vector, dim=-1)
 #             cap_vector = txt_output.mean(-1).unsqueeze(0)
@@ -325,30 +330,30 @@ class CondBatchNorm1d(nn.Module):
             nn.ReLU(inplace=True),
             nn.Linear(in_features//k, in_features),
         )
-    
+
     def forward(self, feat_matrix, cond_vector):
         '''
-        Forward conditional bachnorm using 
-        predicted gamma and beta returning 
+        Forward conditional bachnorm using
+        predicted gamma and beta returning
         the normalized input matrix
-        
+
         Arguments:
-            feat_matrix {torch.FloatTensor} 
+            feat_matrix {torch.FloatTensor}
                 -- shape: batch, features, timesteps
-            cond_vector {torch.FloatTensor} 
+            cond_vector {torch.FloatTensor}
                 -- shape: batch, features
-        
+
         Returns:
-            torch.FloatTensor 
+            torch.FloatTensor
                 -- shape: batch, features, timesteps
         '''
 
-        _, D = cond_vector.shape
-        
-        gammas = self.fc_gamma(cond_vector).view(1, D, 1)
-        betas  = self.fc_beta(cond_vector).view(1, D, 1)
+        B, D = cond_vector.shape
 
-        norm_feat = self.bn(feat_matrix)            
+        gammas = self.fc_gamma(cond_vector).view(B, D, 1)
+        betas  = self.fc_beta(cond_vector).view(B, D, 1)
+
+        norm_feat = self.bn(feat_matrix)
         normalized = norm_feat * (gammas + 1) + betas
         return normalized
 
@@ -359,19 +364,20 @@ class AdaptiveEmbedding(nn.Module):
             self, device, latent_size=1024, k=8,
         ):
         super().__init__()
-        
+
         self.device = device
 
-        # self.fc = nn.Conv1d(latent_size, latent_size*2, 1).to(device)        
+        # self.fc = nn.Conv1d(latent_size, latent_size*2, 1).to(device)
 
         self.cbn_img = CondBatchNorm1d(latent_size, k)
-        # self.cbn_txt = CondBatchNorm1d(latent_size, k)
+        self.cbn_txt = CondBatchNorm1d(latent_size, k)
 
         # self.alpha = nn.Parameter(torch.ones(1))
         # self.beta = nn.Parameter(torch.zeros(1))
 
         self.softmax = nn.Softmax(dim=-1)
         self.norm = ClippedL2Norm()
+        self.task = 't2i'
 
     def forward(self, img_embed, cap_embed, lens, **kwargs):
         '''
@@ -381,8 +387,9 @@ class AdaptiveEmbedding(nn.Module):
         # (B, 1024, T)
         cap_embed = cap_embed.permute(0, 2, 1).to(self.device)
         img_embed = img_embed.permute(0, 2, 1).to(self.device)
-        
-        # img_vector = img_embed.mean(-1)
+
+        # (B, 1024)
+        img_vectors = img_embed.mean(-1)
 
         # cap_embed = self.norm(cap_embed)
         # img_embed = self.norm(img_embed)
@@ -391,20 +398,32 @@ class AdaptiveEmbedding(nn.Module):
             img_embed.shape[0], cap_embed.shape[0]
         ).to(self.device)
 
-        for i, cap in enumerate(cap_embed):
+        for i, cap_tensor in enumerate(cap_embed):
             n_words = lens[i]
             # cap: 1024, T
             # img: 1024, 36
-            cap = cap[:,:n_words].mean(-1).unsqueeze(0)
 
-            img_output = self.cbn_img(img_embed, cap)
+            cap_repr = cap_tensor[:,:n_words].mean(-1).unsqueeze(0)
+
+            img_output = self.cbn_img(img_embed, cap_repr)
             img_vector = img_output.mean(-1)
+
             img_vector = l2norm(img_vector, dim=-1)
-            cap_vector = cap
+            cap_vector = cap_repr
             cap_vector = l2norm(cap_vector, dim=-1)
 
             sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
             sims[:,i] = sim
+
+            if self.task == 'i2t':
+
+                cap_i_expand = cap_tensor.repeat(img_vectors.shape[0], 1, 1)
+                txt_output = self.cbn_txt(cap_i_expand, img_vectors).mean(-1, keepdim=True)
+
+                sim = cosine_similarity(
+                    img_vectors.unsqueeze(2), txt_output, 1,
+                )
+                sims[:,i] = (sims[:,i] + sim) / 2.
 
         return sims
 
@@ -415,7 +434,7 @@ class ExcEmbedding(nn.Module):
             self, device, latent_size=1024, k=8,
         ):
         super().__init__()
-        
+
         self.device = device
 
         self.squeeze = nn.Sequential(*[
@@ -423,7 +442,7 @@ class ExcEmbedding(nn.Module):
             # nn.BatchNorm1d(latent_size//k),
             nn.ReLU(inplace=True),
         ])
-        
+
         self.excite = nn.Sequential(*[
             nn.Linear(latent_size//k, latent_size),
             nn.Sigmoid(),
@@ -434,7 +453,7 @@ class ExcEmbedding(nn.Module):
         self.norm = ClippedL2Norm()
 
 
-    def forward(self, img_embed, cap_embed, lens, **kwargs):        
+    def forward(self, img_embed, cap_embed, lens, **kwargs):
         '''
             img_embed: (B, 36, latent_size)
             cap_embed: (B, T, latent_size)
@@ -459,12 +478,12 @@ class ExcEmbedding(nn.Module):
             cap = cap[:,:n_words].mean(-1).unsqueeze(0)
             gate = self.excite(self.squeeze(cap))
             img_vector = img_vectors * gate + self.beta
-                        
+
             img_vector = l2norm(img_vector, dim=-1)
             cap_vector = cap
-            cap_vector = l2norm(cap_vector, dim=-1)            
+            cap_vector = l2norm(cap_vector, dim=-1)
 
-            sim = cosine_sim(img_vector, cap_vector).squeeze(-1)            
+            sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
             sims[:,i] = sim
 
         return sims
@@ -482,21 +501,20 @@ class Cosine(nn.Module):
         return cosine_sim(img_embed, cap_embed)
 
 
-from timeit import default_timer as dt
-
-class Similarity(nn.Module): 
+class Similarity(nn.Module):
 
     def __init__(self, device, similarity_name='cosine', **kwargs):
         super().__init__()
         self.device = device
         self.similarity = get_similarity_object(similarity_name, device=device, **kwargs)
         logger.info(f'Created similarity: {similarity_name} with fn: {self.similarity}')
-    
+        self.pbar = tqdm(total=0, desc='Test  ')
+
     def forward(self, img_embed, cap_embed, lens, shared=False):
-        logger.debug(f'Similarity - img_shape: {img_embed.shape} cap_shape: {cap_embed.shape}')        
+        logger.debug(f'Similarity - img_shape: {img_embed.shape} cap_shape: {cap_embed.shape}')
         return self.similarity(img_embed, cap_embed, lens)
-    
-    def forward_shared(self, img_embed, cap_embed, lens, shared_size=128):    
+
+    def forward_shared(self, img_embed, cap_embed, lens, shared_size=128):
         """
         Computer pairwise i2t image-caption distance with locality sharding
         """
@@ -504,34 +522,28 @@ class Similarity(nn.Module):
         img_embed = img_embed.to(self.device)
         cap_embed = cap_embed.to(self.device)
 
-        import numpy as np
         n_im_shard = (len(img_embed)-1)//shared_size + 1
         n_cap_shard = (len(cap_embed)-1)//shared_size + 1
-                
-        logger.debug('Calculating shared similarities') 
 
-        d = torch.zeros(len(img_embed), len(cap_embed))
+        logger.debug('Calculating shared similarities')
+
+        self.pbar = helper.reset_pbar(self.pbar)
+        self.pbar.total = (n_im_shard * n_cap_shard) + 1
+
+        d = torch.zeros(len(img_embed), len(cap_embed)).to(self.device)
         for i in range(n_im_shard):
             im_start, im_end = shared_size*i, min(shared_size*(i+1), len(img_embed))
             for j in range(n_cap_shard):
-                logger.info(
-                    f'Shared forward batch ({i+1}/{n_im_shard},{j+1}/{n_cap_shard})'
-                )
                 cap_start, cap_end = shared_size*j, min(shared_size*(j+1), len(cap_embed))
                 im = img_embed[im_start:im_end]
                 s = cap_embed[cap_start:cap_end]
                 l = lens[cap_start:cap_end]
                 sim = self.forward(im, s, l)
-                np_sim = sim.data.cpu().numpy()                
-                
+
                 d[im_start:im_end, cap_start:cap_end] = sim
+                self.pbar.update(1)
+
         logger.debug('Done computing shared similarities.')
-        np_d = d.data.cpu().numpy()
-        # print('Total Sim: {:9.5f} {:9.5f} {:9.5f} {:9.5f}'.format(
-        #     np_d.mean(), np_d.min(), np_d.max(), np_d.std())
-        # )
-
-
         return d
 
 
@@ -550,27 +562,27 @@ class ClippedL2Norm(nn.Module):
     def __init__(self, ):
         super().__init__()
         self.leaky = nn.LeakyReLU(0.1)
-        
+
     def forward(self, x):
-        return l2norm(self.leaky(x), 2)        
+        return l2norm(self.leaky(x), 2)
 
 
 class StackedAttention(nn.Module):
 
     def __init__(
-            self, i2t=True, agg_function='Mean',
-            feature_norm='softmax', lambda_lse=None,
-            smooth=4, **kwargs,
-        ):
+        self, i2t=True, agg_function='Mean',
+        feature_norm='softmax', lambda_lse=None,
+        smooth=4, **kwargs,
+    ):
         super().__init__()
         self.i2t = i2t
         self.lambda_lse = lambda_lse
-        self.agg_function = agg_function 
-        self.feature_norm = feature_norm 
+        self.agg_function = agg_function
+        self.feature_norm = feature_norm
         self.lambda_lse = lambda_lse
         self.smooth = smooth
         self.kwargs = kwargs
-        
+
         self.attention = Attention(
             smooth=smooth, feature_norm=feature_norm,
         )
@@ -586,7 +598,7 @@ class StackedAttention(nn.Module):
         else:
             raise ValueError("unknown aggfunc: {}".format(agg_function))
 
-        self.task = 'i2t' if i2t else 't2i'        
+        self.task = 'i2t' if i2t else 't2i'
 
     def forward(self, images, captions, cap_lens, ):
         """
@@ -626,14 +638,13 @@ class StackedAttention(nn.Module):
 
         # (n_image, n_caption)
         similarities = torch.cat(similarities, 1)
-        
+
         return similarities
 
-    def __repr__(self, ):        
+    def __repr__(self, ):
         return (
             f'StackedAttention(task: {self.task},'
             f'i2t: {self.i2t}, '
-            f'agg_function: {self.aggregate_function}, '
             f'attention: {self.attention}, '
             f'lambda_lse: {self.lambda_lse}, '
             f'agg_function: {self.agg_function}, '
@@ -644,7 +655,6 @@ class StackedAttention(nn.Module):
         )
 
 
-
 class RegionCorr(nn.Module):
 
     def __init__(
@@ -652,7 +662,7 @@ class RegionCorr(nn.Module):
         ):
         super().__init__()
         self.normalize_attn = ClippedL2Norm()
-        pass 
+        pass
 
     def forward(self, images, captions, cap_lens, ):
         """
@@ -698,7 +708,7 @@ class RegionCorr(nn.Module):
 
         return similarities
 
-    
+
 def attn_softmax(attn):
     batch_size, sourceL, queryL = attn.shape
     attn = attn.view(batch_size*sourceL, queryL)
@@ -712,7 +722,7 @@ class Attention(nn.Module):
 
     def __init__(self, smooth, feature_norm='softmax'):
         super().__init__()
-        self.smooth = smooth 
+        self.smooth = smooth
         self.feature_norm = feature_norm
 
         if feature_norm == "softmax":
@@ -782,7 +792,7 @@ _similarities = {
     'region': {
         'class': RegionCorr,
         'args': {},
-    },    
+    },
     'order': None,
     'cross': {
         'class': CrossAttn,
@@ -796,7 +806,7 @@ _similarities = {
         'class': StackedAttention,
         'args': Dict(
             i2t=True, agg_function='Mean',
-            feature_norm='clipped_l2norm', 
+            feature_norm='clipped_l2norm',
             lambda_lse=None, smooth=4,
         ),
     },
@@ -804,7 +814,7 @@ _similarities = {
         'class': AdaptiveEmbedding,
         'args': Dict(),
     },
-    
+
 }
 
 

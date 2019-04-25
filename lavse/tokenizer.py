@@ -48,13 +48,13 @@ class Tokenizer(object):
     """
 
     def __init__(
-        self, vocab_path=None, char_level=False, 
+        self, vocab_path=None, char_level=False,
         maxlen=None, download_tokenizer=False
     ):
         # Create a vocab wrapper and add some special tokens.
         self.char_level = char_level
         self.maxlen = maxlen
-        
+
         vocab = Vocabulary()
         vocab.add_word('<pad>')
         vocab.add_word('<unk>')
@@ -101,7 +101,7 @@ class Tokenizer(object):
         # Add words to the vocabulary.
         for token in tokens:
             self.vocab.add_word(token)
-        
+
         logger.info(f'Vocab built. Tokens found {len(self.vocab)}')
         return self.vocab
 
@@ -114,7 +114,7 @@ class Tokenizer(object):
         logger.info(
             f'Vocab stored into {outpath} with {len(self.vocab)} tokens.'
         )
-    
+
     def load(self, path):
         logger.debug(f'Loading vocab from {path}')
         with open(path) as f:
@@ -126,7 +126,7 @@ class Tokenizer(object):
         self.vocab = vocab
         logger.info(f'Loaded vocab containing {len(self.vocab)} tokens')
         return self
-    
+
     def split_sentence(self, sentence):
         tokens = nltk.tokenize.word_tokenize(
             sentence.lower()
@@ -141,8 +141,8 @@ class Tokenizer(object):
         if self.char_level:
             tokens = ' '.join(tokens)
         tokens = (
-            [self.vocab('<start>')] 
-            + self.tokens_to_int(tokens) 
+            [self.vocab('<start>')]
+            + self.tokens_to_int(tokens)
             + [self.vocab('<end>')]
         )
         return torch.LongTensor(tokens)

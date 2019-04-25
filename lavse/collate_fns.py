@@ -5,11 +5,11 @@ import numpy as np
 def default_padding(captions):
     lengths = [len(cap) for cap in captions]
     targets = torch.zeros(len(captions), max(lengths)).long()
-    
+
     for i, cap in enumerate(captions):
         end = lengths[i]
         targets[i, :end] = cap[:end]
-    
+
     return targets, lengths
 
 
@@ -32,7 +32,7 @@ def collate_fn_word(data):
     # Merge images (convert tuple of 3D tensor to 4D tensor)
     images = torch.stack(images, 0)
     targets, lengths = default_padding(captions)
-    
+
     return images, targets, lengths, ids
 
 
@@ -50,7 +50,7 @@ def collate_lang_word(data):
     """
     # Sort a data list by caption length
     lang_a, lang_b, ids = zip(*data)
-    
+
     # Merget captions (convert tuple of 1D tensor to 2D tensor)
     targ_a, lens_a = default_padding(lang_a)
     targ_b, lens_b = default_padding(lang_b)
@@ -93,7 +93,7 @@ def collate_lang_liwe(data):
     """
     # Sort a data list by caption length
     lang_a, lang_b, ids = zip(*data)
-    
+
     # lens_a = np.array([len(cap) for cap in words_a])
     # lens_b = np.array([len(cap) for cap in words_b])
 
@@ -106,15 +106,15 @@ def collate_lang_liwe(data):
 
 def liwe_padding(captions):
     splitted_caps = []
-    for caption in captions:    
-        sc = split_array(caption) 
-        splitted_caps.append(sc) 
+    for caption in captions:
+        sc = split_array(caption)
+        splitted_caps.append(sc)
     sent_lens = np.array([len(x) for x in splitted_caps])
     max_nb_steps = max(sent_lens)
     word_maxlen = 26
-    targets = torch.zeros(len(captions), max_nb_steps, word_maxlen).long()    
-    for i, cap in enumerate(splitted_caps):    
-        end_sentence = sent_lens[i]    
+    targets = torch.zeros(len(captions), max_nb_steps, word_maxlen).long()
+    for i, cap in enumerate(splitted_caps):
+        end_sentence = sent_lens[i]
         for j, word in enumerate(cap):
             end_word = word_maxlen if len(word) > word_maxlen else len(word)
             targets[i, j, :end_word] = word[:end_word]
@@ -123,11 +123,11 @@ def liwe_padding(captions):
 
 
 def split_array(iterable, splitters=[0, 1, 2]):
-    import itertools            
+    import itertools
     return [
         torch.LongTensor(list(g))
         for k, g in itertools.groupby(
             iterable, lambda x: x in splitters
-        ) 
+        )
         if not k
     ]

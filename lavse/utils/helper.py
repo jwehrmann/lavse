@@ -90,3 +90,14 @@ def reset_pbar(pbar):
     pbar.last_print_t = time()
     pbar.update()
     return pbar
+
+
+def print_tensor_dict(tensor_dict, print_fn):
+    line = []
+    for k, v in sorted(tensor_dict.items()):
+        try:
+            v = v.item()
+        except AttributeError:
+            pass
+        line.append(f'{k.title()}: {v:8.3f}')
+    print_fn(', '.join(line))

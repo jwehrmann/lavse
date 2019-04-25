@@ -21,21 +21,55 @@ export OUT_PATH=runs/temp/
 # --eval_before_training \
 
 
+
+# python train.py \
+# --data_path $DATA_PATH \
+# --train_data f30k_precomp.en \
+# --val_data f30k_precomp.en \
+# --profile scan \
+# --sim scan_i2t \
+# --outpath runs/scan_ours/scan_i2t/f30k_precomp.en/ \
+# --valid_interval 500 \
+# --workers 0 \
+# --eval_before_training \
+
+
 python train.py \
 --data_path $DATA_PATH \
 --train_data f30k_precomp.en \
 --val_data f30k_precomp.en \
---outpath runs/region/f30k_precomp.en/ \
---sim region \
---workers 0 \
+--outpath runs/adaptive_test/f30k_precomp.en/ \
+--sim adaptive \
+--workers 3 \
 --image_encoder hierarchical \
 --text_encoder convgru_sa \
 --text_pooling none \
 --image_pooling none \
 --lr 6e-4 \
+--lr_decay_interval 5 \
+--lr_decay_rate 0.9 \
 --beta 0.999 \
---eval_before_training \
+--vocab vocab/f30k_vocab.json \
+--valid_interval 500 \
+--batch_size 128 \
+# --eval_before_training
 
+
+# python train.py \
+# --data_path $DATA_PATH \
+# --train_data f30k_precomp.en \
+# --val_data f30k_precomp.en \
+# --outpath runs/adaptive_vocab/lr2e-4/f30k_precomp.en/ \
+# --sim adaptive \
+# --workers 0 \
+# --image_encoder hierarchical \
+# --text_encoder convgru_sa \
+# --text_pooling none \
+# --image_pooling none \
+# --lr 2e-4 \
+# --beta 0.999 \
+# --eval_before_training \
+# --vocab vocab/f30k_vocab.json
 
 
 # python train.py \
@@ -59,9 +93,9 @@ python train.py \
 # --data_path $DATA_PATH \
 # --train_data f30k_precomp.en \
 # --val_data f30k_precomp.en \
-# --outpath $OUT_PATH/img_sa_convgru/f30k_precomp.en/ \
+# --outpath $OUT_PATH/temp_cosine/f30k_precomp.en/ \
 # --sim cosine \
-# --val_step 100 \
+# --valid_interval 500 \
 # --workers 0 \
 # --image_encoder sa \
 # --text_encoder convgru_sa \

@@ -15,7 +15,7 @@ logger = get_logger()
 
 
 def prepare_ml_data(instance, device):
-    targ_a, lens_a, targ_b, lens_b, ids = instance 
+    targ_a, lens_a, targ_b, lens_b, ids = instance
     targ_a = targ_a.to(device).long()
     targ_b = targ_b.to(device).long()
     return targ_a, lens_a, targ_b, lens_b, ids
@@ -37,7 +37,7 @@ class DataIterator:
         self.device = device
 
         self.cross_language = isinstance(loader.dataset, CrossLanguageLoader)
-    
+
     def __str__(self):
         return f'{self.loader.dataset.data_name}.{self.loader.dataset.data_split}'
 
@@ -46,14 +46,14 @@ class DataIterator:
             instance = next(self.data_iter)
 
             if self.cross_language:
-                targ_a, lens_a, targ_b, lens_b, ids = prepare_ml_data(instance, self.device) 
+                targ_a, lens_a, targ_b, lens_b, ids = prepare_ml_data(instance, self.device)
                 logger.debug((
                     f'DataIter - CrossLang - Images: {targ_a.shape} '
                     f'DataIter - CrossLang - Target: {targ_a.shape} '
                     f'DataIter - CrossLang - Ids: {ids[:10]}\n'
                 ))
                 return targ_a, lens_a, targ_b, lens_b, ids
-            
+
             images, captions, lengths, ids = prepare_mm_data(instance, self.device)
             #  = prepare_ml_data(instance, self.device)
             logger.debug((
@@ -68,7 +68,7 @@ class DataIterator:
             if self.non_stop:
                 self.data_iter = iter(self.loader)
                 return self.next()
-            else: 
+            else:
                 raise StopIteration(
                     'The data iterator has finished its job.'
                 )
@@ -76,7 +76,7 @@ class DataIterator:
 
 def get_loader(
     loader_name, data_path, data_name, data_split,
-    batch_size, vocab_path, text_repr, 
+    batch_size, vocab_path, text_repr,
     lang='en', workers=4
 ):
 
@@ -85,7 +85,7 @@ def get_loader(
     logger.debug(f'Dataset class is {dataset_class}')
 
     collate_fn, tokenizer = get_text_processing_objects(
-        text_repr=text_repr, 
+        text_repr=text_repr,
         vocab_path=vocab_path,
         lang_adapt=('-' in lang)
     )
@@ -94,9 +94,9 @@ def get_loader(
 
     dataset = dataset_class(
         data_path=data_path,
-        data_name=data_name, 
-        data_split=data_split, 
-        tokenizer=tokenizer, 
+        data_name=data_name,
+        data_split=data_split,
+        tokenizer=tokenizer,
         lang=lang,
     )
     logger.debug(f'Dataset built: {dataset}')
@@ -107,7 +107,7 @@ def get_loader(
         shuffle=(data_split == 'train'),
         pin_memory=True,
         collate_fn=collate_fn,
-        num_workers=workers,
+        num_workers=0,
     )
     logger.debug(f'Loader built: {loader}')
 
@@ -115,10 +115,10 @@ def get_loader(
 
 
 def get_loaders(
-        data_path, loader_name, data_name, 
-        vocab_path, batch_size, 
+        data_path, loader_name, data_name,
+        vocab_path, batch_size,
         workers, text_repr,
-        splits=['train', 'val', 'test'], 
+        splits=['train', 'val', 'test'],
         langs=['en', 'en', 'en'],
     ):
 
@@ -127,14 +127,14 @@ def get_loaders(
     for split, lang in zip(splits, langs):
         logger.debug(f'Getting loader {loader_class}/  {split} / Lang {lang}')
         loader = get_loader(
-            loader_name=loader_name, 
+            loader_name=loader_name,
             data_path=data_path,
             data_name=data_name,
-            batch_size=batch_size, 
-            workers=workers, 
-            text_repr=text_repr, 
-            data_split=split, 
-            lang=lang, 
+            batch_size=batch_size,
+            workers=workers,
+            text_repr=text_repr,
+            data_split=split,
+            lang=lang,
             vocab_path=vocab_path,
         )
         loaders.append(loader)
@@ -212,7 +212,7 @@ def get_text_processing_objects(
     tokenizer_args.update({'vocab_path': vocab_path})
     logger.debug(f'Collate fn {collate_fn}')
     logger.debug(f'Tokenizer args {tokenizer_args}')
-    
+
     tokenizer = Tokenizer(**tokenizer_args)
     logger.debug(f'Tokenizer {tokenizer}')
 

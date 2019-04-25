@@ -12,6 +12,7 @@ from lavse.utils.logger import create_logger
 from lavse import similarity
 
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -249,6 +250,7 @@ if __name__ == '__main__':
         model=model,
         device=device,
         args={'args': args, 'model_args': model_params},
+        # sysoutlog=print,
     )
 
     multimodal_criterion = loss.ContrastiveLoss(
@@ -277,6 +279,8 @@ if __name__ == '__main__':
         lr_decay_interval=args.lr_decay_interval,
         clip_grad=args.grad_clip,
         early_stop=args.early_stop,
+        log_grad_norm=True, 
+        log_histograms=False,
     )
     if args.eval_before_training:
         result, rs = trainer.evaluate_loaders(
