@@ -42,7 +42,7 @@ python train.py \
 --sim adaptive \
 --workers 3 \
 --image_encoder hierarchical \
---text_encoder convgru_sa \
+--text_encoder attngru \
 --text_pooling none \
 --image_pooling none \
 --lr 6e-4 \

@@ -99,17 +99,15 @@ class Trainer:
 
         for epoch in tqdm(range(nb_epochs), desc='Epochs'):
         # for epoch in range(nb_epochs):
-            self.tb_writer.add_scalar('train/epoch', epoch, self.mm_criterion.iteration)
 
             # Update learning rate
-            lr = helper.adjust_learning_rate(
+            self.learning_rate = helper.adjust_learning_rate(
                 optimizer=self.optimizer,
                 initial_lr=self.initial_lr,
                 interval=self.lr_decay_interval,
                 decay=self.lr_decay_rate,
                 epoch=epoch,
             )
-            self.tb_writer.add_scalar('lr', lr, self.mm_criterion.iteration)
 
             # Train a single epoch
             continue_training = self.train_epoch(
@@ -215,20 +213,14 @@ class Trainer:
                 'total_loss': total_loss,
                 'k': self.mm_criterion.k,
                 'batch_time': batch_time,
+                'learning_rate': self.learning_rate,
+                'countdown': self.count,
+                'epoch': epoch,
             })
             logger.tb_log_dict(
                 tb_writer=self.tb_writer, data_dict=train_info,
                 iteration=iteration, prefix='train'
             )
-
-            if self.pbar.n % log_interval == 0:
-                helper.print_tensor_dict(train_info, print_fn=self.sysoutlog)
-
-                if self.log_histograms:
-                    logger.log_param_histograms(
-                        self.model, self.tb_writer,
-                        iteration=self.mm_criterion.iteration,
-                    )
 
             if iteration % valid_interval == 0:
                 # Run evaluation
@@ -248,15 +240,22 @@ class Trainer:
                     )
 
                 # Log updates
-                self.tb_writer.add_scalar('train/countdown', self.count, iteration)
                 for metric, values in metrics.items():
-                    self.tb_writer.add_scalar(metric, values)
+                    self.tb_writer.add_scalar(metric, values, iteration)
 
                 # Early stop
                 if self.count == 0:
                     self.sysoutlog('\n\nEarly stop\n\n')
                     return False
 
+            if self.pbar.n % log_interval == 0:
+                helper.print_tensor_dict(train_info, print_fn=self.sysoutlog)
+
+                if self.log_histograms:
+                    logger.log_param_histograms(
+                        self.model, self.tb_writer,
+                        iteration=self.mm_criterion.iteration,
+                    )
         return True
 
     def evaluate_loaders(self, loaders):

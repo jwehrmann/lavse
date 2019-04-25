@@ -34,10 +34,10 @@ def save_checkpoint(
 
 def restore_checkpoint(path, model=None, optimizer=None):
     state_dict = torch.load(path,  map_location=lambda storage, loc: storage)
-    
+
     if model is not None:
         model.load_state_dict(state_dict['model'])
-    
+
     if optimizer is not None:
         optimizer.load_state_dict(state_dict['optimizer'])
 
@@ -51,9 +51,9 @@ def restore_checkpoint(path, model=None, optimizer=None):
 
 
 def adjust_learning_rate(
-        optimizer, epoch, initial_lr=1e-3,
-        interval=1, decay=0.
-    ):
+    optimizer, epoch, initial_lr,
+    interval=1, decay=0.
+):
 
     lr = initial_lr * (decay ** (epoch // interval))
     for param_group in optimizer.param_groups:
@@ -80,7 +80,7 @@ def get_device(gpu_id):
         device = torch.device('cpu')
 
     return device
-    
+
 
 def reset_pbar(pbar):
     from time import time
@@ -99,5 +99,5 @@ def print_tensor_dict(tensor_dict, print_fn):
             v = v.item()
         except AttributeError:
             pass
-        line.append(f'{k.title()}: {v:8.3f}')
+        line.append(f'{k.title()}: {v:10.6f}')
     print_fn(', '.join(line))
