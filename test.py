@@ -61,12 +61,12 @@ if __name__ == '__main__':
         help='Log/verbosity level.',
     )
 
-    
+
     args = parser.parse_args()
     args = Dict(vars(args))
-    
+
     logger = create_logger(level=args.log_level)
-    
+
     logger.info(f'Used args: \n{args}')
 
     val_loaders = []
@@ -74,7 +74,7 @@ if __name__ == '__main__':
         data_name, lang = val_data.split('.')
         val_loaders.append(
             get_loader(
-                data_path=args.data_path, 
+                data_path=args.data_path,
                 data_name=data_name,
                 loader_name='precomp',
                 vocab_path=args.vocab_path,
@@ -90,6 +90,7 @@ if __name__ == '__main__':
 
     checkpoint = helper.restore_checkpoint(args.model_path)
     model_params = checkpoint['args']['model_args']
+
     model = LAVSE(**model_params).to(device)
     model.load_state_dict(checkpoint['model'])
     print(model)

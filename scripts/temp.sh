@@ -21,37 +21,43 @@ export OUT_PATH=runs/temp/
 # --eval_before_training \
 
 
+python train.py \
+--data_path $DATA_PATH \
+--train_data f30k_precomp.en \
+--val_data f30k_precomp.en \
+--outpath temp/adaptive_i2t/f30k_precomp.en/ \
+--sim rnn_proj \
+--workers 0 \
+--image_encoder hierarchical \
+--text_encoder embed_proj \
+--text_pooling none \
+--image_pooling none \
+--lr 6e-4 \
+--beta 0.999 \
+--vocab vocab/f30k_vocab.json \
+--batch_size 32 \
+--valid_interval 500 \
+# --eval_before_training
+
 
 # python train.py \
 # --data_path $DATA_PATH \
 # --train_data f30k_precomp.en \
 # --val_data f30k_precomp.en \
-# --profile scan \
-# --sim scan_i2t \
-# --outpath runs/scan_ours/scan_i2t/f30k_precomp.en/ \
+# --outpath runs/adaptive_test/f30k_precomp.en/ \
+# --sim adaptive \
+# --workers 3 \
+# --image_encoder hierarchical \
+# --text_encoder attngru \
+# --text_pooling none \
+# --image_pooling none \
+# --lr 6e-4 \
+# --lr_decay_interval 5 \
+# --lr_decay_rate 0.9 \
+# --beta 0.999 \
+# --vocab vocab/f30k_vocab.json \
 # --valid_interval 500 \
-# --workers 0 \
-# --eval_before_training \
-
-
-python train.py \
---data_path $DATA_PATH \
---train_data f30k_precomp.en \
---val_data f30k_precomp.en \
---outpath runs/adaptive_test/f30k_precomp.en/ \
---sim adaptive \
---workers 3 \
---image_encoder hierarchical \
---text_encoder attngru \
---text_pooling none \
---image_pooling none \
---lr 6e-4 \
---lr_decay_interval 5 \
---lr_decay_rate 0.9 \
---beta 0.999 \
---vocab vocab/f30k_vocab.json \
---valid_interval 500 \
---batch_size 128 \
+# --batch_size 128 \
 # --eval_before_training
 
 

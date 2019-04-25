@@ -80,7 +80,7 @@ if __name__ == '__main__':
         help='Path to save logs and models.',
     )
     parser.add_argument(
-        '--profile', default=None, 
+        '--profile', default=None,
         choices=profiles.get_profile_names(),
         help='Import pre-defined setup from profiles.py',
     )
@@ -105,7 +105,7 @@ if __name__ == '__main__':
         help='Path to save logs and models.',
     )
     parser.add_argument(
-        '--text_repr', 
+        '--text_repr',
         default='word',
         help='Path to save logs and models.',
     )
@@ -134,7 +134,7 @@ if __name__ == '__main__':
         help='Number of epochs.',
     )
     parser.add_argument(
-        '--early_stop', default=5, type=int,
+        '--early_stop', default=30, type=int,
         help='Early stop patience.',
     )
     parser.add_argument(
@@ -169,27 +169,27 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     args = Dict(vars(args))
-    
+
     logger = create_logger(level=args.log_level)
 
     if args.profile is not None:
         profile_args = profiles.get_profile(args.profile)
         args.update(profile_args)
         logger.info(f'Using profile {args.profile}')
-    
+
     logger.info(f'Used args: \n{args}')
 
     train_data = args.train_data
     data_name, lang = train_data.split('.')
     train_loader = get_loader(
         data_path=args.data_path,
-        data_name=data_name, 
+        data_name=data_name,
         loader_name='precomp',
         vocab_path=args.vocab_path,
         batch_size=args.batch_size,
         workers=args.workers,
         text_repr=args.text_repr,
-        data_split='train', 
+        data_split='train',
         lang=lang,
     )
 
@@ -198,7 +198,7 @@ if __name__ == '__main__':
         data_name, lang = val_data.split('.')
         val_loaders.append(
             get_loader(
-                data_path=args.data_path, 
+                data_path=args.data_path,
                 data_name=data_name,
                 loader_name='precomp',
                 vocab_path=args.vocab_path,
@@ -216,14 +216,14 @@ if __name__ == '__main__':
             data_name, lang = adapt_data.split('.')
             adapt_loaders.append(
                 get_loader(
-                    data_path=args.data_path, 
+                    data_path=args.data_path,
                     data_name=data_name,
                     loader_name='lang',
                     vocab_path=args.vocab_path,
                     batch_size=args.batch_size,
                     workers=args.workers,
                     text_repr=args.text_repr,
-                    data_split='train', 
+                    data_split='train',
                     lang=lang,
                 )
             )
@@ -259,7 +259,7 @@ if __name__ == '__main__':
         max_violation=args.max_violation,
         weight=1.,
         beta=args.beta,
-        # initial_k=args.initial_k, 
+        # initial_k=args.initial_k,
         # increase_k=args.increase_k,
     )
 
@@ -268,18 +268,18 @@ if __name__ == '__main__':
         margin=args.margin,
         max_violation=args.max_violation,
         weight=1.,
-        # initial_k=args.initial_k, 
+        # initial_k=args.initial_k,
     )
 
     trainer.setup_optim(
-        lr=args.lr, 
-        mm_criterion=multimodal_criterion, 
+        lr=args.lr,
+        mm_criterion=multimodal_criterion,
         ml_criterion=multilanguage_criterion,
-        lr_decay_rate=args.lr_decay_rate, 
+        lr_decay_rate=args.lr_decay_rate,
         lr_decay_interval=args.lr_decay_interval,
         clip_grad=args.grad_clip,
         early_stop=args.early_stop,
-        log_grad_norm=True, 
+        log_grad_norm=True,
         log_histograms=False,
     )
     if args.eval_before_training:

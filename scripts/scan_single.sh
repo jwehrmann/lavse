@@ -8,7 +8,9 @@ python train.py \
 --val_data f30k_precomp.en \
 --profile scan \
 --sim scan_i2t \
---outpath runs/adaptive_test/scan_i2t/f30k_precomp.en/ \
+--outpath runs/baselin/scan_i2t_vocab/f30k_precomp.en/ \
 --valid_interval 500 \
---workers 0 \
+--workers 3 \
+--vocab vocab/f30k_vocab.json \
 # --eval_before_training \
+

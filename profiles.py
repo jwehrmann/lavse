@@ -18,7 +18,6 @@ _profiles = {
         'max_violation': False,
         'initial_k': 0,
         'increase_k': 0,
-        'vocab_path': 'vocab/complete.json',
     },
     'vsepp': {
         'lr': 2e-4,
@@ -34,7 +33,6 @@ _profiles = {
         'early_stop': 5,
         'nb_epochs': 30,
         'max_violation': True,
-        'vocab_path': 'vocab/complete.json',
     },
     'scan': {
         'lr': 2e-4,
@@ -50,7 +48,6 @@ _profiles = {
         'lr_decay_rate': 0.1,
         'early_stop': 30,
         'nb_epochs': 30,
-        'vocab_path': 'vocab/complete.json',
         'beta': 0.,
     },
     'clmr': {
@@ -66,7 +63,6 @@ _profiles = {
         'nb_epochs': 30,
         'initial_k': 0.9,
         'increase_k': 0.1,
-        'vocab_path': 'vocab/complete.json',
     },
     'liwe': {
         'lr': 6e-4,

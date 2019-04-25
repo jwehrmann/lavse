@@ -1,4 +1,4 @@
-import torch 
+import torch
 import torch.nn as nn
 
 from ..utils.layers import default_initializer, l2norm
@@ -9,7 +9,7 @@ from torch.nn.utils.rnn import pad_packed_sequence
 from ..layers import attention, convblocks
 from .embedding import PartialConcat
 
-import numpy as np 
+import numpy as np
 
 
 # RNN Based Language Model
@@ -37,8 +37,8 @@ class EncoderText(nn.Module):
         """Handles variable size captions
         """
         # Embed word ids to vectors
-    
-        x = self.embed(x)        
+
+        x = self.embed(x)
         packed = pack_padded_sequence(x, lengths, batch_first=True)
 
         # Forward propagate RNN
@@ -64,7 +64,7 @@ class RNNEncoder(nn.Module):
 
     def __init__(
         self, num_embeddings, embed_dim, latent_size,
-        num_layers=1, use_bi_gru=True, no_txtnorm=False, 
+        num_layers=1, use_bi_gru=True, no_txtnorm=False,
         rnn_type=nn.GRU):
 
         super(RNNEncoder, self).__init__()
@@ -77,8 +77,8 @@ class RNNEncoder(nn.Module):
         # caption embedding
         self.use_bi_gru = use_bi_gru
         self.rnn = rnn_type(
-            embed_dim, latent_size, num_layers, 
-            batch_first=True, 
+            embed_dim, latent_size, num_layers,
+            batch_first=True,
             bidirectional=use_bi_gru
         )
 
@@ -103,11 +103,36 @@ class RNNEncoder(nn.Module):
         return cap_emb, lengths
 
 
+class WordEmbeddingProj(nn.Module):
+
+    def __init__(
+        self, num_embeddings, embed_dim, latent_size,
+    ):
+
+        super(WordEmbeddingProj, self).__init__()
+        self.latent_size = latent_size
+
+        # word embedding
+        self.embed = nn.Embedding(num_embeddings, embed_dim)
+        self.linear = nn.Linear(embed_dim, latent_size)
+
+        self.apply(default_initializer)
+
+    def forward(self, x, lengths):
+        """Handles variable size captions
+        """
+        # Embed word ids to vectors
+        x = self.embed(x)
+        x = self.linear(x)
+
+        return x, lengths
+
+
 class SelfAttnGRU(nn.Module):
 
     def __init__(
         self, num_embeddings, embed_dim, latent_size,
-        num_layers=1, use_bi_gru=True, no_txtnorm=False, 
+        num_layers=1, use_bi_gru=True, no_txtnorm=False,
         rnn_cell=nn.GRU, activation=nn.LeakyReLU(0.1),
     ):
 
@@ -121,10 +146,10 @@ class SelfAttnGRU(nn.Module):
         # caption embedding
         self.use_bi_gru = use_bi_gru
         self.rnn = rnn_cell(
-            embed_dim, latent_size, num_layers, 
+            embed_dim, latent_size, num_layers,
             batch_first=True, bidirectional=use_bi_gru
         )
-                
+
         self.sa1 = attention.SelfAttention(latent_size, activation)
 
         self.fc = nn.Sequential(*[
@@ -160,11 +185,11 @@ class SelfAttnGRU(nn.Module):
 
         cap_emb = cap_emb.permute(0, 2, 1)
         cap_emb = self.sa1(cap_emb)
-        
+
         cap_emb = self.fc(cap_emb)
         cap_emb = cap_emb.permute(0, 2, 1)
-        
-        # normalization in the joint embedding space        
+
+        # normalization in the joint embedding space
         if not self.no_txtnorm:
             cap_emb = l2norm(cap_emb, dim=-1)
 
@@ -176,7 +201,7 @@ class SelfAttn(nn.Module):
 
     def __init__(
         self, num_embeddings, embed_dim, latent_size,
-        num_layers=1, use_bi_gru=True, no_txtnorm=False, 
+        num_layers=1, use_bi_gru=True, no_txtnorm=False,
         rnn_cell=nn.GRU, activation=nn.LeakyReLU(0.1),
     ):
 
@@ -188,7 +213,7 @@ class SelfAttn(nn.Module):
         self.embed = nn.Embedding(num_embeddings, embed_dim)
 
         self.conv0 = nn.ConvBlock(
-            in_channels=embed_dim, 
+            in_channels=embed_dim,
             out_channel=latent_size,
             kernel_size=1,
             padding=0,
@@ -197,7 +222,7 @@ class SelfAttn(nn.Module):
         self.sa0 = attention.SelfAttention(latent_size, activation)
 
         self.conv1 = convblocks.ParallelBlock(
-            in_channels=embed_dim, 
+            in_channels=embed_dim,
             out_channels=[512, 512],
             kernel_sizes=[1, 2,],
             paddings=[0, 1,],
@@ -211,7 +236,7 @@ class SelfAttn(nn.Module):
             paddings=[0, 1,],
         )
         self.sa2 = attention.SelfAttention(latent_size, activation)
-        
+
         self.conv3 = convblocks.ParallelBlock(
             in_channels=latent_size,
             out_channels=[512, 512],
@@ -244,8 +269,8 @@ class SelfAttn(nn.Module):
         x = torch.cat([a, b, c], dim=1)
         x = self.projection(x)
         x = x.permute(0, 2, 1)
-        
-        # normalization in the joint embedding space        
+
+        # normalization in the joint embedding space
         if not self.no_txtnorm:
             x = l2norm(x, dim=-1)
 
@@ -256,7 +281,7 @@ class ConvGRU(nn.Module):
 
     def __init__(
         self, num_embeddings, embed_dim, latent_size,
-        num_layers=1, use_bi_gru=True, no_txtnorm=False, 
+        num_layers=1, use_bi_gru=True, no_txtnorm=False,
         rnn_cell=nn.GRU, activation=nn.LeakyReLU(0.1),
     ):
 
@@ -270,9 +295,9 @@ class ConvGRU(nn.Module):
         # caption embedding
         self.use_bi_gru = use_bi_gru
         self.rnn = rnn_cell(
-            embed_dim, latent_size, num_layers, 
+            embed_dim, latent_size, num_layers,
             batch_first=True, bidirectional=use_bi_gru)
-        
+
         self.conv1 = convblocks.ConvBlock(
             in_channels=embed_dim,
             out_channels=latent_size,
@@ -297,7 +322,7 @@ class ConvGRU(nn.Module):
         self.sa4 = attention.SelfAttention(latent_size, activation)
 
         # self.fc = nn.Linear(
-        #     1024*4, 
+        #     1024*4,
         #     latent_size
         # )
 
@@ -344,11 +369,11 @@ class ConvGRU(nn.Module):
         b = self.sa3(b)
         c = self.sa4(c)
 
-        cap_emb = torch.cat([a, b, c, d], 1)        
+        cap_emb = torch.cat([a, b, c, d], 1)
         cap_emb = self.fc(cap_emb)
         cap_emb = cap_emb.permute(0, 2, 1)
-        
-        # normalization in the joint embedding space        
+
+        # normalization in the joint embedding space
         if not self.no_txtnorm:
             cap_emb = l2norm(cap_emb, dim=-1)
 
@@ -356,18 +381,18 @@ class ConvGRU(nn.Module):
 
 
 class LiweGRU(nn.Module):
-    
+
     def __init__(
-        self, 
+        self,
         num_embeddings, embed_dim, latent_size,
-        num_layers=1, use_bi_gru=True, no_txtnorm=False, 
+        num_layers=1, use_bi_gru=True, no_txtnorm=False,
         rnn_cell=nn.GRU, partial_class=PartialConcat,
         liwe_neurons=[128, 256], liwe_dropout=0.0,
         liwe_wnorm=True, liwe_char_dim=24,
     ):
 
         super(LiweGRU, self).__init__()
-        
+
         __max_char_in_words = 30
         self.latent_size = latent_size
         self.embed_dim = embed_dim
@@ -382,14 +407,14 @@ class LiweGRU(nn.Module):
         # caption embedding
         self.use_bi_gru = True
         self.rnn = nn.GRU(
-            embed_dim, latent_size, 1, 
+            embed_dim, latent_size, 1,
             batch_first=True, bidirectional=True
         )
- 
+
     def forward(self, x, lens=None):
-        
+
         B, W, Ct = x.size()
-    
+
         word_embed = self.embed(x).contiguous()
         x = word_embed.permute(0, 2, 1).contiguous()
 
@@ -401,8 +426,8 @@ class LiweGRU(nn.Module):
         if self.use_bi_gru:
             b, t, d = cap_emb.shape
             cap_emb = cap_emb.view(b, t, 2, d//2).mean(-2)
-        
+
         if not self.no_txtnorm:
             cap_emb = l2norm(cap_emb, dim=-1)
-        
+
         return cap_emb, lens

@@ -171,146 +171,6 @@ class CrossAttn(nn.Module):
 
         return sims
 
-# class CrossAttn(nn.Module):
-
-#     def __init__(
-#             self, device, latent_size=1024, k=8
-#         ):
-#         super().__init__()
-
-#         self.device = device
-
-#         self.query_conv_img = nn.Sequential(
-#             nn.Conv1d(
-#                 in_channels=latent_size,
-#                 out_channels=latent_size//k,
-#                 kernel_size=1,
-#             ),
-#             nn.LeakyReLU(0.1, inplace=True),
-#         )
-#         self.key_conv_img = nn.Sequential(
-#             nn.Conv1d(
-#                 in_channels=latent_size,
-#                 out_channels=latent_size//k,
-#                 kernel_size=1,
-#             ),
-#             nn.LeakyReLU(0.1, inplace=True),
-#         )
-#         self.value_conv_img = nn.Sequential(
-#             nn.Conv1d(
-#                 in_channels=latent_size,
-#                 out_channels=latent_size,
-#                 kernel_size=1,
-#             ),
-#             nn.LeakyReLU(0.1, inplace=True),
-#         )
-
-
-#         self.query_conv_txt = nn.Sequential(
-#             nn.Conv1d(
-#                 in_channels=latent_size,
-#                 out_channels=latent_size//k,
-#                 kernel_size=1,
-#             ),
-#             nn.LeakyReLU(0.1, inplace=True),
-#         )
-#         self.key_conv_txt = nn.Sequential(
-#             nn.Conv1d(
-#                 in_channels=latent_size,
-#                 out_channels=latent_size//k,
-#                 kernel_size=1,
-#             ),
-#             nn.LeakyReLU(0.1, inplace=True),
-#         )
-#         self.value_conv_txt = nn.Sequential(
-#             nn.Conv1d(
-#                 in_channels=latent_size,
-#                 out_channels=latent_size,
-#                 kernel_size=1,
-#             ),
-#             nn.LeakyReLU(0.1, inplace=True),
-#         )
-
-#         self.gamma_img = nn.Parameter(torch.zeros(1))
-#         self.gamma_txt = nn.Parameter(torch.zeros(1))
-
-#         self.alpha = nn.Parameter(torch.ones(1))
-#         self.beta = nn.Parameter(torch.zeros(1))
-
-#         self.softmax = nn.Softmax(dim=-1)
-#         self.i2t_attention = XAttn(dim=latent_size, k=k)
-
-#     def forward(self, img_embed, cap_embed, lens, **kwargs):
-#         # B, 1024, 36
-#         img_embed = img_embed.permute(0, 2, 1).to(self.device)
-#         cap_embed = cap_embed.permute(0, 2, 1).to(self.device)
-
-#         # B, 36, 128
-#         query_img = self.query_conv_img(img_embed).permute(0, 2, 1)
-#         # B, 128, 36
-#         key_img = self.key_conv_img(img_embed)
-#         # B, 36, 36
-#         # energy_img =  torch.bmm(query_img.permute(0, 2, 1), key_img)
-
-#         # B, T, 128
-#         query_txt = self.query_conv_img(cap_embed).permute(0, 2, 1)
-#         # B, 128, T
-#         key_txt = self.key_conv_img(cap_embed)
-
-#         # B, 1024, 36
-#         value_img = self.value_conv_img(img_embed)
-#         # B, 1024, T
-#         value_txt = self.value_conv_txt(cap_embed)
-
-#         sims = torch.zeros(img_embed.shape[0], cap_embed.shape[0]).to(self.device)
-#         for i, cap in enumerate(cap_embed):
-#             # n_words = lens[i]
-#             # # cap: 1024, T
-#             # cap = cap[:,:n_words]
-#             # query_t = query_txt[i][:n_words]
-#             # query_t = torch.stack([query_t] * len(key_img), 0)
-#             # # energy   : B, T, 36
-#             # energy_cross = torch.bmm(query_t, key_img) * self.alpha + self.beta
-#             # cross_attention = self.softmax(energy_cross)
-#             # value_t = torch.stack([value_txt[i][:,:n_words]] * len(key_img), 0)
-
-#             # img_output = torch.bmm(value_t, cross_attention)
-#             # img_output = self.gamma_img * img_output + value_img
-
-#             n_words = lens[i]
-#             # # cap: 1024, T
-#             cap = cap[:,:n_words]
-#             query_t = query_txt[i][:n_words]
-#             value_t = value_txt[i][:,:n_words]
-#             key_t = key_txt[i][:,:n_words]
-#             query_t = torch.stack([query_t] * len(key_img), 0)
-#             value_t = torch.stack([value_t] * len(key_img), 0)
-#             key_t = torch.stack([key_t] * len(key_img), 0)
-#             # # energy   : B, T, 36
-#             # energy_cross = torch.bmm(query_t, key_img) * self.alpha + self.beta
-#             # cross_attention = self.softmax(energy_cross)
-
-#             # img_output = torch.bmm(value_t, cross_attention)
-#             # img_output = self.gamma_img * img_output + value_img
-
-#             img_output = self.i2t_attention(
-#                 query_a=query_t, value_a=value_t,
-#                 key_b=key_img, value_b=value_img
-#             )
-#             txt_output = self.i2t_attention(
-#                 query_a=query_img, value_a=value_img,
-#                 key_b=key_t, value_b=value_t
-#             )[0]
-
-#             img_vector = img_output.mean(-1)
-#             img_vector = l2norm(img_vector, dim=-1)
-#             cap_vector = txt_output.mean(-1).unsqueeze(0)
-#             cap_vector = l2norm(cap_vector, dim=-1)
-#             sim = cosine_sim(img_vector, cap_vector).squeeze()
-#             sims[:,i] = sim
-
-#         return sims
-
 
 class CondBatchNorm1d(nn.Module):
 
@@ -361,7 +221,7 @@ class CondBatchNorm1d(nn.Module):
 class AdaptiveEmbedding(nn.Module):
 
     def __init__(
-            self, device, latent_size=1024, k=8,
+            self, device, latent_size=1024, k=8, norm=False, task='t2i'
         ):
         super().__init__()
 
@@ -376,8 +236,10 @@ class AdaptiveEmbedding(nn.Module):
         # self.beta = nn.Parameter(torch.zeros(1))
 
         self.softmax = nn.Softmax(dim=-1)
-        self.norm = ClippedL2Norm()
-        self.task = 't2i'
+        self.norm = norm
+        if norm:
+            self.feature_norm = ClippedL2Norm()
+        self.task = task
 
     def forward(self, img_embed, cap_embed, lens, **kwargs):
         '''
@@ -389,41 +251,122 @@ class AdaptiveEmbedding(nn.Module):
         img_embed = img_embed.permute(0, 2, 1).to(self.device)
 
         # (B, 1024)
-        img_vectors = img_embed.mean(-1)
-
-        # cap_embed = self.norm(cap_embed)
-        # img_embed = self.norm(img_embed)
+        if self.norm:
+            cap_embed = self.feature_norm(cap_embed)
+            img_embed = self.feature_norm(img_embed)
 
         sims = torch.zeros(
             img_embed.shape[0], cap_embed.shape[0]
         ).to(self.device)
 
         for i, cap_tensor in enumerate(cap_embed):
-            n_words = lens[i]
             # cap: 1024, T
             # img: 1024, 36
 
-            cap_repr = cap_tensor[:,:n_words].mean(-1).unsqueeze(0)
+            if self.task == 't2i':
+                n_words = lens[i]
+                cap_repr = cap_tensor[:,:n_words].mean(-1).unsqueeze(0)
 
-            img_output = self.cbn_img(img_embed, cap_repr)
-            img_vector = img_output.mean(-1)
+                img_output = self.cbn_img(img_embed, cap_repr)
+                img_vector = img_output.mean(-1)
 
-            img_vector = l2norm(img_vector, dim=-1)
-            cap_vector = cap_repr
-            cap_vector = l2norm(cap_vector, dim=-1)
+                img_vector = l2norm(img_vector, dim=-1)
+                cap_vector = cap_repr
+                cap_vector = l2norm(cap_vector, dim=-1)
 
-            sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
-            sims[:,i] = sim
+                sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
 
             if self.task == 'i2t':
-
+                img_vectors = img_embed.mean(-1)
                 cap_i_expand = cap_tensor.repeat(img_vectors.shape[0], 1, 1)
                 txt_output = self.cbn_txt(cap_i_expand, img_vectors).mean(-1, keepdim=True)
 
                 sim = cosine_similarity(
                     img_vectors.unsqueeze(2), txt_output, 1,
                 )
-                sims[:,i] = (sims[:,i] + sim) / 2.
+
+            sims[:,i] = sim
+
+
+        return sims
+
+
+class RNNProj(nn.Module):
+
+    def __init__(
+            self, device, latent_size=1024, rnn_units=256, norm=False,
+            num_layers=1, bidirectional=True,
+        ):
+        super().__init__()
+
+        self.device = device
+        self.rnn = nn.GRU(
+            latent_size, rnn_units, num_layers,
+            batch_first=True, bidirectional=bidirectional,
+        )
+        import numpy as np
+        total  = 0
+        for k, v in self.rnn.named_parameters():
+            c = np.prod(v.shape).astype(np.int)
+            total += c
+            print(f'{k:45s}: {c:6d} {v.shape}')
+        print('total ', total)
+        self.sa = attention.SelfAttention(rnn_units, activation=nn.LeakyReLU(0.1))
+        print()
+        total  = 0
+        for k, v in self.sa.named_parameters():
+            c = np.prod(v.shape).astype(np.int)
+            total += c
+            print(f'{k:45s}: {c:6d} {v.shape}')
+        print('total', total)
+        exit()
+
+    def forward(self, img_embed, cap_embed, lens, **kwargs):
+        '''
+            img_embed: (B, 36, latent_size)
+            cap_embed: (B, T, latent_size)
+        '''
+        # (B, 1024, T)
+        cap_embed = cap_embed.permute(0, 2, 1).to(self.device)
+        img_embed = img_embed.permute(0, 2, 1).to(self.device)
+
+        # (B, 1024)
+        if self.norm:
+            cap_embed = self.feature_norm(cap_embed)
+            img_embed = self.feature_norm(img_embed)
+
+        sims = torch.zeros(
+            img_embed.shape[0], cap_embed.shape[0]
+        ).to(self.device)
+
+        for i, cap_tensor in enumerate(cap_embed):
+            # cap: 1024, T
+            # img: 1024, 36
+
+            if self.task == 't2i':
+                n_words = lens[i]
+                cap_repr = cap_tensor[:,:n_words].mean(-1).unsqueeze(0)
+
+                img_output = self.cbn_img(img_embed, cap_repr)
+                img_vector = img_output.mean(-1)
+
+                img_vector = l2norm(img_vector, dim=-1)
+                cap_vector = cap_repr
+                cap_vector = l2norm(cap_vector, dim=-1)
+
+                sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
+
+            if self.task == 'i2t':
+                img_vectors = img_embed.mean(-1)
+                cap_i_expand = cap_tensor.repeat(img_vectors.shape[0], 1, 1)
+                txt_output = self.cbn_txt(cap_i_expand, img_vectors).mean(-1, keepdim=True)
+
+                sim = cosine_similarity(
+                    img_vectors.unsqueeze(2), txt_output, 1,
+                )
+
+            sims[:,i] = sim
+
 
         return sims
 
@@ -812,9 +755,38 @@ _similarities = {
     },
     'adaptive': {
         'class': AdaptiveEmbedding,
-        'args': Dict(),
+        'args': Dict(
+            task='t2i',
+        ),
     },
-
+    'adaptive_norm': {
+        'class': AdaptiveEmbedding,
+        'args': Dict(
+            task='t2i',
+            norm=True,
+        ),
+    },
+    'adaptive_k4': {
+        'class': AdaptiveEmbedding,
+        'args': Dict(
+            task='t2i',
+            k=4,
+        ),
+    },
+    'adaptive_i2t': {
+        'class': AdaptiveEmbedding,
+        'args': Dict(
+            task='i2t',
+        ),
+    },
+    'rnn_proj': {
+        'class': RNNProj,
+        'args': Dict(
+            norm=False, num_layers=1,
+            bidirectional=True,
+            rnn_units=256,
+        ),
+    },
 }
 
 

@@ -5,30 +5,30 @@ import torch.nn as nn
 
 __text_encoders__ = {
     'gru': {
-        'class': txtenc.RNNEncoder, 
+        'class': txtenc.RNNEncoder,
         'args': {
             'use_bi_gru': True,
             'rnn_type': nn.GRU,
-            
+
         },
     },
     'scan': {
-        'class': txtenc.EncoderText, 
+        'class': txtenc.EncoderText,
         'args': {
             'use_bi_gru': True,
-            'num_layers': 1,            
+            'num_layers': 1,
         },
     },
     'sa': {
-        'class': txtenc.SelfAttn, 
+        'class': txtenc.SelfAttn,
         'args': {},
     },
     'attngru': {
         'class': txtenc.SelfAttnGRU,
         'args': {
-            'use_bi_gru': True,            
+            'use_bi_gru': True,
             'no_txtnorm': True,
-            
+
         },
     },
     'convgru_sa': {
@@ -41,6 +41,11 @@ __text_encoders__ = {
         'class': txtenc.LiweGRU,
         'args': {
             'use_bi_gru': True,
+        },
+    },
+    'embed_proj': {
+        'class': txtenc.WordEmbeddingProj,
+        'args': {
         },
     },
 }
@@ -57,7 +62,7 @@ def get_text_encoder(model_name, **kwargs):
     arg_dict = dict(kwargs)
     arg_dict.update(model_args)
     model = model_class(**arg_dict)
-    return model 
+    return model
 
 
 def get_txt_pooling(pool_name):
