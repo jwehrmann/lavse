@@ -339,7 +339,9 @@ class AdaptiveEmbeddingI2T(nn.Module):
             img_repr = img_tensor.mean(-1).unsqueeze(0)
 
             txt_output = self.cbn_txt(cap_embed, img_repr)
-            txt_vector = mean_pooling(txt_output.permute(0, 2, 1), lens)
+            # txt_vector = mean_pooling(txt_output.permute(0, 2, 1), lens)
+            txt_vector = txt_output.max(-1)[0]
+
             # print('txt vector', txt_vector.shape)
             txt_vector = l2norm(txt_vector, dim=-1)
             img_vector = img_repr
@@ -348,7 +350,7 @@ class AdaptiveEmbeddingI2T(nn.Module):
             # print('img_vector: ', img_vector.shape)
             sim = cosine_sim(img_vector, txt_vector).squeeze(-1)
             # print('sim', sim.shape)
-            sims[:,i] = sim
+            sims[i,:] = sim
 
         return sims
 
