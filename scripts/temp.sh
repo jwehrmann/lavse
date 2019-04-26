@@ -22,22 +22,40 @@ export OUT_PATH=runs/temp/
 
 
 python train.py \
---data_path $DATA_PATH \
 --train_data f30k_precomp.en \
 --val_data f30k_precomp.en \
---outpath temp/adaptive_i2t/f30k_precomp.en/ \
---sim rnn_proj \
---workers 0 \
+--outpath runs/adaptive_i2t/f30k_precomp.en/ \
+--sim adaptive_i2t \
+--workers 2 \
 --image_encoder hierarchical \
---text_encoder embed_proj \
+--text_encoder attngru \
 --text_pooling none \
 --image_pooling none \
 --lr 6e-4 \
 --beta 0.999 \
 --vocab vocab/f30k_vocab.json \
---batch_size 32 \
---valid_interval 500 \
+--valid_interval 500 
 # --eval_before_training
+
+
+
+# python train.py \
+# --data_path $DATA_PATH \
+# --train_data f30k_precomp.en \
+# --val_data f30k_precomp.en \
+# --outpath temp/adaptive_i2t/f30k_precomp.en/ \
+# --sim rnn_proj \
+# --workers 0 \
+# --image_encoder hierarchical \
+# --text_encoder embed_proj \
+# --text_pooling none \
+# --image_pooling none \
+# --lr 6e-4 \
+# --beta 0.999 \
+# --vocab vocab/f30k_vocab.json \
+# --batch_size 32 \
+# --valid_interval 500 \
+# # --eval_before_training
 
 
 # python train.py \
