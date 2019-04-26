@@ -167,6 +167,9 @@ if __name__ == '__main__':
         help='Performs complete eval before training',
     )
 
+    loader_name = 'precomp'
+    # loader_name = 'dummy'
+
     args = parser.parse_args()
     args = Dict(vars(args))
 
@@ -184,7 +187,7 @@ if __name__ == '__main__':
     train_loader = get_loader(
         data_path=args.data_path,
         data_name=data_name,
-        loader_name='precomp',
+        loader_name=loader_name,
         vocab_path=args.vocab_path,
         batch_size=args.batch_size,
         workers=args.workers,
@@ -200,7 +203,7 @@ if __name__ == '__main__':
             get_loader(
                 data_path=args.data_path,
                 data_name=data_name,
-                loader_name='precomp',
+                loader_name=loader_name,
                 vocab_path=args.vocab_path,
                 batch_size=args.batch_size,
                 workers=args.workers,

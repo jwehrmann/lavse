@@ -99,6 +99,68 @@ class PrecompDataset(Dataset):
         return f'{self.data_name}.{self.data_split}'
 
 
+class DummyDataset(Dataset):
+    """
+    Load precomputed captions and image features
+    Possible options: f30k_precomp, coco_precomp
+    """
+
+    def __init__(
+        self, data_path, data_name,
+        data_split, tokenizer, lang='en'
+    ):
+        logger.debug(f'Precomp dataset\n {[data_path, data_split, tokenizer, lang]}')
+        self.tokenizer = tokenizer
+
+        self.captions = np.random.randint(0, 1000, size=(5000, 50))
+        logger.debug(f'Read captions. Found: {len(self.captions)}')
+
+        # Load Image features
+        self.images = np.random.uniform(size=(1000, 36, 2048))
+        self.length = 5000
+
+        logger.debug(f'Read feature file. Shape: {len(self.images.shape)}')
+
+        # Each image must have five captions
+        assert (
+            self.images.shape[0] == len(self.captions)
+            or self.images.shape[0]*5 == len(self.captions)
+        )
+
+        if self.images.shape[0] != len(self.captions):
+            self.im_div = 5
+        else:
+            self.im_div = 1
+        # the development set for coco is large and so validation would be slow
+        if data_split == 'dev':
+            self.length = 5000
+        print('Image div', self.im_div)
+
+        # self.precomp_captions =  [
+        #     self.tokenizer(x)
+        #     for x in self.captions
+        # ]
+
+        # self.maxlen = max([len(x) for x in self.precomp_captions])
+        # logger.info(f'Maxlen {self.maxlen}')
+
+    def get_img_dim(self):
+        return self.images.shape[-1]
+
+    def __getitem__(self, index):
+        # handle the image redundancy
+        img_id = index//self.im_div
+        image = self.images[img_id]
+        image = torch.FloatTensor(image)
+        # caption = self.precomp_captions[index]
+        caption = torch.LongTensor(self.captions[index])
+
+        return image, caption, index, img_id
+
+    def __len__(self):
+        return self.length
+
+
 class CrossLanguageLoader(Dataset):
     """
     Load precomputed captions and image features

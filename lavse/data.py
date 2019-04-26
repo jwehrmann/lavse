@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 
 from . import collate_fns
-from .loaders import CrossLanguageLoader, PrecompDataset
+from .loaders import CrossLanguageLoader, PrecompDataset, DummyDataset
 from .tokenizer import Tokenizer
 from .utils.file_utils import read_txt
 from .utils.logger import get_logger
@@ -161,6 +161,9 @@ def get_loaders(
 # }
 
 __loaders__ = {
+    'dummy': {
+        'class': DummyDataset,
+    },
     'precomp': {
         'class': PrecompDataset,
     },
