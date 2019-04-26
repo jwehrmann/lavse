@@ -167,7 +167,9 @@ if __name__ == '__main__':
         help='Performs complete eval before training',
     )
 
-    loader_name = 'dummy'
+    loader_name = 'precomp'
+    # loader_name = 'dummy'
+
 
     args = parser.parse_args()
     args = Dict(vars(args))
