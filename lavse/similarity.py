@@ -338,7 +338,7 @@ class AdaptiveEmbeddingI2T(nn.Module):
             img_repr = img_tensor.mean(-1).unsqueeze(0)
 
             txt_output = self.cbn_txt(cap_embed, img_repr)
-            txt_vector = mean_pooling(txt_output.permute(0, 2, 1), lens)
+            txt_vector = mean_pooling(txt_output, lens)
             txt_vector = l2norm(txt_vector, dim=-1)
             img_vector = img_repr
             img_vector = l2norm(img_vector, dim=-1)

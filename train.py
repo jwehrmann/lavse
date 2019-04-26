@@ -170,7 +170,6 @@ if __name__ == '__main__':
     loader_name = 'precomp'
     # loader_name = 'dummy'
 
-
     args = parser.parse_args()
     args = Dict(vars(args))
 
