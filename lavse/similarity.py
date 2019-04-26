@@ -321,6 +321,8 @@ class AdaptiveEmbeddingI2T(nn.Module):
         # (B, 1024, T)
         cap_embed = cap_embed.permute(0, 2, 1).to(self.device)
         img_embed = img_embed.permute(0, 2, 1).to(self.device)
+        print(cap_embed.shape)
+        print(img_embed.shape)
 
         # (B, 1024)
         if self.norm:
@@ -334,19 +336,18 @@ class AdaptiveEmbeddingI2T(nn.Module):
         for i, img_tensor in enumerate(img_embed):
             # cap: 1024, T
             # img: 1024, 36
-            n_words = lens[i]
             img_repr = img_tensor.mean(-1).unsqueeze(0)
 
             txt_output = self.cbn_txt(cap_embed, img_repr)
             txt_vector = mean_pooling(txt_output.permute(0, 2, 1), lens)
-            print('-', txt_vector)
+            print('-', txt_vector.shape)
             txt_vector = l2norm(txt_vector, dim=-1)
             img_vector = img_repr
             img_vector = l2norm(img_vector, dim=-1)
             print(txt_vector.shape)
             print(img_vector.shape)
             sim = cosine_sim(img_vector, txt_vector).squeeze(-1)
-
+            print(sim.shape)
             sims[:,i] = sim
 
         return sims
