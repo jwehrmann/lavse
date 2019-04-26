@@ -43,9 +43,13 @@ __text_encoders__ = {
             'use_bi_gru': True,
         },
     },
-    'embed_proj': {
+    'emb_proj': {
         'class': txtenc.WordEmbeddingProj,
         'args': {
+            'word_sa': True,
+            'projection': False,
+            'non_linear_proj': False,
+            'projection_sa': False,
         },
     },
 }

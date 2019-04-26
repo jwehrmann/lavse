@@ -1,30 +1,30 @@
 from . import precomp
-from . import fullencoder 
+from . import fullencoder
 from . import pooling
 import torchvision
 
 
 _image_encoders = {
     'hierarchical': {
-        'class': precomp.HierarchicalEncoder, 
+        'class': precomp.HierarchicalEncoder,
         'args': {
             'img_dim': 2048,
         },
     },
     'sa': {
-        'class': precomp.SAImgEncoder, 
+        'class': precomp.SAImgEncoder,
         'args': {
             'img_dim': 2048,
         },
     },
     'sagru': {
-        'class': precomp.SAGRUImgEncoder, 
+        'class': precomp.SAGRUImgEncoder,
         'args': {
             'img_dim': 2048,
         },
     },
     'scan': {
-        'class': precomp.SCANImagePrecomp, 
+        'class': precomp.SCANImagePrecomp,
         'args': {
             'img_dim': 2048,
         },
@@ -56,6 +56,16 @@ _image_encoders = {
             'img_dim': 2048,
         },
     },
+    'img_proj': {
+        'class': precomp.ImageProj,
+        'args': {
+            'img_sa': False,
+            'projection': False,
+            'non_linear_proj': False,
+            'projection_sa': False,
+        },
+    },
+
 }
 
 
@@ -70,7 +80,7 @@ def get_image_encoder(model_name, **kwargs):
     arg_dict = dict(kwargs)
     arg_dict.update(model_args)
     model = model_class(**arg_dict)
-    return model 
+    return model
 
 
 def get_img_pooling(pool_name):

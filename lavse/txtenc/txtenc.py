@@ -106,24 +106,59 @@ class RNNEncoder(nn.Module):
 class WordEmbeddingProj(nn.Module):
 
     def __init__(
-        self, num_embeddings, embed_dim, latent_size,
+        self, num_embeddings, embed_dim,
+        latent_size, word_sa=True, projection=False,
+        non_linear_proj=False, projection_sa=False,
     ):
 
         super(WordEmbeddingProj, self).__init__()
         self.latent_size = latent_size
 
         # word embedding
-        self.embed = nn.Embedding(num_embeddings, embed_dim)
-        self.linear = nn.Linear(embed_dim, latent_size)
+        layers = []
+        self.emb = nn.Embedding(num_embeddings, embed_dim)
+        if word_sa:
+            layers.append(
+                attention.SelfAttention(
+                    in_dim=embed_dim,
+                    activation=nn.LeakyReLU(0.1)
+                )
+            )
+        if projection:
+            layers.append(
+                nn.Conv1d(embed_dim, latent_size, 1)
+            )
+        if non_linear_proj:
+            layers.append(
+                nn.LeakyReLU(0.1, inplace=True)
+            )
+        if projection_sa:
+            layers.append(
+                attention.SelfAttention(
+                    in_dim=latent_size,
+                    activation=nn.LeakyReLU(0.1),
+                )
+            )
+
+        self.layers = nn.Sequential(*layers)
 
         self.apply(default_initializer)
 
-    def forward(self, x, lengths):
-        """Handles variable size captions
-        """
+    def forward(self, captions, lengths):
+        '''
+        Extract text features
+
+        Arguments:
+            images {torch.FloatTensor} -- shape: (batch, timesteps, dims)
+
+        Returns:
+            [torch.FloatTensor] -- shape: (batch, [timesteps, or 1], dims)
+        '''
+        x = self.emb(captions)
         # Embed word ids to vectors
-        x = self.embed(x)
-        x = self.linear(x)
+        x = x.permute(0, 2, 1)
+        x = self.layers(x)
+        x = x.permute(0, 2, 1)
 
         return x, lengths
 
