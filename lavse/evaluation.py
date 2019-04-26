@@ -24,6 +24,8 @@ def predict_loader(model, data_loader, device):
         captions = captions.to(device)
         # compute the embeddings
         img_emb, cap_emb = model(images, captions, lengths)
+        print(img_emb.shape)
+        print(ids)
         if img_embs is None:
             if len(img_emb.shape) == 3:
                 is_tensor = True
@@ -35,6 +37,7 @@ def predict_loader(model, data_loader, device):
                 cap_embs = np.zeros((len(data_loader.dataset), cap_emb.size(1)))
             cap_lens = [0] * len(data_loader.dataset)
         # cache embeddings
+        print(img_embs.shape)
         img_embs[ids] = img_emb.data.cpu().numpy()
         if is_tensor:
             cap_embs[ids,:max(lengths),:] = cap_emb.data.cpu().numpy()

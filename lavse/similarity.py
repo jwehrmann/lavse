@@ -291,10 +291,10 @@ class AdaptiveEmbedding(nn.Module):
         return sims
 
 
-class AdaptiveEmbedding(nn.Module):
+class AdaptiveEmbeddingI2T(nn.Module):
 
     def __init__(
-            self, device, latent_size=1024, k=8, norm=False, task='t2i'
+            self, device, latent_size=1024, k=8, norm=False,
         ):
         super().__init__()
 
@@ -312,7 +312,6 @@ class AdaptiveEmbedding(nn.Module):
         self.norm = norm
         if norm:
             self.feature_norm = ClippedL2Norm()
-        self.task = task
 
     def forward(self, img_embed, cap_embed, lens, **kwargs):
         '''
@@ -343,7 +342,6 @@ class AdaptiveEmbedding(nn.Module):
             txt_vector = l2norm(txt_vector, dim=-1)
             img_vector = img_repr
             img_vector = l2norm(img_vector, dim=-1)
-
             sim = cosine_sim(img_vector, txt_vector).squeeze(-1)
 
             sims[:,i] = sim
@@ -834,10 +832,8 @@ _similarities = {
         ),
     },
     'adaptive_i2t': {
-        'class': AdaptiveEmbedding,
-        'args': Dict(
-            task='i2t',
-        ),
+        'class': AdaptiveEmbeddingI2T,
+        'args': Dict(),
     },
     'rnn_proj': {
         'class': RNNProj,

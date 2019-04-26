@@ -20,6 +20,7 @@ export OUT_PATH=runs/temp/
 # --beta 0.999 \
 # --eval_before_training \
 
+--data_path $DATA_PATH \
 
 python train.py \
 --train_data f30k_precomp.en \
@@ -34,9 +35,8 @@ python train.py \
 --lr 6e-4 \
 --beta 0.999 \
 --vocab vocab/f30k_vocab.json \
---valid_interval 500 
-# --eval_before_training
-
+--valid_interval 500 \
+--device cpu
 
 
 # python train.py \
