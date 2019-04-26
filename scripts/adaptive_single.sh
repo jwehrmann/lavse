@@ -56,8 +56,8 @@ python train.py \
 --data_path $DATA_PATH \
 --train_data f30k_precomp.en \
 --val_data f30k_precomp.en \
---outpath runs/adaptive_i2t/f30k_precomp.en/ \
---sim adaptive_i2t \
+--outpath runs/temp/f30k_precomp.en/ \
+--sim adaptive \
 --workers 2 \
 --image_encoder hierarchical \
 --text_encoder attngru \
