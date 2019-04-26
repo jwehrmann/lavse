@@ -21,7 +21,7 @@ class CondBatchNorm1d(nn.Module):
 
     def __init__(
         self, in_features, k, cond_vector_size=None,
-        normalization='batchnorm', nonlinear_proj=True
+        normalization='batchnorm', nonlinear_proj=True,
     ):
         super().__init__()
 
@@ -163,7 +163,8 @@ class AdaptiveEmbedding(nn.Module):
 class AdaptiveEmbeddingI2T(nn.Module):
 
     def __init__(
-            self, device, latent_size=1024, k=8, norm=False, **kwargs
+            self, device, latent_size=1024,
+            k=8, norm=False, cond_vec=False, **kwargs
         ):
         super().__init__()
 
@@ -173,6 +174,7 @@ class AdaptiveEmbeddingI2T(nn.Module):
 
         # self.cbn_img = CondBatchNorm1d(latent_size, k)
         self.cbn_txt = CondBatchNorm1d(latent_size, k, **kwargs)
+        self.cbn_vec = CondBatchNorm1d(latent_size, k, **kwargs)
 
         # self.alpha = nn.Parameter(torch.ones(1))
         # self.beta = nn.Parameter(torch.zeros(1))
@@ -181,6 +183,8 @@ class AdaptiveEmbeddingI2T(nn.Module):
         self.norm = norm
         if norm:
             self.feature_norm = ClippedL2Norm()
+
+        self.cond_vec = cond_vec
 
     def forward(self, img_embed, cap_embed, lens, **kwargs):
         '''
@@ -212,6 +216,9 @@ class AdaptiveEmbeddingI2T(nn.Module):
             txt_output = self.cbn_txt(cap_embed, img_repr)
             # txt_vector = mean_pooling(txt_output.permute(0, 2, 1), lens)
             txt_vector = txt_output.max(-1)[0]
+            if self.cond_vec:
+                txt_vector = self.cbn_vec(txt_vector.unsqueeze(2), img_repr)
+                txt_vector = txt_vector.squeeze(2)
 
             # print('txt vector', txt_vector.shape)
             txt_vector = l2norm(txt_vector, dim=-1)
@@ -706,6 +713,12 @@ _similarities = {
     'adaptive_i2t': {
         'class': AdaptiveEmbeddingI2T,
         'args': Dict(),
+    },
+    'adaptive_i2t_condvec': {
+        'class': AdaptiveEmbeddingI2T,
+        'args': Dict(
+            cond_vec=True,
+        ),
     },
     'adaptive_i2t_bn_linear': {
         'class': AdaptiveEmbeddingI2T,
