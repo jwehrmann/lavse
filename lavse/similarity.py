@@ -725,6 +725,13 @@ _similarities = {
             cond_vec=True,
         ),
     },
+    'adaptive_i2t_condvec_linear': {
+        'class': AdaptiveEmbeddingI2T,
+        'args': Dict(
+            cond_vec=True,
+            nonlinear_proj=False,
+        ),
+    },
     'adaptive_i2t_bn_linear': {
         'class': AdaptiveEmbeddingI2T,
         'args': Dict(

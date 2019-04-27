@@ -6,6 +6,7 @@ from tensorboardX import SummaryWriter
 def save_checkpoint(
         outpath, model, optimizer,
         epoch, args, is_best, classes,
+        save_all=False,
     ):
 
     if optimizer is not None:
@@ -19,15 +20,18 @@ def save_checkpoint(
         'classes': classes,
     }
 
+    if not save_all:
+        epoch = 0
+
     torch.save(
         obj=state_dict,
-        f=os.path.join(outpath, 'checkpoint.pkl'),
+        f=os.path.join(outpath, f'checkpoint_{epoch}.pkl'),
     )
 
     if is_best:
         import shutil
         shutil.copy(
-            os.path.join(outpath, 'checkpoint.pkl'),
+            os.path.join(outpath, f'checkpoint_{epoch}.pkl'),
             os.path.join(outpath, 'best_model.pkl'),
         )
 

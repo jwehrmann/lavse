@@ -166,6 +166,10 @@ if __name__ == '__main__':
         '--eval_before_training', action='store_true',
         help='Performs complete eval before training',
     )
+    parser.add_argument(
+        '--save_all', action='store_true',
+        help='Save checkpoints for all models',
+    )
 
     loader_name = 'precomp'
     # loader_name = 'dummy'
@@ -284,6 +288,7 @@ if __name__ == '__main__':
         early_stop=args.early_stop,
         log_grad_norm=True,
         log_histograms=False,
+        save_all=args.save_all,
     )
     if args.eval_before_training:
         result, rs = trainer.evaluate_loaders(

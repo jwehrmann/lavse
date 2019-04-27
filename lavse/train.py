@@ -59,6 +59,7 @@ class Trainer:
         log_histograms=True,
         log_grad_norm=True,
         early_stop=50,
+        save_all=False,
         **kwargs
     ):
         self.optimizer = optimizer(self.model.parameters(), lr, **kwargs)
@@ -74,6 +75,7 @@ class Trainer:
         self.best_val = 0
         self.count = early_stop
         self.early_stop = early_stop
+        self.save_all = save_all
 
     def fit(
         self, train_loader, valid_loaders, lang_loaders=[],
@@ -298,7 +300,7 @@ class Trainer:
             optimizer=self.optimizer,
             epoch=self.mm_criterion.iteration,
             args=args, classes=None,
-            is_best=is_best
+            is_best=is_best, save_all=self.save_all,
         )
 
     def load(self, path=None):
