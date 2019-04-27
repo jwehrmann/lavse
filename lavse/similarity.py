@@ -26,7 +26,7 @@ class CondBatchNorm1d(nn.Module):
         super().__init__()
 
         if normalization is None:
-            self.norm = lambda x: x
+            self.bn = lambda x: x
         elif normalization == 'batchnorm':
             self.bn = nn.BatchNorm1d(in_features, affine=False)
         elif normalization == 'instancenorm':
@@ -172,9 +172,10 @@ class AdaptiveEmbeddingI2T(nn.Module):
 
         # self.fc = nn.Conv1d(latent_size, latent_size*2, 1).to(device)
 
-        # self.cbn_img = CondBatchNorm1d(latent_size, k)
+        self.cbn_img = CondBatchNorm1d(latent_size, k)
         self.cbn_txt = CondBatchNorm1d(latent_size, k, **kwargs)
-        self.cbn_vec = CondBatchNorm1d(latent_size, k, **kwargs)
+        if cond_vec:
+           self.cbn_vec = CondBatchNorm1d(latent_size, k, **kwargs)
 
         # self.alpha = nn.Parameter(torch.ones(1))
         # self.beta = nn.Parameter(torch.zeros(1))
@@ -713,6 +714,10 @@ _similarities = {
     'adaptive_i2t': {
         'class': AdaptiveEmbeddingI2T,
         'args': Dict(),
+    },
+    'adaptive_i2t_feat_norm_bn': {
+        'class': AdaptiveEmbeddingI2T,
+        'args': Dict(norm=True, nonlinear_proj=False),
     },
     'adaptive_i2t_condvec': {
         'class': AdaptiveEmbeddingI2T,
