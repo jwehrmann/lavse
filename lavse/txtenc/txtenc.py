@@ -239,7 +239,7 @@ class SelfAttnGRUWordCat(nn.Module):
         rnn_cell=nn.GRU, activation=nn.LeakyReLU(0.1),
     ):
 
-        super(SelfAttnGRU, self).__init__()
+        super(SelfAttnGRUWordCat, self).__init__()
         self.latent_size = latent_size
         self.no_txtnorm = no_txtnorm
 
