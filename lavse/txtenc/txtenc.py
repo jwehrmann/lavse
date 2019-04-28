@@ -237,6 +237,7 @@ class SelfAttnGRUWordCat(nn.Module):
         self, num_embeddings, embed_dim, latent_size,
         num_layers=1, use_bi_gru=True, no_txtnorm=False,
         rnn_cell=nn.GRU, activation=nn.LeakyReLU(0.1),
+        embed_k=8,
     ):
 
         super(SelfAttnGRUWordCat, self).__init__()
@@ -245,7 +246,7 @@ class SelfAttnGRUWordCat(nn.Module):
 
         # word embedding
         self.embed = nn.Embedding(num_embeddings, embed_dim)
-        self.embed_sa = attention.SelfAttention(embed_dim, activation)
+        self.embed_sa = attention.SelfAttention(embed_dim, activation, k=embed_k)
 
         # caption embedding
         self.use_bi_gru = use_bi_gru
