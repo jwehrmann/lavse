@@ -292,7 +292,7 @@ class SelfAttnGRUWordCat(nn.Module):
         cap_emb = cap_emb.permute(0, 2, 1)
         cap_emb = self.sa1(cap_emb)
 
-        cap_emb = torch.cat([cap_emb, wsa])
+        cap_emb = torch.cat([cap_emb, wsa], 1)
 
         cap_emb = self.fc(cap_emb)
         cap_emb = cap_emb.permute(0, 2, 1)
