@@ -31,6 +31,14 @@ __text_encoders__ = {
 
         },
     },
+    'attngru_cat': {
+        'class': txtenc.SelfAttnGRUWordCat,
+        'args': {
+            'use_bi_gru': True,
+            'no_txtnorm': True,
+
+        },
+    },
     'convgru_sa': {
         'class': txtenc.ConvGRU,
         'args': {
