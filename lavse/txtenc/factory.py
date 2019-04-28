@@ -47,12 +47,12 @@ __text_encoders__ = {
             'embed_k': 2,
         },
     },
-    'attngru_cat_ekk': {
+    'attngru_cat_ek4': {
         'class': txtenc.SelfAttnGRUWordCat,
         'args': {
             'use_bi_gru': True,
             'no_txtnorm': True,
-            'embed_k': k,
+            'embed_k': 4,
         },
     },
     'convgru_sa': {
