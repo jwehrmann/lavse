@@ -276,7 +276,7 @@ class SelfAttnGRUWordCat(nn.Module):
         # Forward propagate RNN
         # packed = pack_padded_sequence(x, lengths, batch_first=True)
         xt = x.permute(0, 2, 1)
-        wsa = self.embed_dim(xt)
+        wsa = self.embed_sa(xt)
 
         # Forward propagate RNN
         cap_emb, _ = self.rnn(x)
