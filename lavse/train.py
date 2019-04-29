@@ -240,6 +240,12 @@ class Trainer:
                         is_best=True,
                         args=self.args
                     )
+                if self.save_all:
+                    self.save(
+                        path=self.path,
+                        is_best=True,
+                        args=self.args
+                    )
 
                 # Log updates
                 for metric, values in metrics.items():
