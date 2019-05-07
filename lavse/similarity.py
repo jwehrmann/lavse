@@ -280,7 +280,8 @@ class ImageToTextConvProj(nn.Module):
 
     def __init__(
             self, device, latent_size=1024,
-            k=8, norm=False, cond_vec=False, **kwargs
+            k=8, norm=False, use_sa=False,
+            **kwargs
         ):
         super().__init__()
 
@@ -292,6 +293,7 @@ class ImageToTextConvProj(nn.Module):
         self.input_dim = input_dim
         self.conv_out_channels = 128
         self.adapt_img = nn.Linear(latent_size, adapt_img_hidden)
+        self.use_sa = use_sa
 
         self.sim_proj = nn.Sequential(
             nn.Linear(self.conv_out_channels*3, 1),
@@ -314,9 +316,16 @@ class ImageToTextConvProj(nn.Module):
         self.bn = nn.BatchNorm1d(self.conv_out_channels*3)
         self.relu = nn.ReLU(inplace=True)
 
-        self.conv_sa = attention.SelfAttention(
-            self.conv_out_channels*3, activation=nn.LeakyReLU(0.1), k=2
-        )
+        if use_sa:
+            self.conv_sa1 = attention.SelfAttention(
+                self.conv_out_channels, activation=nn.LeakyReLU(0.1), k=2
+            )
+            self.conv_sa2 = attention.SelfAttention(
+                self.conv_out_channels, activation=nn.LeakyReLU(0.1), k=2
+            )
+            self.conv_sa3 = attention.SelfAttention(
+                self.conv_out_channels, activation=nn.LeakyReLU(0.1), k=2
+            )
         # self.cbn_img = CondBatchNorm1d(latent_size, k)
         # self.cbn_txt = CondBatchNorm1d(latent_size, k, **kwargs)
         # if cond_vec:
@@ -360,9 +369,16 @@ class ImageToTextConvProj(nn.Module):
             _, _, T = a.shape
             b = self.conv1d_2x(cap_embed, img_compr)[:,:,:T]
             c = self.conv1d_3x(cap_embed, img_compr)[:,:,:T]
+
+            if self.usa_sa:
+                a = self.conv_sa1(a)
+                b = self.conv_sa2(b)
+                c = self.conv_sa3(c)
+
             x = torch.cat([a, b, c], dim=1)
             x = self.relu(self.bn(x))
-            x = x.mean(-1)
+            x = self.conv_sa(x)
+            x = x.max(-1)[0]
             s = self.sim_proj(x)
             sims[i,:] = s.squeeze(1)
 
@@ -703,6 +719,13 @@ _similarities = {
             norm=False, num_layers=1,
             bidirectional=True,
             rnn_units=256,
+        ),
+    },
+    'conv_proj_sa': {
+        'class': ImageToTextConvProj,
+        'args': Dict(
+            norm=False,
+            use_sa=True,
         ),
     },
 }
