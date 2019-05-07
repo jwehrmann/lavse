@@ -301,7 +301,7 @@ class ImageToTextConvProj(nn.Module):
         self.use_sa = use_sa
 
         self.sim_proj = nn.Sequential(
-            nn.Linear(self.conv_out_channels*4, 128),
+            nn.Linear(self.conv_out_channels*3, 128),
             nn.BatchNorm1d(128),
             nn.ReLU(inplace=True),
             nn.Dropout(0.25),
