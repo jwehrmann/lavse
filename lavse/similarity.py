@@ -240,7 +240,7 @@ class ProjConv1d(nn.Module):
 
     def __init__(
         self, base_proj_channels, in_channels, out_channels,
-        kernel_size, padding, proj_bias=True, weightnorm='batchnorm',
+        kernel_size, padding, groups=1, proj_bias=True, weightnorm='batchnorm',
     ):
         super().__init__()
 
@@ -250,9 +250,10 @@ class ProjConv1d(nn.Module):
         self.padding = padding
         self.proj_bias = proj_bias
         self.base_proj_channels = base_proj_channels
+        self.groups = groups
         self.weightnorm = True
 
-        self.kernel = nn.Linear(base_proj_channels, in_channels * out_channels * kernel_size)
+        self.kernel = nn.Linear(base_proj_channels, (in_channels * out_channels * kernel_size) // groups)
         if weightnorm == 'batchnorm':
             self.weight_norm = nn.BatchNorm1d(out_channels)
         if proj_bias:
@@ -262,7 +263,11 @@ class ProjConv1d(nn.Module):
 
     def forward(self, input, base_proj):
         kernel = self.kernel(base_proj)
-        kernel = kernel.view(self.out_channels, self.in_channels, self.kernel_size)
+        kernel = kernel.view(
+            self.out_channels,
+            self.in_channels // self.groups,
+            self.kernel_size
+        )
         if self.weightnorm:
             kernel = self.weight_norm(kernel.permute(1, 0, 2)).permute(1, 0, 2)
         if self.proj_bias:
@@ -272,7 +277,7 @@ class ProjConv1d(nn.Module):
         return F.conv1d(
             input, kernel, bias=bias, stride=1,
             padding=self.padding, dilation=1,
-            groups=1,
+            groups=self.groups,
         )
 
 
@@ -281,46 +286,71 @@ class ImageToTextConvProj(nn.Module):
     def __init__(
             self, device, latent_size=1024,
             k=8, norm=False, use_sa=False,
-            **kwargs
+            adapt_img_hidden=128, conv_out_channels=128,
+            groups=1, **kwargs
         ):
         super().__init__()
 
         self.device = device
 
         input_dim = 300
-        adapt_img_hidden = 128
 
         self.input_dim = input_dim
-        self.conv_out_channels = 128
+        self.conv_out_channels = conv_out_channels
         self.adapt_img = nn.Linear(latent_size, adapt_img_hidden)
         self.use_sa = use_sa
 
         self.sim_proj = nn.Sequential(
-            nn.Linear(self.conv_out_channels*3, 1),
+            nn.Linear(self.conv_out_channels*4, 1),
             nn.Sigmoid(),
         )
 
         self.conv1d_1x = ProjConv1d(
-            base_proj_channels=adapt_img_hidden, in_channels=input_dim,
-            out_channels=self.conv_out_channels, kernel_size=1, padding=1, proj_bias=True
+            base_proj_channels=adapt_img_hidden,
+            in_channels=input_dim,
+            out_channels=self.conv_out_channels,
+            groups=groups,
+            kernel_size=1,
+            padding=1,
+            proj_bias=True,
         )
         self.conv1d_2x = ProjConv1d(
-            base_proj_channels=adapt_img_hidden, in_channels=input_dim,
-            out_channels=self.conv_out_channels, kernel_size=2, padding=2, proj_bias=True
+            base_proj_channels=adapt_img_hidden,
+            in_channels=input_dim,
+            out_channels=self.conv_out_channels,
+            groups=groups,
+            kernel_size=2,
+            padding=2,
+            proj_bias=True,
         )
         self.conv1d_3x = ProjConv1d(
-            base_proj_channels=adapt_img_hidden, in_channels=input_dim,
-            out_channels=self.conv_out_channels, kernel_size=3, padding=2, proj_bias=True
+            base_proj_channels=adapt_img_hidden,
+            in_channels=input_dim,
+            out_channels=self.conv_out_channels,
+            groups=groups,
+            kernel_size=3,
+            padding=2,
+            proj_bias=True,
+        )
+        self.conv1d_3b = ProjConv1d(
+            base_proj_channels=adapt_img_hidden,
+            in_channels=input_dim,
+            out_channels=self.conv_out_channels,
+            groups=groups,
+            kernel_size=3,
+            padding=2,
+            proj_bias=True
         )
 
         self.bn1 = nn.BatchNorm1d(self.conv_out_channels)
         self.bn2 = nn.BatchNorm1d(self.conv_out_channels)
         self.bn3 = nn.BatchNorm1d(self.conv_out_channels)
+        self.bn4 = nn.BatchNorm1d(self.conv_out_channels)
 
         self.relu1 = nn.ReLU(inplace=True)
         self.relu2 = nn.ReLU(inplace=True)
         self.relu3 = nn.ReLU(inplace=True)
-
+        self.relu4 = nn.ReLU(inplace=True)
 
         if use_sa:
             self.conv_sa1 = attention.SelfAttention(
@@ -332,14 +362,15 @@ class ImageToTextConvProj(nn.Module):
             self.conv_sa3 = attention.SelfAttention(
                 self.conv_out_channels, activation=nn.LeakyReLU(0.1), k=2
             )
-        # self.cbn_img = CondBatchNorm1d(latent_size, k)
-        # self.cbn_txt = CondBatchNorm1d(latent_size, k, **kwargs)
-        # if cond_vec:
-        #    self.cbn_vec = CondBatchNorm1d(latent_size, k, **kwargs)
+            self.conv_sa4 = attention.SelfAttention(
+                self.conv_out_channels, activation=nn.LeakyReLU(0.1), k=2
+            )
 
-        # self.alpha = nn.Parameter(torch.ones(1))
-        # self.beta = nn.Parameter(torch.zeros(1))
-
+        self.merge = nn.Sequential(
+            nn.Conv1d(self.conv_out_channels * 4, self.conv_out_channels * 4, 1),
+            nn.LeakyReLU(0.1),
+            nn.BatchNorm1d(self.conv_out_channels*4),
+        )
         self.norm = norm
         if norm:
             self.feature_norm = ClippedL2Norm()
@@ -377,15 +408,18 @@ class ImageToTextConvProj(nn.Module):
             b = self.conv1d_2x(cap_embed, img_compr)[:,:,:T]
             b = self.relu2(self.bn2(b))
             c = self.conv1d_3x(cap_embed, img_compr)[:,:,:T]
-            c = self.relu3(self.bn3(b))
+            c = self.relu3(self.bn3(c))
+            d = self.conv1d_3b(cap_embed, img_compr)[:,:,:T]
+            d = self.relu4(self.bn4(d))
 
             if self.use_sa:
                 a = self.conv_sa1(a)
                 b = self.conv_sa2(b)
                 c = self.conv_sa3(c)
+                d = self.conv_sa3(d)
 
-            x = torch.cat([a, b, c], dim=1)
-            # x = self.relu(self.bn(x))
+            x = torch.cat([a, b, c, d], dim=1)
+            x = self.merge(x)
             x = x.max(-1)[0]
             s = self.sim_proj(x)
             sims[i,:] = s.squeeze(1)
@@ -734,6 +768,16 @@ _similarities = {
         'args': Dict(
             norm=False,
             use_sa=True,
+        ),
+    },
+    'conv_proj_sa_256_g2': {
+        'class': ImageToTextConvProj,
+        'args': Dict(
+            norm=False,
+            use_sa=True,
+            adapt_img_hidden=256,
+            conv_out_channels=256,
+            groups=2,
         ),
     },
 }
