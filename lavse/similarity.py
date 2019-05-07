@@ -301,7 +301,11 @@ class ImageToTextConvProj(nn.Module):
         self.use_sa = use_sa
 
         self.sim_proj = nn.Sequential(
-            nn.Linear(self.conv_out_channels*4, 1),
+            nn.Linear(self.conv_out_channels*4, 128),
+            nn.BatchNorm1d(128),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.25),
+            nn.Linear(128, 1),
             nn.Sigmoid(),
         )
 
@@ -332,25 +336,14 @@ class ImageToTextConvProj(nn.Module):
             padding=2,
             proj_bias=True,
         )
-        self.conv1d_3b = ProjConv1d(
-            base_proj_channels=adapt_img_hidden,
-            in_channels=input_dim,
-            out_channels=self.conv_out_channels,
-            groups=groups,
-            kernel_size=3,
-            padding=2,
-            proj_bias=True
-        )
 
         self.bn1 = nn.BatchNorm1d(self.conv_out_channels)
         self.bn2 = nn.BatchNorm1d(self.conv_out_channels)
         self.bn3 = nn.BatchNorm1d(self.conv_out_channels)
-        self.bn4 = nn.BatchNorm1d(self.conv_out_channels)
 
         self.relu1 = nn.ReLU(inplace=True)
         self.relu2 = nn.ReLU(inplace=True)
         self.relu3 = nn.ReLU(inplace=True)
-        self.relu4 = nn.ReLU(inplace=True)
 
         if use_sa:
             self.conv_sa1 = attention.SelfAttention(
@@ -362,15 +355,7 @@ class ImageToTextConvProj(nn.Module):
             self.conv_sa3 = attention.SelfAttention(
                 self.conv_out_channels, activation=nn.LeakyReLU(0.1), k=2
             )
-            self.conv_sa4 = attention.SelfAttention(
-                self.conv_out_channels, activation=nn.LeakyReLU(0.1), k=2
-            )
 
-        self.merge = nn.Sequential(
-            nn.Conv1d(self.conv_out_channels * 4, self.conv_out_channels * 4, 1),
-            nn.LeakyReLU(0.1),
-            nn.BatchNorm1d(self.conv_out_channels*4),
-        )
         self.norm = norm
         if norm:
             self.feature_norm = ClippedL2Norm()
@@ -409,17 +394,13 @@ class ImageToTextConvProj(nn.Module):
             b = self.relu2(self.bn2(b))
             c = self.conv1d_3x(cap_embed, img_compr)[:,:,:T]
             c = self.relu3(self.bn3(c))
-            d = self.conv1d_3b(cap_embed, img_compr)[:,:,:T]
-            d = self.relu4(self.bn4(d))
 
             if self.use_sa:
                 a = self.conv_sa1(a)
                 b = self.conv_sa2(b)
                 c = self.conv_sa3(c)
-                d = self.conv_sa3(d)
 
-            x = torch.cat([a, b, c, d], dim=1)
-            x = self.merge(x)
+            x = torch.cat([a, b, c], dim=1)
             x = x.max(-1)[0]
             s = self.sim_proj(x)
             sims[i,:] = s.squeeze(1)
