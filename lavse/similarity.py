@@ -313,8 +313,14 @@ class ImageToTextConvProj(nn.Module):
             out_channels=self.conv_out_channels, kernel_size=3, padding=2, proj_bias=True
         )
 
-        self.bn = nn.BatchNorm1d(self.conv_out_channels*3)
-        self.relu = nn.ReLU(inplace=True)
+        self.bn1 = nn.BatchNorm1d(self.conv_out_channels)
+        self.bn2 = nn.BatchNorm1d(self.conv_out_channels)
+        self.bn3 = nn.BatchNorm1d(self.conv_out_channels)
+
+        self.relu1 = nn.ReLU(inplace=True)
+        self.relu2 = nn.ReLU(inplace=True)
+        self.relu3 = nn.ReLU(inplace=True)
+
 
         if use_sa:
             self.conv_sa1 = attention.SelfAttention(
@@ -366,9 +372,12 @@ class ImageToTextConvProj(nn.Module):
             img_repr = img_tensor.unsqueeze(0)
             img_compr = self.adapt_img(img_repr)
             a = self.conv1d_1x(cap_embed, img_compr)
+            a = self.relu1(self.bn1(a))
             _, _, T = a.shape
             b = self.conv1d_2x(cap_embed, img_compr)[:,:,:T]
+            b = self.relu2(self.bn2(b))
             c = self.conv1d_3x(cap_embed, img_compr)[:,:,:T]
+            c = self.relu3(self.bn3(b))
 
             if self.use_sa:
                 a = self.conv_sa1(a)
@@ -376,8 +385,7 @@ class ImageToTextConvProj(nn.Module):
                 c = self.conv_sa3(c)
 
             x = torch.cat([a, b, c], dim=1)
-            x = self.relu(self.bn(x))
-            x = self.conv_sa(x)
+            # x = self.relu(self.bn(x))
             x = x.max(-1)[0]
             s = self.sim_proj(x)
             sims[i,:] = s.squeeze(1)
