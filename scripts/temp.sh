@@ -26,16 +26,18 @@ python train.py \
 --train_data f30k_precomp.en \
 --val_data f30k_precomp.en \
 --outpath runs/adaptive_i2t_im_sa/f30k_precomp.en/ \
---sim hier \
 --workers 3 \
---image_encoder img_proj \
+--sim rnn_proj \
+--image_encoder hierarchical \
 --text_encoder emb_proj \
 --text_pooling none \
 --image_pooling none \
 --lr 6e-4 \
 --beta 0.999 \
 --vocab vocab/f30k_vocab.json \
---valid_interval 500
+--valid_interval 500 \
+--device cpu \
+--loader dummy
 
 
 # python train.py \

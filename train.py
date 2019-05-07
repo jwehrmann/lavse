@@ -171,11 +171,17 @@ if __name__ == '__main__':
         help='Save checkpoints for all models',
     )
 
-    loader_name = 'precomp'
-    # loader_name = 'dummy'
+    parser.add_argument(
+        '--loader_name', default='precomp',
+        help='Loader to be used',
+    )
+
+    # loader_name = 'precomp'
 
     args = parser.parse_args()
     args = Dict(vars(args))
+
+    loader_name = args.loader_name
 
     logger = create_logger(level=args.log_level)
 
