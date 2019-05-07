@@ -370,7 +370,7 @@ class ImageToTextConvProj(nn.Module):
             b = self.conv1d_2x(cap_embed, img_compr)[:,:,:T]
             c = self.conv1d_3x(cap_embed, img_compr)[:,:,:T]
 
-            if self.usa_sa:
+            if self.use_sa:
                 a = self.conv_sa1(a)
                 b = self.conv_sa2(b)
                 c = self.conv_sa3(c)
