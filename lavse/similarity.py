@@ -251,7 +251,11 @@ class ProjConv1d(nn.Module):
         self.proj_bias = proj_bias
         self.base_proj_channels = base_proj_channels
         self.groups = groups
-        self.weightnorm = True
+
+        if weightnorm == None:
+            weightnorm = False
+
+        self.weightnorm = weightnorm
 
         self.kernel = nn.Linear(base_proj_channels, (in_channels * out_channels * kernel_size) // groups)
         if weightnorm == 'batchnorm':
@@ -269,7 +273,9 @@ class ProjConv1d(nn.Module):
             self.kernel_size
         )
         if self.weightnorm:
-            kernel = self.weight_norm(kernel.permute(1, 0, 2)).permute(1, 0, 2)
+            kernel = self.weight_norm(
+                kernel.permute(1, 0, 2)
+            ).permute(1, 0, 2)
         if self.proj_bias:
             bias = self.bias(base_proj)
             bias = bias.view(self.out_channels)
