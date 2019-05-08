@@ -351,10 +351,21 @@ class ImageToTextSAProj(nn.Module):
 
         self.input_dim = input_dim
         self.rnn_units = rnn_units
-        self.adapt_img = nn.Linear(latent_size, adapt_img_hidden)
+        # self.adapt_img = nn.Linear(latent_size, adapt_img_hidden)
 
         import numpy as np
 
+        self.sim_proj = nn.Sequential(
+            nn.Linear(input_dim, 512),
+            nn.BatchNorm1d(512),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.50),
+            nn.Linear(512, 64),
+            nn.BatchNorm1d(64),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.50),
+            nn.Linear(64, 1),
+        )
         # self.sa = attention.SelfAttention(
         #     1024,
         #     activation=nn.ReLU(inplace=True),
@@ -369,8 +380,9 @@ class ImageToTextSAProj(nn.Module):
             module=ProjConv1d,
             in_dim=300,
             activation=nn.ReLU(inplace=True),
-            groups=8,
-            base_proj_channels=1024,
+            groups=1,
+            base_proj_channels=latent_size,
+            k=4,
         )
 
         total = 0
@@ -378,7 +390,7 @@ class ImageToTextSAProj(nn.Module):
             print(f'{k:35s} {str(tuple(v.shape)):20s} {np.product(tuple(v.shape)):,}')
             total += np.product(tuple(v.shape))
         print(f'{total:,}')
-        exit()
+
         self.norm = norm
         if norm:
             self.feature_norm = ClippedL2Norm()
@@ -415,13 +427,14 @@ class ImageToTextSAProj(nn.Module):
             # cap: 1024, T
             # img: 1024, 36
             img_repr = img_tensor.unsqueeze(0)
-            img_compr = self.adapt_img(img_repr)
-            x = self.sa(cap_embed, img_compr)
+            # img_compr = self.adapt_img(img_repr)
+            x = self.sa(cap_embed, img_repr)
+
             # x = self.projected_rnn(
             #     input=cap_embed,
             #     base_proj=img_compr,
             # )
-            # x = x.max(1)[0]
+            x = x.max(-1)[0]
             # _x = torch.stack([img_compr] * len(x), dim=0)
             # print(img_compr.shape)
             # print(x.shape)
@@ -1101,7 +1114,7 @@ _similarities = {
             norm=False, num_layers=1,
             bidirectional=True,
             rnn_units=1024,
-            adapt_img_hidden=256,
+            adapt_img_hidden=128,
         ),
     },
     'conv_proj_sa': {
