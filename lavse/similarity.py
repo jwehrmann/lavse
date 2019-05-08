@@ -351,7 +351,7 @@ class ImageToTextSAProj(nn.Module):
 
         self.input_dim = input_dim
         self.rnn_units = rnn_units
-        # self.adapt_img = nn.Linear(latent_size, adapt_img_hidden)
+        self.adapt_img = nn.Linear(latent_size, adapt_img_hidden)
 
         import numpy as np
 
@@ -381,7 +381,7 @@ class ImageToTextSAProj(nn.Module):
             in_dim=300,
             activation=nn.ReLU(inplace=True),
             groups=1,
-            base_proj_channels=latent_size,
+            base_proj_channels=adapt_img_hidden,
             k=4,
         )
 
@@ -427,8 +427,8 @@ class ImageToTextSAProj(nn.Module):
             # cap: 1024, T
             # img: 1024, 36
             img_repr = img_tensor.unsqueeze(0)
-            # img_compr = self.adapt_img(img_repr)
-            x = self.sa(cap_embed, img_repr)
+            img_compr = self.adapt_img(img_repr)
+            x = self.sa(cap_embed, img_compr)
 
             # x = self.projected_rnn(
             #     input=cap_embed,
@@ -1122,6 +1122,7 @@ _similarities = {
         'args': Dict(
             norm=False,
             use_sa=True,
+            adapt_img_hidden=256,
         ),
     },
     'conv_proj_sa_256_g2': {
