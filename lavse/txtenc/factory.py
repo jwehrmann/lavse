@@ -70,7 +70,7 @@ __text_encoders__ = {
     'emb_proj': {
         'class': txtenc.WordEmbeddingProj,
         'args': {
-            'word_sa': True,
+            'word_sa': False,
             'projection': False,
             'non_linear_proj': False,
             'projection_sa': False,

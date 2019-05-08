@@ -281,6 +281,148 @@ class ProjConv1d(nn.Module):
         )
 
 
+class ProjRNN(nn.Module):
+
+    def __init__(
+        self, base_proj_channels, rnn_input, rnn_units, device
+    ):
+        super().__init__()
+
+        self.base_proj_channels = base_proj_channels
+        self.rnn_units = rnn_units
+        self.weights_dim = rnn_units * 3
+        self.device = device
+        self.rnn_input = rnn_input
+
+        self.weight_ih = nn.Linear(base_proj_channels, self.weights_dim * rnn_input)
+        self.weight_hh = nn.Linear(base_proj_channels, self.weights_dim * rnn_units)
+        self.bias_ih = nn.Linear(base_proj_channels, self.weights_dim)
+        self.bias_hh = nn.Linear(base_proj_channels, self.weights_dim)
+
+        print(self.weight_ih)
+        print(self.weight_hh)
+        print(self.bias_ih)
+        print(self.bias_hh)
+
+    def forward(self, input, base_proj):
+        b, t, d = input.shape
+
+        weight_ih = self.weight_ih(base_proj)
+        weight_ih = weight_ih.view(
+            self.weights_dim, self.rnn_input
+        )
+        weight_hh = self.weight_hh(base_proj)
+        weight_hh = weight_hh.view(
+            self.weights_dim, self.rnn_units
+        )
+        bias_ih = self.bias_ih(base_proj).view(-1)
+        bias_hh = self.bias_hh(base_proj).view(-1)
+
+        hx = torch.zeros(b,  self.rnn_units).to(self.device)
+
+        outputs = []
+        for i in range(t):
+            input_vec = input[:,i]
+            out = _VF.gru_cell(
+                input_vec, hx,
+                weight_ih, weight_hh,
+                bias_ih, bias_hh,
+            )
+            outputs.append(out)
+        outputs = torch.stack(outputs, 0)
+        outputs = outputs.permute(1, 0, 2)
+        return outputs
+
+
+class ImageToTextRNNProj(nn.Module):
+
+    def __init__(
+            self, device, latent_size=1024,
+            k=8, norm=False, use_sa=False,
+            adapt_img_hidden=128, rnn_units=128,
+            groups=1, **kwargs
+        ):
+        super().__init__()
+
+        self.device = device
+
+        input_dim = 300
+
+        self.input_dim = input_dim
+        self.rnn_units = rnn_units
+        self.adapt_img = nn.Linear(latent_size, adapt_img_hidden)
+        self.use_sa = use_sa
+
+        self.sim_proj = nn.Sequential(
+            nn.Linear(self.rnn_units, 128),
+            nn.BatchNorm1d(128),
+            nn.ReLU(inplace=True),
+            nn.Dropout(0.25),
+            nn.Linear(128, 1),
+            nn.Sigmoid(),
+        )
+
+        self.rnn = nn.GRU(
+            input_dim, rnn_units, 1,
+            batch_first=True, bidirectional=False,
+        )
+
+        import numpy as np
+        total = 0
+        for k, v in self.rnn.named_parameters():
+            print(f'{k:35s} {str(tuple(v.shape)):20s} {np.product(tuple(v.shape)):,}')
+            total += np.product(tuple(v.shape))
+        print(f'{total:,}')
+
+        self.projected_rnn = ProjRNN(
+            base_proj_channels=adapt_img_hidden,
+            rnn_input=300,
+            rnn_units=rnn_units,
+            device=device
+        )
+
+        self.norm = norm
+        if norm:
+            self.feature_norm = ClippedL2Norm()
+
+    def forward(self, img_embed, cap_embed, lens, **kwargs):
+        '''
+            img_embed: (B, 36, latent_size)
+            cap_embed: (B, T, latent_size)
+        '''
+        # (B, 1024, T)
+        cap_embed = cap_embed.to(self.device)
+        img_embed = img_embed.permute(0, 2, 1).to(self.device)
+        # print('cap_embed', cap_embed.shape)
+        # print('img_embed', img_embed.shape)
+
+        # (B, 1024)
+        if self.norm:
+            cap_embed = self.feature_norm(cap_embed)
+            img_embed = self.feature_norm(img_embed)
+
+        sims = torch.zeros(
+            img_embed.shape[0], cap_embed.shape[0]
+        ).to(self.device)
+
+        img_embed = img_embed.mean(-1)
+
+        for i, img_tensor in enumerate(img_embed):
+            # cap: 1024, T
+            # img: 1024, 36
+            img_repr = img_tensor.unsqueeze(0)
+            img_compr = self.adapt_img(img_repr)
+            x = self.projected_rnn(
+                input=cap_embed,
+                base_proj=img_compr,
+            )
+            x = x.max(1)[0]
+            s = self.sim_proj(x)
+            sims[i,:] = s.squeeze(1)
+
+        return sims
+
+
 class ImageToTextConvProj(nn.Module):
 
     def __init__(
@@ -737,11 +879,11 @@ _similarities = {
         ),
     },
     'rnn_proj': {
-        'class': ImageToTextConvProj,
+        'class': ImageToTextRNNProj,
         'args': Dict(
             norm=False, num_layers=1,
             bidirectional=True,
-            rnn_units=256,
+            rnn_units=128,
         ),
     },
     'conv_proj_sa': {
