@@ -340,7 +340,8 @@ class ImageToTextRNNProj(nn.Module):
             self, device, latent_size=1024,
             k=8, norm=False, use_sa=False,
             adapt_img_hidden=128, rnn_units=128,
-            groups=1, **kwargs
+            add_rnn=False,
+            **kwargs
         ):
         super().__init__()
 
@@ -354,17 +355,17 @@ class ImageToTextRNNProj(nn.Module):
         self.use_sa = use_sa
 
         self.sim_proj = nn.Sequential(
-            nn.Linear(self.rnn_units, 128),
-            nn.BatchNorm1d(128),
+            nn.Linear(self.rnn_units * 2 + adapt_img_hidden, 256),
+            nn.BatchNorm1d(256),
             nn.ReLU(inplace=True),
-            nn.Dropout(0.25),
-            nn.Linear(128, 1),
+            nn.Dropout(0.50),
+            nn.Linear(256, 1),
             nn.Sigmoid(),
         )
 
         self.rnn = nn.GRU(
             input_dim, rnn_units, 1,
-            batch_first=True, bidirectional=False,
+            batch_first=True, bidirectional=True,
         )
 
         import numpy as np
@@ -406,6 +407,12 @@ class ImageToTextRNNProj(nn.Module):
         ).to(self.device)
 
         img_embed = img_embed.mean(-1)
+        cap_ctx, _ = self.rnn(cap_embed)
+        cap_ctx = (
+                cap_ctx[:,:,:cap_ctx.size(2)//2]
+                + cap_ctx[:,:,cap_ctx.size(2)//2:]
+        )/2
+        cap_ctx = cap_ctx.max(1)[0]
 
         for i, img_tensor in enumerate(img_embed):
             # cap: 1024, T
@@ -417,6 +424,11 @@ class ImageToTextRNNProj(nn.Module):
                 base_proj=img_compr,
             )
             x = x.max(1)[0]
+            _x = torch.stack([img_compr] * len(x), dim=0)
+            # print(img_compr.shape)
+            # print(x.shape)
+            # print(_x.shape)
+            x = torch.cat([cap_ctx, x, _x.squeeze(1)], dim=1)
             s = self.sim_proj(x)
             sims[i,:] = s.squeeze(1)
 

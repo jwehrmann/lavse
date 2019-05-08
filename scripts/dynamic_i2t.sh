@@ -2,7 +2,7 @@
 
 python train.py \
 --data_path $DATA_PATH \
---outpath $OUT_PATH/temp/dynamic_i2t_rnn/f30k_precomp.en/ \
+--outpath $OUT_PATH/temp/dynamic_i2t_rnn_2/f30k_precomp.en/ \
 --train_data f30k_precomp.en \
 --val_data f30k_precomp.en \
 --workers 3 \
