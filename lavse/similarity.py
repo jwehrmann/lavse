@@ -380,9 +380,9 @@ class ImageToTextSAProj(nn.Module):
             module=ProjConv1d,
             in_dim=300,
             activation=nn.ReLU(inplace=True),
-            groups=8,
+            groups=10,
             base_proj_channels=adapt_img_hidden,
-            k=4,
+            k=2,
         )
 
         total = 0
