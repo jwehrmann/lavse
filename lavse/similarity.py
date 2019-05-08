@@ -334,6 +334,78 @@ class ProjRNN(nn.Module):
         return outputs
 
 
+class AdaptiveConvI2T(nn.Module):
+
+    def __init__(
+            self, device, latent_size=1024,
+            k=8, norm=False, cond_vec=False, **kwargs
+        ):
+        super().__init__()
+
+        self.device = device
+
+        # self.fc = nn.Conv1d(latent_size, latent_size*2, 1).to(device)
+
+        self.proj_conv = ProjConv1d(
+            latent_size, in_channels=latent_size,
+            out_channels=latent_size, groups=8,
+            kernel_size=1,
+        )
+
+        # self.alpha = nn.Parameter(torch.ones(1))
+        # self.beta = nn.Parameter(torch.zeros(1))
+
+        self.norm = norm
+        if norm:
+            self.feature_norm = ClippedL2Norm()
+
+        self.cond_vec = cond_vec
+
+    def forward(self, img_embed, cap_embed, lens, **kwargs):
+        '''
+            img_embed: (B, 36, latent_size)
+            cap_embed: (B, T, latent_size)
+        '''
+        # (B, 1024, T)
+        cap_embed = cap_embed.permute(0, 2, 1).to(self.device)
+        img_embed = img_embed.permute(0, 2, 1).to(self.device)
+        # print('cap_embed', cap_embed.shape)
+        # print('img_embed', img_embed.shape)
+
+        # (B, 1024)
+        if self.norm:
+            cap_embed = self.feature_norm(cap_embed)
+            img_embed = self.feature_norm(img_embed)
+
+        sims = torch.zeros(
+            img_embed.shape[0], cap_embed.shape[0]
+        ).to(self.device)
+
+        img_embed = img_embed.mean(-1)
+
+        for i, img_tensor in enumerate(img_embed):
+            # cap: 1024, T
+            # img: 1024, 36
+            img_repr = img_tensor.unsqueeze(0)
+
+            txt_output = self.proj_conv(cap_embed, img_repr)
+            # txt_vector = mean_pooling(txt_output.permute(0, 2, 1), lens)
+            txt_vector = txt_output.max(-1)[0]
+
+            # print('txt vector', txt_vector.shape)
+            txt_vector = l2norm(txt_vector, dim=-1)
+            img_vector = img_repr
+            img_vector = l2norm(img_vector, dim=-1)
+            # print('txt vector -- ', txt_vector.shape)
+            # print('img_vector: ', img_vector.shape)
+            sim = cosine_sim(img_vector, txt_vector).squeeze(-1)
+            # print('sim', sim.shape)
+            sims[i,:] = sim
+
+        return sims
+
+
+
 class ImageToTextSAProj(nn.Module):
 
     def __init__(
@@ -1113,8 +1185,14 @@ _similarities = {
         'args': Dict(
             norm=False, num_layers=1,
             bidirectional=True,
-            rnn_units=1024,
+            rnn_units=512,
             adapt_img_hidden=128,
+        ),
+    },
+    'adapt_conv_proj': {
+        'class': AdaptiveConvI2T,
+        'args': Dict(
+            norm=False,
         ),
     },
     'conv_proj_sa': {
