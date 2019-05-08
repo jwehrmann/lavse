@@ -25,7 +25,26 @@ python train.py \
 --data_path $DATA_PATH \
 --train_data f30k_precomp.en \
 --val_data f30k_precomp.en \
---outpath runs/adapt_conv_proj/f30k_precomp.en/ \
+--outpath $OUT_PATH/temp/adapt_conv_proj/f30k_precomp.en/ \
+--workers 3 \
+--sim adapt_conv_proj_nonorm \
+--image_encoder hierarchical \
+--text_encoder attngru \
+--text_pooling none \
+--image_pooling none \
+--lr 6e-4 \
+--beta 0.999 \
+--vocab vocab/f30k_vocab.json \
+--valid_interval 500 \
+--device cpu \
+--loader dummy
+
+
+python train.py \
+--data_path $DATA_PATH \
+--train_data f30k_precomp.en \
+--val_data f30k_precomp.en \
+--outpath $OUT_PATH/temp/adapt_conv_proj/f30k_precomp.en/ \
 --workers 3 \
 --sim adapt_conv_proj \
 --image_encoder hierarchical \

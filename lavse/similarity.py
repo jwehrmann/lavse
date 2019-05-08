@@ -338,7 +338,7 @@ class AdaptiveConvI2T(nn.Module):
 
     def __init__(
             self, device, latent_size=1024,
-            k=8, norm=False, cond_vec=False, **kwargs
+            k=8, norm=False, **kwargs
         ):
         super().__init__()
 
@@ -349,7 +349,7 @@ class AdaptiveConvI2T(nn.Module):
         self.proj_conv = ProjConv1d(
             latent_size, in_channels=latent_size,
             out_channels=latent_size, groups=8,
-            kernel_size=1,
+            kernel_size=1, **kwargs
         )
 
         # self.alpha = nn.Parameter(torch.ones(1))
@@ -358,8 +358,6 @@ class AdaptiveConvI2T(nn.Module):
         self.norm = norm
         if norm:
             self.feature_norm = ClippedL2Norm()
-
-        self.cond_vec = cond_vec
 
     def forward(self, img_embed, cap_embed, lens, **kwargs):
         '''
@@ -1193,6 +1191,13 @@ _similarities = {
         'class': AdaptiveConvI2T,
         'args': Dict(
             norm=False,
+        ),
+    },
+    'adapt_conv_proj_nonorm': {
+        'class': AdaptiveConvI2T,
+        'args': Dict(
+            norm=False,
+            weightnorm=None,
         ),
     },
     'conv_proj_sa': {

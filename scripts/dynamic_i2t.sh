@@ -32,7 +32,8 @@ python train.py \
 --beta 0.999 \
 --vocab vocab/f30k_vocab.json \
 --valid_interval 500 \
---batch_size 100
+--batch_size 100 \
+--latent_size 512
 
 # python train.py \
 # --data_path $DATA_PATH \
