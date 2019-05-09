@@ -1317,7 +1317,7 @@ _similarities = {
         'class': AdaptiveConvEmbI2T,
         'args': Dict(
             norm=False,
-            weightnorm='softmax',
+            weightnorm=None,
         ),
     },
     'conv_proj_sa': {
