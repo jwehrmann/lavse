@@ -25,11 +25,11 @@ python train.py \
 --data_path $DATA_PATH \
 --train_data f30k_precomp.en \
 --val_data f30k_precomp.en \
---outpath $OUT_PATH/temp/adapt_conv_proj/f30k_precomp.en/ \
+--outpath $OUT_PATH/temp/adapt_conv_emb_proj/f30k_precomp.en/ \
 --workers 3 \
---sim adapt_conv_proj_nonorm \
+--sim adapt_conv_emb_proj \
 --image_encoder hierarchical \
---text_encoder attngru \
+--text_encoder emb_proj \
 --text_pooling none \
 --image_pooling none \
 --lr 6e-4 \

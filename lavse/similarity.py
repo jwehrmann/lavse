@@ -11,6 +11,7 @@ from .txtenc.pooling import mean_pooling
 from .utils.layers import l2norm
 from .utils.logger import get_logger
 from .utils import helper
+from . import txtenc
 
 from torch.nn import _VF
 
@@ -338,6 +339,107 @@ class ProjRNN(nn.Module):
         outputs = torch.stack(outputs, 0)
         outputs = outputs.permute(1, 0, 2)
         return outputs
+
+
+class AdaptiveConvEmbI2T(nn.Module):
+
+    def __init__(
+            self, device, latent_size=1024,
+            k=8, norm=False, **kwargs
+        ):
+        super().__init__()
+
+        self.device = device
+
+        # self.fc = nn.Conv1d(latent_size, latent_size*2, 1).to(device)
+
+        self.proj_conv_1 = ProjConv1d(
+            base_proj_channels=latent_size,
+            in_channels=300,
+            out_channels=latent_size, groups=2,
+            kernel_size=1, **kwargs
+        )
+        self.proj_conv_2 = ProjConv1d(
+            base_proj_channels=latent_size,
+            in_channels=300,
+            out_channels=latent_size, groups=2,
+            kernel_size=2, **kwargs
+        )
+        self.proj_conv_3 = ProjConv1d(
+            base_proj_channels=latent_size,
+            in_channels=300,
+            out_channels=latent_size, groups=2,
+            kernel_size=3, **kwargs
+        )
+
+        self.rnn = nn.GRU(
+            300, latent_size, 1,
+            batch_first=True, bidirectional=True
+        )
+
+        self.txt_fc = nn.Linear(latent_size*4, latent_size)
+        # self.alpha = nn.Parameter(torch.ones(1))
+        # self.beta = nn.Parameter(torch.zeros(1))
+
+        self.norm = norm
+        if norm:
+            self.feature_norm = ClippedL2Norm()
+
+    def forward(self, img_embed, cap_embed, lens, **kwargs):
+        '''
+            img_embed: (B, 36, latent_size)
+            cap_embed: (B, T, latent_size)
+        '''
+        # (B, 1024, T)
+        cap_embed = cap_embed.to(self.device)
+        img_embed = img_embed.permute(0, 2, 1).to(self.device)
+        # print('cap_embed', cap_embed.shape)
+        # print('img_embed', img_embed.shape)
+
+        # (B, 1024)
+        if self.norm:
+            cap_embed = self.feature_norm(cap_embed)
+            img_embed = self.feature_norm(img_embed)
+
+        sims = torch.zeros(
+            img_embed.shape[0], cap_embed.shape[0]
+        ).to(self.device)
+
+        img_embed = img_embed.mean(-1)
+        cap_embed_latent, _ = self.rnn(cap_embed)
+        b, t, d = cap_embed_latent.shape
+        cap_embed_latent = cap_embed_latent.view(b, t, 2, d//2).mean(-2)
+        txt_0 = txtenc.pooling.last_hidden_state_pool(cap_embed_latent, lens)
+
+        cap_embed = cap_embed.permute(0, 2, 1)
+
+        for i, img_tensor in enumerate(img_embed):
+            # cap: 1024, T
+            # img: 1024, 36
+            img_repr = img_tensor.unsqueeze(0)
+
+            txt_1 = self.proj_conv_1(cap_embed, img_repr)
+            txt_2 = self.proj_conv_2(cap_embed, img_repr)
+            txt_3 = self.proj_conv_3(cap_embed, img_repr)
+            # txt_vector = mean_pooling(txt_output.permute(0, 2, 1), lens)
+            txt_1 = txt_1.max(-1)[0]
+            txt_2 = txt_2.max(-1)[0]
+            txt_3 = txt_3.max(-1)[0]
+
+            txt = torch.cat([txt_0, txt_1, txt_2, txt_3], 1)
+            txt_vector = self.txt_fc(txt)
+
+            # print('txt vector', txt_vector.shape)
+            txt_vector = l2norm(txt_vector, dim=-1)
+            img_vector = img_repr
+            img_vector = l2norm(img_vector, dim=-1)
+            # print('txt vector -- ', txt_vector.shape)
+            # print('img_vector: ', img_vector.shape)
+            sim = cosine_sim(img_vector, txt_vector).squeeze(-1)
+            # print('sim', sim.shape)
+            sims[i,:] = sim
+
+        return sims
 
 
 class AdaptiveConvI2T(nn.Module):
@@ -1201,6 +1303,13 @@ _similarities = {
     },
     'adapt_conv_proj_nonorm': {
         'class': AdaptiveConvI2T,
+        'args': Dict(
+            norm=False,
+            weightnorm=None,
+        ),
+    },
+    'adapt_conv_emb_proj': {
+        'class': AdaptiveConvEmbI2T,
         'args': Dict(
             norm=False,
             weightnorm=None,
