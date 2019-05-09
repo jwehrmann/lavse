@@ -571,12 +571,12 @@ class AdaptiveConvI2T(nn.Module):
         ).to(self.device)
 
         img_embed = img_embed.mean(-1)
+        a = self.bn_a(cap_embed)
 
         for i, img_tensor in enumerate(img_embed):
             # cap: 1024, T
             # img: 1024, 36
             img_repr = img_tensor.unsqueeze(0)
-            a = self.bn_a(cap_embed)
             txt_output = self.proj_conv(a, img_repr)
             # txt_vector = mean_pooling(txt_output.permute(0, 2, 1), lens)
             txt_vector = txt_output.max(-1)[0]

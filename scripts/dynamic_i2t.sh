@@ -2,11 +2,11 @@
 
 python train.py \
 --data_path $DATA_PATH \
---outpath $OUT_PATH/temp/proj_sa_sim/f30k_precomp.en/ \
+--outpath $OUT_PATH/temp/adapt_conv_proj_nonorm_bn/f30k_precomp.en/ \
 --train_data f30k_precomp.en \
 --val_data f30k_precomp.en \
 --workers 3 \
---sim proj_sa_sim \
+--sim adapt_conv_proj_nonorm_bn \
 --image_encoder hierarchical \
 --text_encoder emb_proj \
 --text_pooling none \
