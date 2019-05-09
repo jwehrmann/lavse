@@ -357,21 +357,21 @@ class AdaptiveConvEmbI2T(nn.Module):
             base_proj_channels=latent_size,
             in_channels=300,
             out_channels=latent_size//4,
-            groups=2,
+            groups=4,
             kernel_size=1, **kwargs
         )
         self.proj_conv_2 = ProjConv1d(
             base_proj_channels=latent_size,
             in_channels=300,
             out_channels=latent_size//4,
-            groups=2,
+            groups=4,
             kernel_size=2, **kwargs
         )
         self.proj_conv_3 = ProjConv1d(
             base_proj_channels=latent_size,
             in_channels=300,
             out_channels=latent_size//4,
-            groups=2,
+            groups=4,
             kernel_size=3, **kwargs
         )
 
