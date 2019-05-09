@@ -355,20 +355,20 @@ class AdaptiveConvEmbI2T(nn.Module):
 
         # self.fc = nn.Conv1d(latent_size, latent_size*2, 1).to(device)
 
-        self.proj_conv_1 = ProjConv1d(
-            base_proj_channels=latent_size,
-            in_channels=300,
-            out_channels=latent_size//4,
-            groups=4,
-            kernel_size=1, **kwargs
-        )
-        self.proj_conv_2 = ProjConv1d(
-            base_proj_channels=latent_size,
-            in_channels=300,
-            out_channels=latent_size//4,
-            groups=4,
-            kernel_size=2, **kwargs
-        )
+        # self.proj_conv_1 = ProjConv1d(
+        #     base_proj_channels=latent_size,
+        #     in_channels=300,
+        #     out_channels=latent_size//4,
+        #     groups=4,
+        #     kernel_size=1, **kwargs
+        # )
+        # self.proj_conv_2 = ProjConv1d(
+        #     base_proj_channels=latent_size,
+        #     in_channels=300,
+        #     out_channels=latent_size//4,
+        #     groups=4,
+        #     kernel_size=2, **kwargs
+        # )
         self.proj_conv_3 = ProjConv1d(
             base_proj_channels=latent_size,
             in_channels=300,
@@ -382,7 +382,7 @@ class AdaptiveConvEmbI2T(nn.Module):
             batch_first=True, bidirectional=True
         )
 
-        self.txt_fc = nn.Linear(latent_size+latent_size//4*3, latent_size)
+        self.txt_fc = nn.Linear(latent_size+latent_size//4, latent_size)
         # self.alpha = nn.Parameter(torch.ones(1))
         # self.beta = nn.Parameter(torch.zeros(1))
 
@@ -423,15 +423,15 @@ class AdaptiveConvEmbI2T(nn.Module):
             # img: 1024, 36
             img_repr = img_tensor.unsqueeze(0)
 
-            txt_1 = self.proj_conv_1(cap_embed, img_repr)
-            txt_2 = self.proj_conv_2(cap_embed, img_repr)
+            # txt_1 = self.proj_conv_1(cap_embed, img_repr)
+            # txt_2 = self.proj_conv_2(cap_embed, img_repr)
             txt_3 = self.proj_conv_3(cap_embed, img_repr)
             # txt_vector = mean_pooling(txt_output.permute(0, 2, 1), lens)
-            txt_1 = txt_1.max(-1)[0]
-            txt_2 = txt_2.max(-1)[0]
+            # txt_1 = txt_1.max(-1)[0]
+            # txt_2 = txt_2.max(-1)[0]
             txt_3 = txt_3.max(-1)[0]
 
-            txt = torch.cat([txt_0, txt_1, txt_2, txt_3], 1)
+            txt = torch.cat([txt_0, txt_3], 1)
             txt_vector = self.txt_fc(txt)
 
             # print('txt vector', txt_vector.shape)
@@ -1317,7 +1317,7 @@ _similarities = {
         'class': AdaptiveConvEmbI2T,
         'args': Dict(
             norm=False,
-            weightnorm=None,
+            weightnorm='softmax',
         ),
     },
     'conv_proj_sa': {
