@@ -25,9 +25,9 @@ python train.py \
 --data_path $DATA_PATH \
 --train_data f30k_precomp.en \
 --val_data f30k_precomp.en \
---outpath $OUT_PATH/temp/adapt_conv_emb_proj/f30k_precomp.en/ \
+--outpath $OUT_PATH/temp/adapt_conv_proj_nonorm/f30k_precomp.en/ \
 --workers 3 \
---sim adapt_conv_emb_proj \
+--sim adapt_conv_proj_nonorm_k32 \
 --image_encoder hierarchical \
 --text_encoder emb_proj \
 --text_pooling none \

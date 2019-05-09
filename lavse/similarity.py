@@ -1314,12 +1314,28 @@ _similarities = {
             weightnorm=None,
         ),
     },
+    'adapt_conv_proj_nonorm_k32': {
+        'class': AdaptiveConvI2T,
+        'args': Dict(
+            norm=False,
+            weightnorm=None,
+            groups=32,
+        ),
+    },
     'adapt_conv_proj_l2': {
         'class': AdaptiveConvI2T,
         'args': Dict(
             norm=False,
             weightnorm='l2',
             groups=8,
+        ),
+    },
+    'adapt_conv_proj_l2_k32': {
+        'class': AdaptiveConvI2T,
+        'args': Dict(
+            norm=False,
+            weightnorm='l2',
+            groups=32,
         ),
     },
     'adapt_conv_emb_proj': {
