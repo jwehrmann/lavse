@@ -261,6 +261,8 @@ class ProjConv1d(nn.Module):
         self.kernel = nn.Linear(base_proj_channels, (in_channels * out_channels * kernel_size) // groups)
         if weightnorm == 'batchnorm':
             self.weight_norm = nn.BatchNorm1d(out_channels)
+        elif weightnorm == 'softmax':
+            self.weight_norm = nn.Softmax(dim=-1)
         if proj_bias:
             self.bias = nn.Linear(base_proj_channels, out_channels)
 
