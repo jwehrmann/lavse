@@ -263,6 +263,8 @@ class ProjConv1d(nn.Module):
             self.weight_norm = nn.BatchNorm1d(out_channels)
         elif weightnorm == 'softmax':
             self.weight_norm = nn.Softmax(dim=-1)
+        elif weightnorm == 'l2':
+            self.weight_norm = lambda x: l2norm(x, dim=1)
         if proj_bias:
             self.bias = nn.Linear(base_proj_channels, out_channels)
 
@@ -451,7 +453,7 @@ class AdaptiveConvI2T(nn.Module):
 
     def __init__(
             self, device, latent_size=1024,
-            k=8, norm=False, **kwargs
+            k=8, norm=False, groups=8, **kwargs
         ):
         super().__init__()
 
@@ -461,7 +463,7 @@ class AdaptiveConvI2T(nn.Module):
 
         self.proj_conv = ProjConv1d(
             latent_size, in_channels=latent_size,
-            out_channels=latent_size, groups=8,
+            out_channels=latent_size, groups=groups,
             kernel_size=1, **kwargs
         )
 
@@ -514,7 +516,6 @@ class AdaptiveConvI2T(nn.Module):
             sims[i,:] = sim
 
         return sims
-
 
 
 class ImageToTextSAProj(nn.Module):
@@ -1311,6 +1312,14 @@ _similarities = {
         'args': Dict(
             norm=False,
             weightnorm=None,
+        ),
+    },
+    'adapt_conv_proj_l2': {
+        'class': AdaptiveConvI2T,
+        'args': Dict(
+            norm=False,
+            weightnorm='l2',
+            groups=8,
         ),
     },
     'adapt_conv_emb_proj': {
