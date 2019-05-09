@@ -356,19 +356,22 @@ class AdaptiveConvEmbI2T(nn.Module):
         self.proj_conv_1 = ProjConv1d(
             base_proj_channels=latent_size,
             in_channels=300,
-            out_channels=latent_size, groups=4,
+            out_channels=latent_size//4,
+            groups=2,
             kernel_size=1, **kwargs
         )
         self.proj_conv_2 = ProjConv1d(
             base_proj_channels=latent_size,
             in_channels=300,
-            out_channels=latent_size, groups=4,
+            out_channels=latent_size//4,
+            groups=2,
             kernel_size=2, **kwargs
         )
         self.proj_conv_3 = ProjConv1d(
             base_proj_channels=latent_size,
             in_channels=300,
-            out_channels=latent_size, groups=4,
+            out_channels=latent_size//4,
+            groups=2,
             kernel_size=3, **kwargs
         )
 
@@ -377,7 +380,7 @@ class AdaptiveConvEmbI2T(nn.Module):
             batch_first=True, bidirectional=True
         )
 
-        self.txt_fc = nn.Linear(latent_size*4, latent_size)
+        self.txt_fc = nn.Linear(latent_size+latent_size//4*3, latent_size)
         # self.alpha = nn.Parameter(torch.ones(1))
         # self.beta = nn.Parameter(torch.zeros(1))
 
