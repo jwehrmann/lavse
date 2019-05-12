@@ -1,12 +1,13 @@
 import torch
 import torch.nn as nn
 
-from ..utils.layers import default_initializer, l2norm
+from ..similarity.measure import l2norm
+from ...utils.layers import default_initializer
 
 from torch.nn.utils.rnn import pack_padded_sequence
 from torch.nn.utils.rnn import pad_packed_sequence
 
-from ..layers import attention, convblocks
+from ...model.layers import attention, convblocks
 from .embedding import PartialConcat
 
 import numpy as np

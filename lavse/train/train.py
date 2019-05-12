@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import random
 from pathlib import Path
 from random import shuffle
 from timeit import default_timer as dt
@@ -8,24 +9,19 @@ from timeit import default_timer as dt
 import numpy as np
 import torch
 import torch.nn as nn
+from addict import Dict
 from numpy.polynomial.polynomial import polyfit
+from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.data import DataLoader, dataset
 from tqdm import tqdm
 
-from .data import DataIterator, prepare_ml_data, prepare_mm_data
-from .evaluation import i2t, t2i
-from .loss import cosine_sim, cosine_sim_numpy
-from .utils import helper, layers, logger
-
-from torch.nn.utils.clip_grad import clip_grad_norm_
-import torch
-torch.manual_seed(0)
-
 from . import evaluation
+from ..data.loaders import DataIterator
+from ..model.loss import cosine_sim, cosine_sim_numpy
+from ..utils import helper, layers, logger
+from .evaluation import i2t, t2i
 
-from addict import Dict
-
-import random
+torch.manual_seed(0)
 random.seed(0, version=2)
 
 
@@ -60,9 +56,35 @@ class Trainer:
         log_grad_norm=True,
         early_stop=50,
         save_all=False,
+        finetune_convnet=False,
         **kwargs
     ):
-        self.optimizer = optimizer(self.model.parameters(), lr, **kwargs)
+
+        # TODO: improve this! :S
+        total_params = 0
+        nb_trainable_params = 0
+        if not finetune_convnet:
+            self.sysoutlog('Not finetuning cnn!')
+            for k, v in self.model.named_parameters():
+                v.requires_grad = not k.startswith('img_enc.cnn')
+                total_params += np.product(tuple(v.shape))
+                if v.requires_grad:
+                    nb_trainable_params += np.product(tuple(v.shape))
+
+        trainable_params = [
+            x for x in self.model.parameters()
+            if x.requires_grad
+        ]
+
+        self.sysoutlog(
+            f'Trainable layers: {len(trainable_params)}, '
+            f'Total Params: {total_params:,}, '
+            f'Train Params: {nb_trainable_params:,}'
+        )
+        self.optimizer = optimizer(
+            trainable_params, lr, **kwargs
+        )
+
         self.mm_criterion = mm_criterion
         self.ml_criterion = ml_criterion
         self.initial_lr = lr

@@ -2,16 +2,14 @@ import argparse
 from pathlib import Path
 
 import torch
+from addict import Dict
 
 import profiles
-from addict import Dict
-from lavse import imgenc, loss, train, txtenc
-from lavse.data import get_loader, get_loaders
-from lavse.model import LAVSE
+from lavse.train import train
+from lavse.data.loaders import get_loader, get_loaders
+from lavse.model import imgenc, loss, model, txtenc
+from lavse.model.similarity.factory import get_sim_names
 from lavse.utils.logger import create_logger
-from lavse import similarity
-
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -57,7 +55,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--sim', default='cosine', type=str,
-        help='Similarity.', choices=similarity.get_sim_names(),
+        help='Similarity.', choices=get_sim_names(),
     )
     parser.add_argument(
         '--batch_size', default=128, type=int,
@@ -170,6 +168,10 @@ if __name__ == '__main__':
         '--save_all', action='store_true',
         help='Save checkpoints for all models',
     )
+    parser.add_argument(
+        '--finetune', action='store_true',
+        help='Finetune convolutional net',
+    )
 
     parser.add_argument(
         '--loader_name', default='precomp',
@@ -247,7 +249,6 @@ if __name__ == '__main__':
         imgenc_name=args.image_encoder,
         txtenc_name=args.text_encoder,
         latent_size=args.latent_size,
-        img_dim=train_loader.dataset.get_img_dim(),
         num_embeddings=len(train_loader.dataset.tokenizer),
         embed_dim=args.embed_dim,
         txt_pooling=args.text_pooling,
@@ -256,7 +257,7 @@ if __name__ == '__main__':
         device=device,
     )
 
-    model = LAVSE(**model_params).to(device)
+    model = model.LAVSE(**model_params).to(device)
     print(model)
 
     trainer = train.Trainer(
@@ -295,6 +296,7 @@ if __name__ == '__main__':
         log_grad_norm=True,
         log_histograms=False,
         save_all=args.save_all,
+        finetune_convnet=args.finetune
     )
     if args.eval_before_training:
         result, rs = trainer.evaluate_loaders(

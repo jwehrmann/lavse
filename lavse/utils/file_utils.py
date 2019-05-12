@@ -6,12 +6,12 @@ def read_txt(path):
 
 
 def save_json(path, obj):
-    import json 
+    import json
     with open(path, 'w') as fp:
         json.dump(obj, fp)
 
 
 def load_json(path):
-    import json 
-    with open(path, 'w') as fp:
+    import json
+    with open(path, 'rb') as fp:
         return json.load(fp)

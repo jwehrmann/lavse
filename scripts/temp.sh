@@ -20,61 +20,83 @@ export OUT_PATH=runs/temp/
 # --beta 0.999 \
 # --eval_before_training \
 
-python train.py \
---data_path $DATA_PATH \
---train_data f30k_precomp.en \
---val_data f30k_precomp.en \
---outpath $OUT_PATH/temp/adapt_conv_proj_l2/f30k_precomp.en/ \
---workers 3 \
---sim adapt_conv_proj_l2 \
---image_encoder hierarchical \
---text_encoder attngru \
---text_pooling none \
---image_pooling none \
---lr 2e-4 \
---beta 0.999 \
---vocab vocab/f30k_vocab.json \
---valid_interval 500 \
---device cpu \
---loader dummy
+# python train.py \
+# --data_path $DATA_PATH \
+# --train_data f30k_precomp.en \
+# --val_data f30k_precomp.en \
+# --outpath $OUT_PATH/temp/proj_conv_reduced/f30k_precomp.en/ \
+# --workers 3 \
+# --sim proj_conv_reduced \
+# --image_encoder hierarchical \
+# --text_encoder emb_proj \
+# --text_pooling none \
+# --image_pooling none \
+# --lr 6e-4 \
+# --beta 0.99 \
+# --vocab vocab/f30k_vocab.json \
+# --valid_interval 500 \
+# --device cpu \
+# --loader dummy
 
 
 python train.py \
---data_path $DATA_PATH \
---train_data f30k_precomp.en \
---val_data f30k_precomp.en \
---outpath $OUT_PATH/temp/adapt_conv_proj_l2_k32/f30k_precomp.en/ \
---workers 3 \
---sim adapt_conv_proj_l2_k32 \
---image_encoder hierarchical \
---text_encoder attngru \
---text_pooling none \
---image_pooling none \
+--data_path /home/jonatas/data/ \
+--train_data f30k.en \
+--val_data f30k.en \
+--outpath $OUT_PATH/temp/proj_conv_reduced/f30k_precomp.en/ \
+--workers 10 \
+--loader image \
+--sim cosine \
+--image_encoder full_image \
+--text_encoder gru \
+--text_pooling mean \
+--image_pooling mean \
 --lr 6e-4 \
---beta 0.999 \
+--beta 0.99 \
 --vocab vocab/f30k_vocab.json \
 --valid_interval 500 \
---device cpu \
---loader dummy
+# --finetune \
+# --device cpu \
+# --loader dummy
 
 
-python train.py \
---data_path $DATA_PATH \
---train_data f30k_precomp.en \
---val_data f30k_precomp.en \
---outpath $OUT_PATH/temp/adapt_conv_proj/f30k_precomp.en/ \
---workers 3 \
---sim adapt_conv_proj \
---image_encoder hierarchical \
---text_encoder attngru \
---text_pooling none \
---image_pooling none \
---lr 6e-4 \
---beta 0.999 \
---vocab vocab/f30k_vocab.json \
---valid_interval 500 \
---device cpu \
---loader dummy
+
+# python train.py \
+# --data_path $DATA_PATH \
+# --train_data f30k_precomp.en \
+# --val_data f30k_precomp.en \
+# --outpath $OUT_PATH/temp/adapt_conv_proj_l2_k32/f30k_precomp.en/ \
+# --workers 3 \
+# --sim adapt_conv_proj_l2_k32 \
+# --image_encoder hierarchical \
+# --text_encoder attngru \
+# --text_pooling none \
+# --image_pooling none \
+# --lr 6e-4 \
+# --beta 0.999 \
+# --vocab vocab/f30k_vocab.json \
+# --valid_interval 500 \
+# --device cpu \
+# --loader dummy
+
+
+# python train.py \
+# --data_path $DATA_PATH \
+# --train_data f30k_precomp.en \
+# --val_data f30k_precomp.en \
+# --outpath $OUT_PATH/temp/adapt_conv_proj/f30k_precomp.en/ \
+# --workers 3 \
+# --sim adapt_conv_proj \
+# --image_encoder hierarchical \
+# --text_encoder attngru \
+# --text_pooling none \
+# --image_pooling none \
+# --lr 6e-4 \
+# --beta 0.999 \
+# --vocab vocab/f30k_vocab.json \
+# --valid_interval 500 \
+# --device cpu \
+# --loader dummy
 
 # python train.py \
 # --data_path $DATA_PATH \

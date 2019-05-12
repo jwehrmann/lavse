@@ -5,9 +5,9 @@ import numpy as np
 
 def adjust_k(epoch, initial_k, increase_k, max_violation=False):
     """
-        Update loss hyper-parameter k 
-        linearly from intial_k to 1 according to 
-        the number of epochs  
+        Update loss hyper-parameter k
+        linearly from intial_k to 1 according to
+        the number of epochs
     """
     if max_violation:
         return 1.
@@ -17,7 +17,7 @@ def adjust_k(epoch, initial_k, increase_k, max_violation=False):
 
 def cosine_sim(im, s,):
     """
-        Cosine similarity between all the 
+        Cosine similarity between all the
         image and sentence pairs
     """
     return im.mm(s.t())
@@ -25,7 +25,7 @@ def cosine_sim(im, s,):
 
 def cosine_sim_numpy(im, s):
     """
-        Cosine similarity between all the 
+        Cosine similarity between all the
         image and sentence pairs
     """
     return im.dot(s.T)
@@ -41,12 +41,12 @@ class ContrastiveLoss_(nn.Module):
             margin=0.2, max_violation=True,
             weight=1., initial_k=1., increase_k=0,
         ):
-        super(ContrastiveLoss, self).__init__()        
+        super(ContrastiveLoss, self).__init__()
         self.margin = margin
         self.device = device
         self.sim = cosine_sim
         self.weight = weight
-        self.initial_k = initial_k 
+        self.initial_k = initial_k
         self.increase_k = increase_k
         self.max_violation = max_violation
         self.epoch = -1
@@ -57,8 +57,8 @@ class ContrastiveLoss_(nn.Module):
 
     def update_k(self,):
         self.k = adjust_k(
-            self.epoch, 
-            initial_k=self.initial_k, 
+            self.epoch,
+            initial_k=self.initial_k,
             increase_k=self.increase_k,
             max_violation=self.max_violation,
         )
@@ -97,7 +97,7 @@ class ContrastiveLoss_(nn.Module):
         cost_im_max = cost_im.max(0)[0]
 
         cost_hard_k = (cost_s_max.sum() + cost_im_max.sum()) * k
-        
+
         total_loss = cost_all_k + cost_hard_k
 
         return total_loss * self.weight
@@ -114,7 +114,7 @@ class ContrastiveLoss(nn.Module):
             margin=0.2, max_violation=True,
             weight=1., beta=0.999,
         ):
-        super().__init__()        
+        super().__init__()
         self.margin = margin
         self.device = device
         self.sim = cosine_sim
@@ -127,9 +127,9 @@ class ContrastiveLoss(nn.Module):
 
     def adjust_k(self, ):
         """
-            Update loss hyper-parameter k 
-            linearly from intial_k to 1 according to 
-            the number of epochs  
+            Update loss hyper-parameter k
+            linearly from intial_k to 1 according to
+            the number of epochs
         """
         if self.max_violation:
             self.k = 1
@@ -143,7 +143,7 @@ class ContrastiveLoss(nn.Module):
     def forward(self, scores ):
         # compute image-sentence score matrix
         # scores = self.sim(im, s)
-        
+
         diagonal = scores.diag().view(scores.size(0), 1)
         d1 = diagonal.expand_as(scores)
         d2 = diagonal.t().expand_as(scores)
@@ -174,7 +174,7 @@ class ContrastiveLoss(nn.Module):
         cost_im_max = cost_im.max(0)[0]
 
         cost_hard_k = (cost_s_max.sum() + cost_im_max.sum()) * k
-        
+
         total_loss = cost_all_k + cost_hard_k
 
         return total_loss * self.weight

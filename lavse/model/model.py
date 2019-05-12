@@ -3,9 +3,10 @@ import torch.nn as nn
 
 from .imgenc import get_image_encoder, get_img_pooling
 from .txtenc import get_text_encoder, get_txt_pooling
-from .similarity import Similarity
-from .utils.layers import l2norm
-from .utils.logger import get_logger
+from .similarity.similarity import Similarity
+from .similarity.measure import l2norm
+from .similarity.factory import get_similarity_object
+from ..utils.logger import get_logger
 
 logger = get_logger()
 
@@ -15,8 +16,8 @@ class LAVSE(nn.Module):
     def __init__(
         self, imgenc_name, txtenc_name,
         num_embeddings, embed_dim=300,
-        latent_size=1024, img_dim=2048,
-        txt_pooling='lens', img_pooling='mean',
+        latent_size=1024, txt_pooling='lens',
+        img_pooling='mean',
         similarity_name='cosine',
         device=None, **kwargs
     ):
@@ -27,8 +28,8 @@ class LAVSE(nn.Module):
         self.img_enc = get_image_encoder(
             model_name=imgenc_name,
             latent_size=latent_size,
-            img_dim=img_dim,
         )
+
         logger.info((
             'Image encoder created\n'
             f'{self.img_enc}'
@@ -48,8 +49,13 @@ class LAVSE(nn.Module):
             f'{self.txt_enc}'
         ))
 
+        sim_obj = get_similarity_object(
+            similarity_name,
+            device=device,
+            **kwargs
+        )
         self.similarity = Similarity(
-            similarity_name=similarity_name,
+            similarity_object=sim_obj,
             device=device,
             latent_size=latent_size,
             **kwargs

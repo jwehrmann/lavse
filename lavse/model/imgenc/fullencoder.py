@@ -7,8 +7,9 @@ from torch import nn
 
 from torchvision import models
 
-from ..layers import attention, convblocks
-from ..utils.layers import default_initializer, l1norm, l2norm
+from ...model.layers import attention, convblocks
+from ...utils.layers import default_initializer
+from ..similarity.measure import l1norm, l2norm
 from .common import load_state_dict_with_replace
 
 
@@ -55,11 +56,11 @@ class FullImageEncoder(nn.Module):
     def __init__(self, cnn, img_dim, latent_size, no_imgnorm=False):
         super(FullImageEncoder, self).__init__()
         self.latent_size = latent_size
-        self.no_imgnorm = no_imgnorm        
+        self.no_imgnorm = no_imgnorm
         self.fc = nn.Linear(img_dim, latent_size)
 
         self.apply(default_initializer)
-        
+
         self.cnn = BaseFeatures(cnn(pretrained=True))
         # self.aggregate = Aggregate()
 

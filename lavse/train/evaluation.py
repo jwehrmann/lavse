@@ -1,8 +1,10 @@
-import torch
-import numpy as np
-from .loss import cosine_sim
-from .utils import layers
 from timeit import default_timer as dt
+
+import numpy as np
+import torch
+
+from ..utils import layers
+from ..model.loss import cosine_sim
 
 
 def predict_loader(model, data_loader, device):
