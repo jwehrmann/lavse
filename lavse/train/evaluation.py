@@ -6,6 +6,8 @@ import torch
 from ..utils import layers
 from ..model.loss import cosine_sim
 
+from tqdm import tqdm 
+
 
 def predict_loader(model, data_loader, device):
 
@@ -16,11 +18,14 @@ def predict_loader(model, data_loader, device):
     cap_embs = None
     cap_lens = None
 
-    max_n_word = 0
-    for i, (images, captions, lengths, ids) in enumerate(data_loader):
-        max_n_word = max(max_n_word, max(lengths))
+    max_n_word = 70
+    # for i, (images, captions, lengths, ids) in enumerate(data_loader):
+    #     max_n_word = max(max_n_word, max(lengths))
 
-    for i, (images, captions, lengths, ids) in enumerate(data_loader):
+    for i, (images, captions, lengths, ids) in tqdm(
+        enumerate(data_loader), total=len(data_loader),
+        leave=False, desc='Pred  '
+    ):
 
         images = images.to(device)
         captions = captions.to(device)
@@ -79,12 +84,16 @@ def evaluate(
             embed_a=img_emb, embed_b=txt_emb,
             lens=lengths, shared_size=shared_size
         )
+        # sims = model.get_sim_matrix(
+        #     embed_a=img_emb, embed_b=txt_emb,
+        #     lens=lengths, 
+        # )
         sims = layers.tensor_to_numpy(sims)
 
     end_sim = dt()
 
     i2t_metrics = i2t(sims)
-    t2i_metrics = t2i(sims)
+    t2i_metrics = t2i(sims)    
 
     rsum = np.sum(i2t_metrics[:3]) + np.sum(t2i_metrics[:3])
 
@@ -144,7 +153,6 @@ def t2i(sims,):
 
     # --> (5N(caption), N(image))
     sims = sims.T
-
     for index in range(npts):
         for i in range(5):
             inds = np.argsort(sims[5 * index + i])[::-1]

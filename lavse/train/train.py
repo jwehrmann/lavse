@@ -29,7 +29,8 @@ class Trainer:
 
     def __init__(
         self, model=None, device='cuda:0',
-        args=None, sysoutlog=tqdm.write
+        args=None, sysoutlog=tqdm.write, 
+        master=True,
     ):
 
         self.device = torch.device(device)
@@ -42,6 +43,7 @@ class Trainer:
 
         self.optimizer = None
         self.metrics = {}
+        self.master = master
 
     def setup_optim(
         self,
@@ -63,18 +65,14 @@ class Trainer:
         # TODO: improve this! :S
         total_params = 0
         nb_trainable_params = 0
-        if not finetune_convnet:
-            self.sysoutlog('Not finetuning cnn!')
-            for k, v in self.model.named_parameters():
-                v.requires_grad = not k.startswith('img_enc.cnn')
-                total_params += np.product(tuple(v.shape))
-                if v.requires_grad:
-                    nb_trainable_params += np.product(tuple(v.shape))
-
-        trainable_params = [
-            x for x in self.model.parameters()
-            if x.requires_grad
-        ]
+        trainable_params = []
+        for k, v in self.model.named_parameters():
+            total_params += np.product(tuple(v.shape))
+            if not finetune_convnet:
+                v.requires_grad = 'img_enc.cnn' not in k
+            if v.requires_grad:
+                nb_trainable_params += np.product(tuple(v.shape))
+                trainable_params.append(v)
 
         self.sysoutlog(
             f'Trainable layers: {len(trainable_params)}, '
@@ -108,9 +106,7 @@ class Trainer:
         if self.optimizer is None:
             print('You forgot to setup_optim.')
             exit()
-
-        self.pbar = tqdm(total=len(train_loader), desc='Steps ')
-
+        
         # Set up tensorboard logger
         tb_writer = helper.get_tb_writer(path)
         path = tb_writer.file_writer.get_logdir()
@@ -121,7 +117,11 @@ class Trainer:
         self.train_iter = None
         self.lang_iters = {}
 
-        for epoch in tqdm(range(nb_epochs), desc='Epochs'):
+        pbar = lambda x: range(x)
+        if self.master:
+            pbar = lambda x: tqdm(range(x), desc='Epochs')
+
+        for epoch in pbar(nb_epochs):
         # for epoch in range(nb_epochs):
 
             # Update learning rate
@@ -149,9 +149,9 @@ class Trainer:
     def _forward_multimodal_loss(
         self, images, captions, lens
     ):
-        img_emb, cap_emb = self.model(images, captions, lens)
+        img_emb, cap_emb = self.model(images, captions, lens)        
+        sim_matrix = self.model.get_sim_matrix(img_emb, cap_emb, lens)        
 
-        sim_matrix = self.model.get_sim_matrix(img_emb, cap_emb, lens)
         loss = self.mm_criterion(sim_matrix)
         return loss
 
@@ -181,14 +181,19 @@ class Trainer:
         #     )
         #     for loader in lang_loaders
         # ]
+        
+        pbar = lambda x: x
+        if self.master:
+            pbar = lambda x: tqdm(
+                x, total=len(x), 
+                desc='Steps ', 
+                leave=False,
+            )
 
-        pbar = helper.reset_pbar(self.pbar)
-
-        for instance in train_loader:
+        for instance in pbar(train_loader):
             self.model.train()
 
             # Update progress bar
-            self.pbar.update(1)
             self.optimizer.zero_grad()
 
             begin_forward = dt()
@@ -217,7 +222,7 @@ class Trainer:
             total_loss = multimodal_loss + total_lang_loss
             total_loss.backward()
 
-            if self.log_grad_norm:
+            if self.log_grad_norm and self.master:
                 logger.log_grad_norm(
                     self.model, self.tb_writer,
                     iteration=iteration,
@@ -241,10 +246,11 @@ class Trainer:
                 'countdown': self.count,
                 'epoch': epoch,
             })
-            logger.tb_log_dict(
-                tb_writer=self.tb_writer, data_dict=train_info,
-                iteration=iteration, prefix='train'
-            )
+            if self.master:
+                logger.tb_log_dict(
+                    tb_writer=self.tb_writer, data_dict=train_info,
+                    iteration=iteration, prefix='train'
+                )
 
             if iteration % valid_interval == 0:
                 # Run evaluation
@@ -254,31 +260,34 @@ class Trainer:
                 # and save checkpoint
                 if val_metric < self.best_val:
                     self.count -= 1
-                else:
+                elif not self.save_all:
                     self.count = self.early_stop
                     self.best_val = val_metric
-                    self.save(
-                        path=self.path,
-                        is_best=True,
-                        args=self.args
-                    )
-                if self.save_all:
-                    self.save(
-                        path=self.path,
-                        is_best=True,
-                        args=self.args
-                    )
+                    if self.master:
+                        self.save(
+                            path=self.path,
+                            is_best=True,
+                            args=self.args
+                        )
+                else:
+                    if self.master:
+                        self.save(
+                            path=self.path,
+                            is_best=True,
+                            args=self.args
+                        )
 
-                # Log updates
-                for metric, values in metrics.items():
-                    self.tb_writer.add_scalar(metric, values, iteration)
+                if self.master:
+                    # Log updates
+                    for metric, values in metrics.items():
+                        self.tb_writer.add_scalar(metric, values, iteration)
 
                 # Early stop
-                if self.count == 0:
+                if self.count == 0 and self.master:
                     self.sysoutlog('\n\nEarly stop\n\n')
                     return False
 
-            if self.pbar.n % log_interval == 0:
+            if iteration % log_interval == 0 and self.master:
                 helper.print_tensor_dict(train_info, print_fn=self.sysoutlog)
 
                 if self.log_histograms:

@@ -593,11 +593,17 @@ class Similarity(nn.Module):
         self.device = device
         self.similarity = similarity_object
         # self.similarity = factory.get_similarity_object(similarity_name, device=device, **kwargs)
-        logger.info(f'Created similarity: {similarity_object} with fn: {self.similarity}')
-        self.pbar = tqdm(total=0, desc='Test  ')
+        logger.info(f'Created similarity: {similarity_object}')
+        self.set_master_()
+
+    def set_master_(self, is_master=True):
+        self.master = is_master
 
     def forward(self, img_embed, cap_embed, lens, shared=False):
-        logger.debug(f'Similarity - img_shape: {img_embed.shape} cap_shape: {cap_embed.shape}')
+        logger.debug((
+            f'Similarity - img_shape: {img_embed.shape} '
+            'cap_shape: {cap_embed.shape}'
+        ))
         return self.similarity(img_embed, cap_embed, lens)
 
     def forward_shared(self, img_embed, cap_embed, lens, shared_size=128):
@@ -613,21 +619,26 @@ class Similarity(nn.Module):
 
         logger.debug('Calculating shared similarities')
 
-        self.pbar = helper.reset_pbar(self.pbar)
-        self.pbar.total = (n_im_shard * n_cap_shard) + 1
+        pbar_fn = lambda x: range(x)
+        if self.master:
+            pbar_fn = lambda x: tqdm(
+                range(x), total=x, 
+                desc='Test  ', 
+                leave=False,
+            )
 
-        d = torch.zeros(len(img_embed), len(cap_embed)).to(self.device)
-        for i in range(n_im_shard):
-            im_start, im_end = shared_size*i, min(shared_size*(i+1), len(img_embed))
+        d = torch.zeros(len(img_embed), len(cap_embed)).cpu()
+        for i in pbar_fn(n_im_shard):
+            im_start = shared_size*i
+            im_end = min(shared_size*(i+1), len(img_embed))
             for j in range(n_cap_shard):
-                cap_start, cap_end = shared_size*j, min(shared_size*(j+1), len(cap_embed))
+                cap_start = shared_size*j
+                cap_end = min(shared_size*(j+1), len(cap_embed))
                 im = img_embed[im_start:im_end]
                 s = cap_embed[cap_start:cap_end]
                 l = lens[cap_start:cap_end]
                 sim = self.forward(im, s, l)
-
-                d[im_start:im_end, cap_start:cap_end] = sim
-                self.pbar.update(1)
+                d[im_start:im_end, cap_start:cap_end] = sim                
 
         logger.debug('Done computing shared similarities.')
         return d

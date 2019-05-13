@@ -1,282 +1,62 @@
-export DATA_PATH=/home/jonatas/data/lavse/
-export OUT_PATH=runs/temp/
+export DATA_PATH=/opt/jonatas/datasets/lavse/
+export OUT_PATH=/opt/jonatas/runs/
+export CUDA_VISIBLE_DEVICES=1,2,3
+export NGPUS=3
 
+python -m torch.distributed.launch --nproc_per_node=$NGPUS \
+train.py \
+--data_path $DATA_PATH \
+--train_data f30k.en \
+--val_data f30k.en \
+--outpath $OUT_PATH/runs/adapt/resnet34_fixed/f30k/ \
+--workers 4 \
+--loader image \
+--sim adaptive_i2t_bn_linear \
+--image_encoder full_image \
+--text_encoder attngru \
+--text_pooling none \
+--image_pooling none \
+--lr 6e-4 \
+--beta 0.995 \
+--vocab vocab/f30k_vocab.json \
+--valid_interval 160 \
+--ngpu $NGPUS \
+--eval_before_training
 
-# # pythlocal
-
-# python train.py \
+# python -m torch.distributed.launch --nproc_per_node=$NGPUS \
+# train.py \
 # --data_path $DATA_PATH \
 # --train_data f30k_precomp.en \
 # --val_data f30k_precomp.en \
-# --outpath $OUT_PATH/cross/lr_5e-4/f30k_precomp.en/ \
-# --sim cross \
-# --val_step 100 \
-# --workers 0 \
+# --outpath $OUT_PATH/adaptive_i2t_bn_linear/f30k_precomp.en/ \
+# --sim adaptive_i2t_bn_linear \
+# --workers 3 \
 # --image_encoder hierarchical \
 # --text_encoder attngru \
-# --text_pooling none \
-# --image_pooling none \
-# --lr 5e-4 \
-# --beta 0.999 \
-# --eval_before_training \
-
-# python train.py \
-# --data_path $DATA_PATH \
-# --train_data f30k_precomp.en \
-# --val_data f30k_precomp.en \
-# --outpath $OUT_PATH/temp/proj_conv_reduced/f30k_precomp.en/ \
-# --workers 3 \
-# --sim proj_conv_reduced \
-# --image_encoder hierarchical \
-# --text_encoder emb_proj \
 # --text_pooling none \
 # --image_pooling none \
 # --lr 6e-4 \
 # --beta 0.99 \
 # --vocab vocab/f30k_vocab.json \
-# --valid_interval 500 \
-# --device cpu \
-# --loader dummy
-
-
-python train.py \
---data_path /home/jonatas/data/ \
---train_data f30k.en \
---val_data f30k.en \
---outpath $OUT_PATH/temp/proj_conv_reduced/f30k_precomp.en/ \
---workers 10 \
---loader image \
---sim cosine \
---image_encoder full_image \
---text_encoder gru \
---text_pooling mean \
---image_pooling mean \
---lr 6e-4 \
---beta 0.99 \
---vocab vocab/f30k_vocab.json \
---valid_interval 500 \
-# --finetune \
-# --device cpu \
-# --loader dummy
-
-
-
-# python train.py \
-# --data_path $DATA_PATH \
-# --train_data f30k_precomp.en \
-# --val_data f30k_precomp.en \
-# --outpath $OUT_PATH/temp/adapt_conv_proj_l2_k32/f30k_precomp.en/ \
-# --workers 3 \
-# --sim adapt_conv_proj_l2_k32 \
-# --image_encoder hierarchical \
-# --text_encoder attngru \
-# --text_pooling none \
-# --image_pooling none \
-# --lr 6e-4 \
-# --beta 0.999 \
-# --vocab vocab/f30k_vocab.json \
-# --valid_interval 500 \
-# --device cpu \
-# --loader dummy
-
-
-# python train.py \
-# --data_path $DATA_PATH \
-# --train_data f30k_precomp.en \
-# --val_data f30k_precomp.en \
-# --outpath $OUT_PATH/temp/adapt_conv_proj/f30k_precomp.en/ \
-# --workers 3 \
-# --sim adapt_conv_proj \
-# --image_encoder hierarchical \
-# --text_encoder attngru \
-# --text_pooling none \
-# --image_pooling none \
-# --lr 6e-4 \
-# --beta 0.999 \
-# --vocab vocab/f30k_vocab.json \
-# --valid_interval 500 \
-# --device cpu \
-# --loader dummy
-
-# python train.py \
-# --data_path $DATA_PATH \
-# --train_data f30k_precomp.en \
-# --val_data f30k_precomp.en \
-# --outpath runs/adaptive_i2t_im_sa/f30k_precomp.en/ \
-# --workers 3 \
-# --sim rnn_proj_large \
-# --image_encoder hierarchical \
-# --text_encoder emb_proj \
-# --text_pooling none \
-# --image_pooling none \
-# --lr 6e-4 \
-# --beta 0.999 \
-# --vocab vocab/f30k_vocab.json \
-# --valid_interval 500 \
-# --device cpu \
-# --loader dummy
-
-
-
-# python train.py \
-# --data_path $DATA_PATH \
-# --train_data f30k_precomp.en \
-# --val_data f30k_precomp.en \
-# --outpath runs/adaptive_i2t_im_sa/f30k_precomp.en/ \
-# --workers 3 \
-# --sim rnn_proj \
-# --image_encoder hierarchical \
-# --text_encoder emb_proj \
-# --text_pooling none \
-# --image_pooling none \
-# --lr 6e-4 \
-# --beta 0.999 \
-# --vocab vocab/f30k_vocab.json \
-# --valid_interval 500 \
-# --device cpu \
-# --loader dummy
-
-
-# python train.py \
-# --data_path $DATA_PATH \
-# --train_data f30k_precomp.en \
-# --val_data f30k_precomp.en \
-# --outpath temp/adaptive_i2t/f30k_precomp.en/ \
-# --sim rnn_proj \
-# --workers 0 \
-# --image_encoder hierarchical \
-# --text_encoder embed_proj \
-# --text_pooling none \
-# --image_pooling none \
-# --lr 6e-4 \
-# --beta 0.999 \
-# --vocab vocab/f30k_vocab.json \
-# --batch_size 32 \
-# --valid_interval 500 \
-# # --eval_before_training
-
-
-# python train.py \
-# --data_path $DATA_PATH \
-# --train_data f30k_precomp.en \
-# --val_data f30k_precomp.en \
-# --outpath runs/adaptive_test/f30k_precomp.en/ \
-# --sim adaptive \
-# --workers 3 \
-# --image_encoder hierarchical \
-# --text_encoder attngru \
-# --text_pooling none \
-# --image_pooling none \
-# --lr 6e-4 \
-# --lr_decay_interval 5 \
-# --lr_decay_rate 0.9 \
-# --beta 0.999 \
-# --vocab vocab/f30k_vocab.json \
-# --valid_interval 500 \
-# --batch_size 128 \
-# --eval_before_training
-
-
-# python train.py \
-# --data_path $DATA_PATH \
-# --train_data f30k_precomp.en \
-# --val_data f30k_precomp.en \
-# --outpath runs/adaptive_vocab/lr2e-4/f30k_precomp.en/ \
-# --sim adaptive \
-# --workers 0 \
-# --image_encoder hierarchical \
-# --text_encoder convgru_sa \
-# --text_pooling none \
-# --image_pooling none \
-# --lr 2e-4 \
-# --beta 0.999 \
-# --eval_before_training \
-# --vocab vocab/f30k_vocab.json
-
-
-# python train.py \
-# --data_path $DATA_PATH \
-# --train_data f30k_precomp.en \
-# --val_data f30k_precomp.en \
-# --outpath runs/cross/f30k_precomp.en/ \
-# --sim cross \
-# --workers 0 \
-# --image_encoder hierarchical \
-# --text_encoder attngru \
-# --text_pooling none \
-# --image_pooling none \
-# --lr 2e-4 \
-# --beta 0.999 \
+# --valid_interval 250 \
+# --ngpu $NGPUS \
 # --eval_before_training \
 
 
-
-# python train.py \
+# python -m torch.distributed.launch --nproc_per_node=1 \
+# train.py \
 # --data_path $DATA_PATH \
-# --train_data f30k_precomp.en \
-# --val_data f30k_precomp.en \
-# --outpath $OUT_PATH/temp_cosine/f30k_precomp.en/ \
+# --train_data f30k.en \
+# --val_data f30k.en \
+# --outpath $OUT_PATH/temp/f30k/ \
+# --workers 4 \
 # --sim cosine \
-# --valid_interval 500 \
-# --workers 0 \
-# --image_encoder sa \
-# --text_encoder convgru_sa \
-# --text_pooling mean \
+# --image_encoder scan \
+# --text_encoder scan \
+# --text_pooling lens \
 # --image_pooling mean \
-# --lr_decay_interval 10 \
-# --lr_decay_rate 0.1 \
 # --lr 6e-4 \
-# --beta 0.997 \
-# --eval_before_training \
-
-
-# python train.py \
-# --data_path $DATA_PATH \
-# --train_data f30k_precomp.en \
-# --val_data f30k_precomp.en \
-# --outpath $OUT_PATH/sagru_sa_convgru_norm_leaky_999/f30k_precomp.en/ \
-# --sim cosine \
-# --val_step 100 \
-# --workers 0 \
-# --image_encoder sagru \
-# --text_encoder convgru_sa \
-# --text_pooling mean \
-# --image_pooling mean \
-# --lr 2e-4 \
-# --beta 0.999 \
-# --eval_before_training \
-
-
-
-# python train.py \
-# --data_path $DATA_PATH \
-# --train_data f30k_precomp.en \
-# --val_data f30k_precomp.en \
-# --outpath $OUT_PATH/sagru_sa_convgru_large_lr/f30k_precomp.en/ \
-# --sim cosine \
-# --val_step 100 \
-# --workers 0 \
-# --image_encoder sagru \
-# --text_encoder convgru_sa \
-# --text_pooling mean \
-# --image_pooling mean \
-# --lr_decay_interval 3 \
-# --lr_decay_rate 0.9 \
-# --lr 1e-3 \
-# --beta 0.997 \
-# --eval_before_training \
-
-# python train.py \
-# --data_path $DATA_PATH \
-# --train_data f30k_precomp.en \
-# --val_data f30k_precomp.en \
-# --outpath $OUT_PATH/squeeze-hier/lr2e-4/f30k_precomp.en/ \
-# --sim squeeze \
-# --val_step 100 \
-# --workers 0 \
-# --image_encoder hierarchical \
-# --text_pooling none \
-# --image_pooling none \
-# --lr 5e-4 \
-# --beta 0.9995 \
-# # --eval_before_training \
+# --beta 0.99 \
+# --vocab vocab/f30k_vocab.json \
+# --valid_interval 50 \
+# --ngpu 1 \

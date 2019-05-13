@@ -162,3 +162,24 @@ python train.py \
 --valid_interval 500 \
 --eval_before_training \
 --save_all
+
+
+# Distributed
+python -m torch.distributed.launch --nproc_per_node=$NGPUS \
+train.py \
+--data_path $DATA_PATH \
+--train_data f30k_precomp.en \
+--val_data f30k_precomp.en \
+--outpath $OUT_PATH/adaptive_i2t_bn_linear/f30k_precomp.en/ \
+--sim adaptive_i2t_bn_linear \
+--workers 3 \
+--image_encoder hierarchical \
+--text_encoder attngru \
+--text_pooling none \
+--image_pooling none \
+--lr 6e-4 \
+--beta 0.99 \
+--vocab vocab/f30k_vocab.json \
+--valid_interval 250 \
+--ngpu $NGPUS \
+--eval_before_training \

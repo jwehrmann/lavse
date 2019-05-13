@@ -61,6 +61,10 @@ class LAVSE(nn.Module):
             **kwargs
         )
         logger.info(f'Using similarity: {similarity_name}')
+    
+    def set_master_(self, is_master=True):
+        self.master = is_master
+        self.similarity.set_master_(is_master)
 
     def extract_caption_features(
         self, captions, lengths,
