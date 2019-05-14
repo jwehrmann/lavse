@@ -1,5 +1,6 @@
 from timeit import default_timer as dt
 
+import numpy as np
 import torch
 from addict import Dict
 from torch import nn
@@ -7,84 +8,84 @@ from torch.nn import _VF
 from torch.nn import functional as F
 from tqdm import tqdm
 
-from .. import txtenc
 from ...utils import helper
 from ...utils.logger import get_logger
-from ..layers import attention
+from .. import txtenc
+from ..layers import attention, condbn, dynconv
 from ..txtenc.pooling import mean_pooling
 from .measure import cosine_sim, l2norm
 
 logger = get_logger()
 
 
-class CondBatchNorm1d(nn.Module):
+class Similarity(nn.Module):
 
-    def __init__(
-        self, in_features, k, cond_vector_size=None,
-        normalization='batchnorm', nonlinear_proj=True,
-    ):
+    def __init__(self, device, similarity_object, **kwargs):
         super().__init__()
+        self.device = device
+        self.similarity = similarity_object
+        # self.similarity = factory.get_similarity_object(similarity_name, device=device, **kwargs)
+        logger.info(f'Created similarity: {similarity_object}')
+        self.set_master_()
 
-        if normalization is None:
-            self.bn = lambda x: x
-        elif normalization == 'batchnorm':
-            self.bn = nn.BatchNorm1d(in_features, affine=False)
-        elif normalization == 'instancenorm':
-            self.bn = nn.InstanceNorm1d(in_features, affine=False)
+    def set_master_(self, is_master=True):
+        self.master = is_master
 
-        self.nb_channels = in_features
-        self.cond_vector_size = cond_vector_size
+    def forward(self, img_embed, cap_embed, lens, shared=False):
+        logger.debug((
+            f'Similarity - img_shape: {img_embed.shape} '
+            'cap_shape: {cap_embed.shape}'
+        ))
+        return self.similarity(img_embed, cap_embed, lens)
 
-        if cond_vector_size is None:
-            cond_vector_size = in_features
+    def forward_shared(self, img_embed, cap_embed, lens, shared_size=128):
+        """
+        Computer pairwise i2t image-caption distance with locality sharding
+        """
 
-        if nonlinear_proj:
-            self.fc_gamma = nn.Sequential(
-                nn.Linear(cond_vector_size, cond_vector_size//k),
-                nn.ReLU(inplace=True),
-                nn.Linear(cond_vector_size//k, in_features),
+        img_embed = img_embed.to(self.device)
+        cap_embed = cap_embed.to(self.device)
+
+        n_im_shard = (len(img_embed)-1)//shared_size + 1
+        n_cap_shard = (len(cap_embed)-1)//shared_size + 1
+
+        logger.debug('Calculating shared similarities')
+
+        pbar_fn = lambda x: range(x)
+        if self.master:
+            pbar_fn = lambda x: tqdm(
+                range(x), total=x, 
+                desc='Test  ', 
+                leave=False,
             )
 
-            self.fc_beta = nn.Sequential(
-                nn.Linear(cond_vector_size, cond_vector_size//k),
-                nn.ReLU(inplace=True),
-                nn.Linear(cond_vector_size//k, in_features),
-            )
-        else:
-            self.fc_gamma = nn.Sequential(
-                nn.Linear(cond_vector_size, in_features),
-            )
+        d = torch.zeros(len(img_embed), len(cap_embed)).cpu()
+        for i in pbar_fn(n_im_shard):
+            im_start = shared_size*i
+            im_end = min(shared_size*(i+1), len(img_embed))
+            for j in range(n_cap_shard):
+                cap_start = shared_size*j
+                cap_end = min(shared_size*(j+1), len(cap_embed))
+                im = img_embed[im_start:im_end]
+                s = cap_embed[cap_start:cap_end]
+                l = lens[cap_start:cap_end]
+                sim = self.forward(im, s, l)
+                d[im_start:im_end, cap_start:cap_end] = sim                
 
-            self.fc_beta = nn.Sequential(
-                nn.Linear(cond_vector_size, in_features),
-            )
+        logger.debug('Done computing shared similarities.')
+        return d
 
-    def forward(self, feat_matrix, cond_vector):
-        '''
-        Forward conditional bachnorm using
-        predicted gamma and beta returning
-        the normalized input matrix
 
-        Arguments:
-            feat_matrix {torch.FloatTensor}
-                -- shape: batch, features, timesteps
-            cond_vector {torch.FloatTensor}
-                -- shape: batch, features
+class Cosine(nn.Module):
 
-        Returns:
-            torch.FloatTensor
-                -- shape: batch, features, timesteps
-        '''
+    def __init__(self, device, latent_size=1024):
+        super().__init__()
+        self.device = device
 
-        B, D, _ = feat_matrix.shape
-        Bv, Dv = cond_vector.shape
-
-        gammas = self.fc_gamma(cond_vector).view(Bv, D, 1)
-        betas  = self.fc_beta(cond_vector).view(Bv, D, 1)
-
-        norm_feat = self.bn(feat_matrix)
-        normalized = norm_feat * (gammas + 1) + betas
-        return normalized
+    def forward(self, img_embed, cap_embed, *args, **kwargs):
+        img_embed = l2norm(img_embed, dim=1)
+        cap_embed = l2norm(cap_embed, dim=1)
+        return cosine_sim(img_embed, cap_embed)
 
 
 class AdaptiveEmbedding(nn.Module):
@@ -98,8 +99,8 @@ class AdaptiveEmbedding(nn.Module):
 
         # self.fc = nn.Conv1d(latent_size, latent_size*2, 1).to(device)
 
-        self.cbn_img = CondBatchNorm1d(latent_size, k)
-        self.cbn_txt = CondBatchNorm1d(latent_size, k)
+        self.cbn_img = condbn.CondBatchNorm1d(latent_size, k)
+        self.cbn_txt = condbn.CondBatchNorm1d(latent_size, k)
 
         # self.alpha = nn.Parameter(torch.ones(1))
         # self.beta = nn.Parameter(torch.zeros(1))
@@ -171,11 +172,10 @@ class AdaptiveEmbeddingI2T(nn.Module):
         self.device = device
 
         # self.fc = nn.Conv1d(latent_size, latent_size*2, 1).to(device)
-
-        self.cbn_img = CondBatchNorm1d(latent_size, k)
-        self.cbn_txt = CondBatchNorm1d(latent_size, k, **kwargs)
+        
+        self.cbn_txt = condbn.CondBatchNorm1d(latent_size, k, **kwargs)
         if cond_vec:
-           self.cbn_vec = CondBatchNorm1d(latent_size, k, **kwargs)
+           self.cbn_vec = condbn.CondBatchNorm1d(latent_size, k, **kwargs)
 
         # self.alpha = nn.Parameter(torch.ones(1))
         # self.beta = nn.Parameter(torch.zeros(1))
@@ -230,6 +230,84 @@ class AdaptiveEmbeddingI2T(nn.Module):
             sim = cosine_sim(img_vector, txt_vector).squeeze(-1)
             # print('sim', sim.shape)
             sims[i,:] = sim
+
+        return sims
+
+
+class DynConv2dSim(nn.Module):
+
+    def __init__(
+            self, device, latent_size=1024, reduce_proj=8, groups=2,
+            img_dim=512,
+        ):
+        super().__init__()
+
+        self.img_reduce = nn.Conv2d(
+            in_channels=latent_size, 
+            out_channels=latent_size//reduce_proj, 
+            kernel_size=1,
+        )
+
+        self.cap_reduce = nn.Linear(
+            latent_size, latent_size//reduce_proj,
+        )
+
+        self.pconv1 = dynconv.ProjConv2d(
+            base_proj_channels=latent_size//reduce_proj,
+            in_channels=latent_size//reduce_proj,
+            out_channels=latent_size//reduce_proj,
+            kernel_size=3,
+            padding=1,
+            groups=groups,
+            weightnorm=None,
+        )
+
+        self.conv1 = nn.Conv2d(
+            latent_size//reduce_proj, latent_size, 1
+        )
+
+        self.device = device        
+
+    def forward(self, img_embed, cap_embed, lens, **kwargs):
+        '''
+            img_embed: (B, 36, latent_size)
+            cap_embed: (B, T, latent_size)
+        '''
+        
+        cap_embed = cap_embed.permute(0, 2, 1).to(self.device)
+        img_embed = img_embed.permute(0, 2, 1).to(self.device)
+        B, D, WH = img_embed.shape
+        H = int(np.sqrt(WH))
+        img_embed = img_embed.view(B, D, H, H)
+        
+        img_reduced = self.img_reduce(img_embed)
+
+        sims = torch.zeros(
+            img_embed.shape[0], cap_embed.shape[0]
+        ).to(self.device)
+
+        for i, cap_tensor in enumerate(cap_embed):
+            # cap: 1024, T
+            # img: 1024, 36
+            
+            n_words = lens[i]
+            cap_repr = cap_tensor[:,:n_words].mean(-1).unsqueeze(0)
+            cap_reduced = self.cap_reduce(cap_repr)
+            
+            img_output = self.pconv1(img_reduced, cap_reduced)
+            img_output = self.conv1(img_output)
+
+            # img_vector = img_output.mean(-1).mean(-1)
+            img_embed += img_output
+            img_vector = img_embed.mean(-1).mean(-1)
+
+            img_vector = l2norm(img_vector, dim=-1)
+            cap_vector = cap_repr
+            cap_vector = l2norm(cap_vector, dim=-1)
+
+            sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
+            sims[:,i] = sim
+
 
         return sims
 
@@ -319,53 +397,6 @@ class ProjRNNReducedI2T(nn.Module):
         return sims
 
 
-class MixedConv(nn.Module):
-
-    def __init__(
-        self, base_proj_channels,
-        in_channels, out_channels,
-        kernel_size, groups,
-    ):
-        super().__init__()
-
-        self.conv1p = ProjConv1d(
-            base_proj_channels=base_proj_channels,
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=kernel_size,
-            groups=groups,
-        )
-        self.conv1a = nn.Conv1d(
-            in_channels=in_channels,
-            out_channels=out_channels,
-            kernel_size=kernel_size,
-            groups=groups,
-        )
-
-        self.batch_norm = nn.BatchNorm1d(out_channels*2)
-
-        self.conv1 = nn.Conv1d(
-            in_channels=in_channels*2,
-            out_channels=out_channels,
-            kernel_size=1,
-        )
-
-        # self.sa1 = attention.SelfAttention(
-        #     out_channels,
-        #     nn.LeakyReLU(0.1, inplace=True),
-        # )
-
-    def forward(self, x, base_feat):
-        proj_x = self.conv1p(x, base_feat)
-        for_x = self.conv1a(x)
-        x = torch.cat([proj_x, for_x], 1)
-        x = self.batch_norm(x)
-        x = nn.ReLU(inplace=True)(x)
-        x = self.conv1(x)
-        # x_sa = self.sa1(x)
-        return x
-
-
 class ProjConvReducedI2T(nn.Module):
 
     def __init__(
@@ -379,7 +410,7 @@ class ProjConvReducedI2T(nn.Module):
         self.reduce_img = nn.Conv1d(latent_size, latent_size//k, 1)
         self.reduce_txt = nn.Conv1d(300, latent_size//k, 1)
 
-        self.mixed_a = MixedConv(
+        self.mixed_a = layers.MixedConv1d(
             base_proj_channels=latent_size//k,
             in_channels=latent_size//k,
             out_channels=latent_size//k,
@@ -387,7 +418,7 @@ class ProjConvReducedI2T(nn.Module):
             groups=2,
         )
 
-        self.mixed_b = MixedConv(
+        self.mixed_b = layers.MixedConv(
             base_proj_channels=latent_size//k,
             in_channels=latent_size//k,
             out_channels=latent_size//k,
@@ -460,188 +491,6 @@ class ProjConvReducedI2T(nn.Module):
             sims[i,:] = sim
 
         return sims
-
-
-class ProjConv1d(nn.Module):
-
-    def __init__(
-        self, base_proj_channels, in_channels, out_channels,
-        kernel_size, padding=0, groups=1, proj_bias=True,
-        weightnorm='batchnorm',
-    ):
-        super().__init__()
-
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.kernel_size = kernel_size
-        self.padding = padding
-        self.proj_bias = proj_bias
-        self.base_proj_channels = base_proj_channels
-        self.groups = groups
-
-        if weightnorm == None:
-            weightnorm = False
-
-        self.weightnorm = weightnorm
-
-        self.kernel = nn.Linear(
-            base_proj_channels,
-            (in_channels * out_channels * kernel_size) // groups
-        )
-        if weightnorm == 'batchnorm':
-            self.weight_norm = nn.BatchNorm1d(out_channels)
-        elif weightnorm == 'softmax':
-            self.weight_norm = nn.Softmax(dim=-1)
-        elif weightnorm == 'l2':
-            self.weight_norm = lambda x: l2norm(x, dim=1)
-        if proj_bias:
-            self.bias = nn.Linear(base_proj_channels, out_channels)
-
-        print(self.kernel)
-
-    def forward(self, input, base_proj):
-        kernel = self.kernel(base_proj)
-        kernel = kernel.view(
-            self.out_channels,
-            self.in_channels // self.groups,
-            self.kernel_size
-        )
-        if self.weightnorm:
-            kernel = self.weight_norm(
-                kernel.permute(1, 0, 2)
-            ).permute(1, 0, 2)
-        if self.proj_bias:
-            bias = self.bias(base_proj)
-            bias = bias.view(self.out_channels)
-
-        return F.conv1d(
-            input, kernel, bias=bias, stride=1,
-            padding=self.padding, dilation=1,
-            groups=self.groups,
-        )
-
-
-class ProjRNN(nn.Module):
-
-    def __init__(
-        self, base_proj_channels, rnn_input, rnn_units, device
-    ):
-        super().__init__()
-
-        self.base_proj_channels = base_proj_channels
-        self.rnn_units = rnn_units
-        self.weights_dim = rnn_units * 3
-        self.device = device
-        self.rnn_input = rnn_input
-
-        self.weight_ih = nn.Linear(base_proj_channels, self.weights_dim * rnn_input)
-        self.weight_hh = nn.Linear(base_proj_channels, self.weights_dim * rnn_units)
-        self.bias_ih = nn.Linear(base_proj_channels, self.weights_dim)
-        self.bias_hh = nn.Linear(base_proj_channels, self.weights_dim)
-
-        print(self.weight_ih)
-        print(self.weight_hh)
-        print(self.bias_ih)
-        print(self.bias_hh)
-
-    def forward(self, input, base_proj):
-        b, t, d = input.shape
-
-        weight_ih = self.weight_ih(base_proj)
-        weight_ih = weight_ih.view(
-            self.weights_dim, self.rnn_input
-        )
-        weight_hh = self.weight_hh(base_proj)
-        weight_hh = weight_hh.view(
-            self.weights_dim, self.rnn_units
-        )
-        bias_ih = self.bias_ih(base_proj).view(-1)
-        bias_hh = self.bias_hh(base_proj).view(-1)
-
-        hx = torch.zeros(b,  self.rnn_units).to(self.device)
-
-        outputs = []
-        for i in range(t):
-            input_vec = input[:,i]
-            out = _VF.gru_cell(
-                input_vec, hx,
-                weight_ih, weight_hh,
-                bias_ih, bias_hh,
-            )
-            outputs.append(out)
-        outputs = torch.stack(outputs, 0)
-        outputs = outputs.permute(1, 0, 2)
-        return outputs
-
-
-class Cosine(nn.Module):
-
-    def __init__(self, device, latent_size=1024):
-        super().__init__()
-        self.device = device
-
-    def forward(self, img_embed, cap_embed, *args, **kwargs):
-        img_embed = l2norm(img_embed, dim=1)
-        cap_embed = l2norm(cap_embed, dim=1)
-        return cosine_sim(img_embed, cap_embed)
-
-
-class Similarity(nn.Module):
-
-    def __init__(self, device, similarity_object, **kwargs):
-        super().__init__()
-        self.device = device
-        self.similarity = similarity_object
-        # self.similarity = factory.get_similarity_object(similarity_name, device=device, **kwargs)
-        logger.info(f'Created similarity: {similarity_object}')
-        self.set_master_()
-
-    def set_master_(self, is_master=True):
-        self.master = is_master
-
-    def forward(self, img_embed, cap_embed, lens, shared=False):
-        logger.debug((
-            f'Similarity - img_shape: {img_embed.shape} '
-            'cap_shape: {cap_embed.shape}'
-        ))
-        return self.similarity(img_embed, cap_embed, lens)
-
-    def forward_shared(self, img_embed, cap_embed, lens, shared_size=128):
-        """
-        Computer pairwise i2t image-caption distance with locality sharding
-        """
-
-        img_embed = img_embed.to(self.device)
-        cap_embed = cap_embed.to(self.device)
-
-        n_im_shard = (len(img_embed)-1)//shared_size + 1
-        n_cap_shard = (len(cap_embed)-1)//shared_size + 1
-
-        logger.debug('Calculating shared similarities')
-
-        pbar_fn = lambda x: range(x)
-        if self.master:
-            pbar_fn = lambda x: tqdm(
-                range(x), total=x, 
-                desc='Test  ', 
-                leave=False,
-            )
-
-        d = torch.zeros(len(img_embed), len(cap_embed)).cpu()
-        for i in pbar_fn(n_im_shard):
-            im_start = shared_size*i
-            im_end = min(shared_size*(i+1), len(img_embed))
-            for j in range(n_cap_shard):
-                cap_start = shared_size*j
-                cap_end = min(shared_size*(j+1), len(cap_embed))
-                im = img_embed[im_start:im_end]
-                s = cap_embed[cap_start:cap_end]
-                l = lens[cap_start:cap_end]
-                sim = self.forward(im, s, l)
-                d[im_start:im_end, cap_start:cap_end] = sim                
-
-        logger.debug('Done computing shared similarities.')
-        return d
 
 
 class LogSumExp(nn.Module):

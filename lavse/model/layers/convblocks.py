@@ -61,7 +61,3 @@ class ParallelBlock(nn.Module):
         outs = torch.cat([out[:,:,:t] for out in outs], dim=1)
         return outs
       
-
-
-
-    

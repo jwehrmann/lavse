@@ -53,7 +53,10 @@ class Aggregate(nn.Module):
 
 class FullImageEncoder(nn.Module):
 
-    def __init__(self, cnn, img_dim, latent_size, no_imgnorm=False):
+    def __init__(
+        self, cnn, img_dim, latent_size, 
+        no_imgnorm=False, pretrained=True
+    ):
         super(FullImageEncoder, self).__init__()
         self.latent_size = latent_size
         self.no_imgnorm = no_imgnorm
@@ -61,7 +64,7 @@ class FullImageEncoder(nn.Module):
 
         self.apply(default_initializer)
 
-        self.cnn = BaseFeatures(cnn(pretrained=True))
+        self.cnn = BaseFeatures(cnn(pretrained))
         # self.aggregate = Aggregate()
 
     def forward(self, images):

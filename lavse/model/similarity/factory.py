@@ -39,7 +39,7 @@ _similarities = {
     },
     'adaptive_i2t': {
         'class': sim.AdaptiveEmbeddingI2T,
-        'args': Dict(),
+        'args': {},
     },
     'adaptive_i2t_feat_norm_bn': {
         'class': sim.AdaptiveEmbeddingI2T,
@@ -97,6 +97,18 @@ _similarities = {
         'class': sim.ProjConvReducedI2T,
         'args': Dict(
             k=8,
+        ),
+    },
+    'proj_conv_reduced': {
+        'class': sim.ProjConvReducedI2T,
+        'args': Dict(
+            k=8,
+        ),
+    },
+    'dynconv': {
+        'class': sim.DynConv2dSim,
+        'args': Dict(
+            
         ),
     },
 }
