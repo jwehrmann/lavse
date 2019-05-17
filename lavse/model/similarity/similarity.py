@@ -234,6 +234,103 @@ class AdaptiveEmbeddingI2T(nn.Module):
         return sims
 
 
+
+class DynConv1dSim(nn.Module):
+
+    def __init__(
+            self, device, latent_size=1024, reduce_proj=8, groups=1,
+            img_dim=2048,
+        ):
+        super().__init__()
+
+        # 2048 -> 256
+        self.img_reduce = nn.Conv1d(
+            in_channels=latent_size, 
+            out_channels=latent_size//reduce_proj, 
+            kernel_size=1,
+        )
+
+        # self.img_proj = nn.Conv1d(
+        #     in_channels=latent_size, 
+        #     out_channels=latent_size, 
+        #     kernel_size=1,
+        # )
+
+        # self.cap_reduce = nn.Linear(
+        #     latent_size, latent_size//reduce_proj,
+        # )
+
+        self.pconv1 = dynconv.DynamicConv1dTBC(
+            input_size=latent_size//reduce_proj,
+            query_size=latent_size+latent_size//reduce_proj,
+            kernel_size=3,
+            weight_softmax=True,
+            renorm_padding=True,
+            padding_l=1,
+            num_heads=reduce_proj,
+        )
+
+        self.img_fc = nn.Linear(
+            latent_size//reduce_proj+latent_size, latent_size
+        )
+
+        self.sa = attention.SelfAttention(
+            latent_size, nn.LeakyReLU(0.1, inplace=True)
+        )
+
+        self.device = device        
+
+    def forward(self, img_embed, cap_embed, lens, **kwargs):
+        '''
+            img_embed: (B, 36, latent_size)
+            cap_embed: (B, T, latent_size)
+        '''
+        
+        cap_embed = cap_embed.permute(0, 2, 1).to(self.device)
+        img_embed = img_embed.permute(0, 2, 1)           
+
+        B, D, R = img_embed.shape     
+    
+        img_reduced = self.img_reduce(img_embed)        
+        img_proj = self.sa(img_embed).mean(-1)
+
+        sims = torch.zeros(
+            img_embed.shape[0], cap_embed.shape[0]
+        ).to(self.device)
+
+        for i, cap_tensor in enumerate(cap_embed):
+            # cap: 1024, T
+            # img: 1024, 36
+            
+            n_words = lens[i]
+            cap_repr = cap_tensor[:,:n_words].mean(-1).unsqueeze(0)            
+            # cap_reduced = self.cap_reduce(cap_repr)
+
+            cap_repl = cap_repr.repeat(B, R).view(B, -1,R)
+
+            img_red_flat = img_reduced.view(B, -1, R)
+            
+            cond = torch.cat([img_red_flat, cap_repl], dim=1)
+            a = self.pconv1(
+                img_red_flat.permute(2, 0, 1), 
+                query=cond.permute(2, 0, 1),
+            )            
+            a = a.mean(0)
+            # img_vector = img_output.mean(-1).mean(-1)
+            img_vector = torch.cat([img_proj, a], dim=1)
+            img_vector = self.img_fc(img_vector)
+
+            img_vector = l2norm(img_vector, dim=-1)
+            cap_vector = cap_repr
+            cap_vector = l2norm(cap_vector, dim=-1)
+
+            sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
+            sims[:,i] = sim
+
+
+        return sims
+
+
 class DynConv2dSim(nn.Module):
 
     def __init__(

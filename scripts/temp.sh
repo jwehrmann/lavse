@@ -3,26 +3,95 @@ export OUT_PATH=/opt/jonatas/runs/
 export CUDA_VISIBLE_DEVICES=1,2,3
 export NGPUS=3
 
+
+# python -m torch.distributed.launch --nproc_per_node=$NGPUS \
+# train.py \
+# --data_path $DATA_PATH \
+# --train_data f30k_precomp.en \
+# --val_data f30k_precomp.en \
+# --outpath $OUT_PATH/temp/dyn1d_precomp0_b995/ \
+# --workers 4 \
+# --sim dynconv1d \
+# --image_encoder hierarchical \
+# --text_encoder attngru \
+# --text_pooling none \
+# --image_pooling none \
+# --lr 6e-4 \
+# --beta 0.95 \
+# --vocab vocab/f30k_vocab.json \
+# --valid_interval 160 \
+# --ngpu $NGPUS \
+# --lr_decay_interval 10 \
+# --batch_size 128
+export CUDA_VISIBLE_DEVICES=0
+export NGPUS=1
+
+
+
 python -m torch.distributed.launch --nproc_per_node=$NGPUS \
 train.py \
 --data_path $DATA_PATH \
---train_data f30k.en \
---val_data f30k.en \
---outpath $OUT_PATH/temp/dyn_resnet152/ \
---workers 8 \
---loader image \
---sim dynconv \
---image_encoder resnet152 \
+--train_data f30k_precomp.en \
+--val_data f30k_precomp.en \
+--outpath $OUT_PATH/temp/dyn1d_precomp0_b95_/ \
+--workers 4 \
+--sim dynconv1d \
+--image_encoder hierarchical \
 --text_encoder attngru \
 --text_pooling none \
 --image_pooling none \
 --lr 6e-4 \
---beta 0.995 \
---vocab vocab/f30k.json \
---valid_interval 160 \
+--beta 0.95 \
+--vocab vocab/f30k_vocab.json \
+--valid_interval 500 \
 --ngpu $NGPUS \
 --lr_decay_interval 10 \
 --batch_size 128
+
+# python -m torch.distributed.launch --nproc_per_node=$NGPUS \
+# train.py \
+# --data_path $DATA_PATH \
+# --train_data f30k.en \
+# --val_data f30k.en \
+# --outpath $OUT_PATH/temp/dyn_resnet152/ \
+# --workers 8 \
+# --loader image \
+# --sim dynconv \
+# --image_encoder resnet152 \
+# --text_encoder attngru \
+# --text_pooling none \
+# --image_pooling none \
+# --lr 6e-4 \
+# --beta 0.995 \
+# --vocab vocab/f30k.json \
+# --valid_interval 160 \
+# --ngpu $NGPUS \
+# --lr_decay_interval 10 \
+# --batch_size 128
+
+# export CUDA_VISIBLE_DEVICES=0
+# export NGPUS=1
+# python -m torch.distributed.launch --nproc_per_node=$NGPUS \
+# train.py \
+# --data_path $DATA_PATH \
+# --train_data f30k.en \
+# --val_data f30k.en \
+# --outpath $OUT_PATH/temp/dyn_resnet152_b099/ \
+# --workers 4 \
+# --loader image \
+# --sim dynconv \
+# --image_encoder resnet152 \
+# --text_encoder attngru \
+# --text_pooling none \
+# --image_pooling none \
+# --lr 6e-4 \
+# --beta 0.99 \
+# --vocab vocab/f30k.json \
+# --valid_interval 500 \
+# --ngpu $NGPUS \
+# --lr_decay_interval 10 \
+# --batch_size 128
+
 
 # python -m torch.distributed.launch --nproc_per_node=$NGPUS \
 # python train.py \

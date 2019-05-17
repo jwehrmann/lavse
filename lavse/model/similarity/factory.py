@@ -111,6 +111,12 @@ _similarities = {
             groups=1,
         ),
     },
+    'dynconv1d': {
+        'class': sim.DynConv1dSim,
+        'args': Dict(
+            groups=1,
+        ),
+    },
 }
 
 
