@@ -36,10 +36,10 @@ _image_encoders = {
         },
     },
     'full_image': {
-        'class': fullencoder.FullImageEncoder,
+        'class': fullencoder.ImageEncoder,
         'args': {
-            'cnn': torchvision.models.resnet34,
-            'img_dim': 512,
+            'cnn': torchvision.models.resnet152,
+            'img_dim': 248,
         },
     },
     'resnet50': {
@@ -49,11 +49,42 @@ _image_encoders = {
             'img_dim': 2048,
         },
     },
-    'resnet101': {
+    'resnet50_ft': {
         'class': fullencoder.FullImageEncoder,
+        'args': {
+            'cnn': torchvision.models.resnet50,
+            'img_dim': 2048,
+            'finetune': True,
+        },
+    },
+    'resnet101': {
+        'class': fullencoder.FullHierImageEncoder,
         'args': {
             'cnn': torchvision.models.resnet101,
             'img_dim': 2048,
+            'proj_regions': False,
+        },
+    },
+    'resnet152': {
+        'class': fullencoder.FullImageEncoder,
+        'args': {
+            'cnn': torchvision.models.resnet152,
+            'img_dim': 2048,
+            'proj_regions': False,
+        },
+    },
+    'resnet152_ft': {
+        'class': fullencoder.FullImageEncoder,
+        'args': {
+            'cnn': torchvision.models.resnet152,
+            'img_dim': 2048,
+            'finetune': True,
+        },
+    },
+    'vsepp_pt': {
+        'class': fullencoder.VSEPPEncoder,
+        'args': {
+            'cnn_type': 'resnet152', 
         },
     },
     'img_proj': {

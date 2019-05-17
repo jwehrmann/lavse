@@ -31,8 +31,8 @@ class LAVSE(nn.Module):
         )
 
         logger.info((
-            'Image encoder created\n'
-            f'{self.img_enc}'
+            'Image encoder created: '
+            f'{imgenc_name}'
         ))
 
         self.txt_enc = get_text_encoder(
@@ -45,8 +45,8 @@ class LAVSE(nn.Module):
         self.img_pool = get_img_pooling(img_pooling)
 
         logger.info((
-            'Text encoder created\n'
-            f'{self.txt_enc}'
+            'Text encoder created: '
+            f'{txtenc_name}'
         ))
 
         sim_obj = get_similarity_object(

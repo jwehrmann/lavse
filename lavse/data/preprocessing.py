@@ -14,7 +14,7 @@ def get_transform(
 
     if split == 'train':
         t_list = [
-            transforms.Resize(resize_to),
+            # transforms.Resize(resize_to),
             transforms.RandomHorizontalFlip(),
             transforms.RandomResizedCrop(crop_size),
         ]

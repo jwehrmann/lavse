@@ -72,6 +72,17 @@ def get_train_params():
         help='Path to save logs and models.',
     )
     parser.add_argument(
+        '--resume', default=None,
+        help='Checkpoint to resume training.',
+    )
+    parser.add_argument(
+        '--data_parallel', action='store_true',
+        help=(
+            'Whether to use several GPUs to train the model', 
+            '[use when a single model do not fit the GPU memory].'
+        ),
+    )
+    parser.add_argument(
         '--profile', default=None,
         choices=profiles.get_profile_names(),
         help='Import pre-defined setup from profiles.py',

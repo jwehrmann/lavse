@@ -18,50 +18,56 @@ def predict_loader(model, data_loader, device):
     cap_embs = None
     cap_lens = None
 
-    max_n_word = 70
+    pbar_fn = lambda x: x
+    if model.master:
+        pbar_fn = lambda x: tqdm(
+            x, total=len(x), 
+            desc='Pred  ', 
+            leave=False,
+        )
+
     # for i, (images, captions, lengths, ids) in enumerate(data_loader):
     #     max_n_word = max(max_n_word, max(lengths))
+    max_n_word = 70
 
-    for i, (images, captions, lengths, ids) in tqdm(
-        enumerate(data_loader), total=len(data_loader),
-        leave=False, desc='Pred  '
-    ):
+    with torch.no_grad():
+        for (images, captions, lengths, ids) in pbar_fn(data_loader):
 
-        images = images.to(device)
-        captions = captions.to(device)
-        # compute the embeddings
-        img_emb, cap_emb = model(images, captions, lengths)
-        if img_embs is None:
-            if len(img_emb.shape) == 3:
-                is_tensor = True
-                img_embs = np.zeros((len(data_loader.dataset), img_emb.size(1), img_emb.size(2)))
-                cap_embs = np.zeros((len(data_loader.dataset), max_n_word, cap_emb.size(2)))
+            images = images.to(device)
+            captions = captions.to(device)
+            # compute the embeddings
+            img_emb, cap_emb = model(images, captions, lengths)
+            if img_embs is None:
+                if len(img_emb.shape) == 3:
+                    is_tensor = True
+                    img_embs = np.zeros((len(data_loader.dataset), img_emb.size(1), img_emb.size(2)))
+                    cap_embs = np.zeros((len(data_loader.dataset), max_n_word, cap_emb.size(2)))
+                else:
+                    is_tensor = False
+                    img_embs = np.zeros((len(data_loader.dataset), img_emb.size(1)))
+                    cap_embs = np.zeros((len(data_loader.dataset), cap_emb.size(1)))
+                cap_lens = [0] * len(data_loader.dataset)
+            # cache embeddings
+            img_embs[ids] = img_emb.data.cpu().numpy()
+            if is_tensor:
+                cap_embs[ids,:max(lengths),:] = cap_emb.data.cpu().numpy()
             else:
-                is_tensor = False
-                img_embs = np.zeros((len(data_loader.dataset), img_emb.size(1)))
-                cap_embs = np.zeros((len(data_loader.dataset), cap_emb.size(1)))
-            cap_lens = [0] * len(data_loader.dataset)
-        # cache embeddings
-        img_embs[ids] = img_emb.data.cpu().numpy()
-        if is_tensor:
-            cap_embs[ids,:max(lengths),:] = cap_emb.data.cpu().numpy()
-        else:
-            cap_embs[ids,] = cap_emb.data.cpu().numpy()
+                cap_embs[ids,] = cap_emb.data.cpu().numpy()
 
-        for j, nid in enumerate(ids):
-            cap_lens[nid] = lengths[j]
+            for j, nid in enumerate(ids):
+                cap_lens[nid] = lengths[j]
 
-        del images, captions
+            del images, captions
 
-    # Remove image feature redundancy
-    if img_embs.shape[0] == cap_embs.shape[0]:
-        img_embs = img_embs[
-            np.arange(
-                start=0,
-                stop=img_embs.shape[0],
-                step=5
-            ).astype(np.int),
-        ]
+        # Remove image feature redundancy
+        if img_embs.shape[0] == cap_embs.shape[0]:
+            img_embs = img_embs[
+                np.arange(
+                    start=0,
+                    stop=img_embs.shape[0],
+                    step=5
+                ).astype(np.int),
+            ]
 
     return img_embs, cap_embs, cap_lens
 
@@ -70,7 +76,7 @@ def evaluate(
     model, img_emb, txt_emb, lengths,
     device, shared_size=128
 ):
-
+    model.eval()
     _metrics_ = ('r1', 'r5', 'r10', 'medr', 'meanr')
 
     begin_pred = dt()

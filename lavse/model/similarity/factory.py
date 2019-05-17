@@ -108,7 +108,7 @@ _similarities = {
     'dynconv': {
         'class': sim.DynConv2dSim,
         'args': Dict(
-            
+            groups=1,
         ),
     },
 }

@@ -99,10 +99,11 @@ class Trainer:
 
     def fit(
         self, train_loader, valid_loaders, lang_loaders=[],
-        nb_epochs=2000, path='runs/',
-        log_interval=50, valid_interval=500
+        init_iteration=0, nb_epochs=2000, path='runs/',
+        log_interval=50, valid_interval=500, world_size=1,
     ):
         self.path = path
+        self.world_size = world_size
         if self.optimizer is None:
             print('You forgot to setup_optim.')
             exit()
@@ -206,6 +207,7 @@ class Trainer:
             )
 
             iteration = self.mm_criterion.iteration
+            adjusted_iter = self.world_size * iteration
 
             # Cross-language update
             total_lang_loss = 0.
@@ -262,25 +264,19 @@ class Trainer:
                     self.count -= 1
                 elif not self.save_all:
                     self.count = self.early_stop
-                    self.best_val = val_metric
-                    if self.master:
-                        self.save(
-                            path=self.path,
-                            is_best=True,
-                            args=self.args
-                        )
-                else:
-                    if self.master:
-                        self.save(
-                            path=self.path,
-                            is_best=True,
-                            args=self.args
-                        )
-
+                    self.best_val = val_metric                    
+                
                 if self.master:
+                    self.save(
+                        path=self.path,
+                        is_best=(val_metric >= self.best_val),
+                        args=self.args,
+                        rsum=val_metric,
+                    )
+                    
                     # Log updates
                     for metric, values in metrics.items():
-                        self.tb_writer.add_scalar(metric, values, iteration)
+                        self.tb_writer.add_scalar(metric, values, iteration)                    
 
                 # Early stop
                 if self.count == 0 and self.master:
@@ -329,15 +325,21 @@ class Trainer:
             final_sum += result[f'{loader_name}/rsum']
 
         return loader_metrics, final_sum/float(nb_loaders)
-
-    def save(self, path=None, is_best=False, args=None):
+    
+    def save(
+        self, path=None, 
+        is_best=False, args=None,
+        **kwargs
+    ):
 
         helper.save_checkpoint(
             path, self.model,
             optimizer=self.optimizer,
-            epoch=self.mm_criterion.iteration,
-            args=args, classes=None,
-            is_best=is_best, save_all=self.save_all,
+            is_best=is_best,
+            save_all=self.save_all,
+            iteration=self.mm_criterion.iteration,
+            args=self.args,
+            **kwargs
         )
 
     def load(self, path=None):

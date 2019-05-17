@@ -11,6 +11,8 @@ from lavse.data.loaders import get_loader, get_loaders
 from lavse.model import imgenc, loss, model, txtenc
 from lavse.train import train
 from lavse.utils.logger import create_logger
+from lavse.utils import helper
+
 
 if __name__ == '__main__':
 
@@ -57,7 +59,7 @@ if __name__ == '__main__':
                 data_name=data_name,
                 loader_name=loader_name,
                 vocab_path=args.vocab_path,
-                batch_size=args.batch_size,
+                batch_size=args.batch_size//4,
                 workers=args.workers,
                 text_repr=args.text_repr,
                 data_split='dev',
@@ -103,8 +105,25 @@ if __name__ == '__main__':
     )
 
     model = model.LAVSE(**model_params).to(device)
+    
+    if args.resume is not None:
+        logger.info(f'Resuming checkpoint: {args.resume}')
+        checkpoint = helper.restore_checkpoint(
+            path=args.resume,
+            model=model,
+        )
+        model = checkpoint['model']
+        logger.info((
+            f"Loaded checkpoint. Iteration: {checkpoint['iteration']}, "
+            f"rsum: {checkpoint['rsum']}, "
+            f"keys: {checkpoint.keys()}"
+        ))
+
     is_master = (args.local_rank == 0)
 
+    # Distribute across distinct process on various GPUS
+    # This is used when a single model can fit the memory
+    # and the user wants to speed up the training
     world_size = args.ngpu
     if world_size > 1:
         torch.distributed.init_process_group(
@@ -120,10 +139,22 @@ if __name__ == '__main__':
             device_ids=[args.local_rank],
             output_device=args.local_rank,
         )
+        model.module.set_master_(is_master)
+        model.master = is_master
+    else:
+        model.set_master_(is_master)
+        model.master = is_master
 
+    # Distribute the same process in GPUs 
+    # This is used when a single model cannot fit the memory
+    if args.data_parallel:
+        import torch.nn as nn
+        model = nn.DataParallel(model).cuda()
+
+    if hasattr(model, 'module'):
         model.get_sim_matrix = model.module.get_sim_matrix
         model.get_sim_matrix_shared = model.module.get_sim_matrix_shared
-        model.module.set_master_(is_master)
+        model.master = is_master
 
     print_fn = (lambda x: x) if not is_master else tqdm.write
 
@@ -161,16 +192,17 @@ if __name__ == '__main__':
         lr_decay_interval=args.lr_decay_interval,
         clip_grad=args.grad_clip,
         early_stop=args.early_stop,
-        log_grad_norm=True,
+        log_grad_norm=False,
         log_histograms=False,
         save_all=args.save_all,
         finetune_convnet=args.finetune,
+        optimizer=torch.optim.Adam,
     )
+
     if args.eval_before_training:
         result, rs = trainer.evaluate_loaders(
             val_loaders
         )
-
 
     trainer.fit(
         train_loader=train_loader,
@@ -180,4 +212,5 @@ if __name__ == '__main__':
         nb_epochs=args.nb_epochs,
         path=args.outpath,
         valid_interval=args.valid_interval,
+        world_size=world_size
     )

@@ -4,24 +4,19 @@ from tensorboardX import SummaryWriter
 
 
 def save_checkpoint(
-        outpath, model, optimizer,
-        epoch, args, is_best, classes,
-        save_all=False,
+        outpath, model, optimizer=None,
+        is_best=False, save_all=False, **kwargs
     ):
-
-    if optimizer is not None:
-        optimizer = optimizer.state_dict()
-
+    
     state_dict = {
         'model': model.state_dict(),
-        'optimizer': optimizer,
-        'args': args,
-        'epoch': epoch,
-        'classes': classes,
+        'optimizer': optimizer,        
     }
 
+    state_dict.update(**kwargs)
+
     if not save_all:
-        epoch = 0
+        epoch = -1
 
     torch.save(
         obj=state_dict,
@@ -36,22 +31,19 @@ def save_checkpoint(
         )
 
 
-def restore_checkpoint(path, model=None, optimizer=None):
-    state_dict = torch.load(path,  map_location=lambda storage, loc: storage)
-
-    if model is not None:
-        model.load_state_dict(state_dict['model'])
-
-    if optimizer is not None:
-        optimizer.load_state_dict(state_dict['optimizer'])
-
-    return {
-        'model': state_dict['model'],
-        'optimizer': optimizer,
-        'args': state_dict['args'],
-        'epoch': state_dict['epoch'],
-        'classes': state_dict['classes'],
-    }
+def restore_checkpoint(path, model=None, optimizer=False):
+    state_dict = torch.load(
+        path,  map_location=lambda storage, loc: storage
+    )
+        
+    model.load_state_dict(state_dict['model'])        
+    state_dict['model'] = model
+    
+    if optimizer:
+        optimizer = state_dict['optimizer']
+        state_dict['optimizer'] = None
+    
+    return state_dict
 
 
 def adjust_learning_rate(
