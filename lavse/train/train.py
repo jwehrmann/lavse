@@ -25,6 +25,7 @@ torch.manual_seed(0)
 random.seed(0, version=2)
 
 
+
 class Trainer:
 
     def __init__(
@@ -51,6 +52,7 @@ class Trainer:
         ml_criterion=None,
         optimizer=torch.optim.Adam,
         lr=1e-3,
+        cnn_lr_factor=0.1,
         lr_decay_rate=0.1,
         lr_decay_interval=15,
         clip_grad=2.,
@@ -68,19 +70,42 @@ class Trainer:
         trainable_params = []
         for k, v in self.model.named_parameters():
             total_params += np.product(tuple(v.shape))
-            if not finetune_convnet:
-                v.requires_grad = 'img_enc.cnn' not in k
+            if 'img_enc.cnn' in k:
+                if not finetune_convnet:
+                    v.requires_grad = False
+                continue
             if v.requires_grad:
                 nb_trainable_params += np.product(tuple(v.shape))
                 trainable_params.append(v)
 
-        self.sysoutlog(
-            f'Trainable layers: {len(trainable_params)}, '
-            f'Total Params: {total_params:,}, '
-            f'Train Params: {nb_trainable_params:,}'
-        )
+        
         self.optimizer = optimizer(
             trainable_params, lr, **kwargs
+        )
+        if hasattr(self.model, 'module'):
+            _params = self.model.module.img_enc.cnn.parameters()
+        else:
+            _params = self.model.img_enc.cnn.parameters()
+        
+        if finetune_convnet:
+            self.optimizer.add_param_group({
+                'params': _params,
+                'lr': lr * cnn_lr_factor,
+                'name': 'cnn',
+            })
+        
+        count_params = lambda p: np.sum([
+            np.product(tuple(x.shape)) for x in p
+        ])
+
+        for k in self.optimizer.param_groups:                        
+            self.sysoutlog(
+                f"lr: {k['lr']}, #layers: {len(k['params'])}, #params: {count_params(k['params']):,}"
+            )
+        self.sysoutlog(
+            #f'Trainable layers: {len(trainable_params)}, '
+            f'Total Params: {total_params:,}, '
+            #f'Train Params: {nb_trainable_params:,}'
         )
 
         self.mm_criterion = mm_criterion
@@ -248,6 +273,13 @@ class Trainer:
                 'countdown': self.count,
                 'epoch': epoch,
             })
+
+            for param_group in self.optimizer.param_groups:
+                if 'name' in param_group:
+                    train_info.update({f"lr_{param_group['name']}": param_group['lr']})
+                else:
+                    train_info.update({'lr_base': param_group['lr']})
+
             if self.master:
                 logger.tb_log_dict(
                     tb_writer=self.tb_writer, data_dict=train_info,

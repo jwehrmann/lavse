@@ -58,7 +58,7 @@ _image_encoders = {
         },
     },
     'resnet101': {
-        'class': fullencoder.FullHierImageEncoder,
+        'class': fullencoder.FullImageEncoder,
         'args': {
             'cnn': torchvision.models.resnet101,
             'img_dim': 2048,

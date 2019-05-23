@@ -227,9 +227,9 @@ class FullImageEncoder(nn.Module):
         # Full text encoder
         self.cnn = BaseFeatures(cnn(pretrained))
         
-        # For efficient memory usage.
-        for param in self.cnn.parameters():
-            param.requires_grad = finetune
+        # # For efficient memory usage.
+        # for param in self.cnn.parameters():
+        #     param.requires_grad = finetune
         
         # Only applies pooling when region_pool is enabled
         self.region_pool = nn.AdaptiveAvgPool1d(1)

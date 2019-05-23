@@ -120,63 +120,6 @@ class ProjConv1d(nn.Module):
 
         self.weightnorm = weightnorm
 
-        self.kernel = nn.Conv1d(
-            base_proj_channels,
-            (in_channels * out_channels * kernel_size) // groups,
-            1
-        )
-        if weightnorm == 'batchnorm':
-            self.weight_norm = nn.BatchNorm1d(out_channels)
-        elif weightnorm == 'softmax':
-            self.weight_norm = nn.Softmax(dim=-1)
-        elif weightnorm == 'l2':
-            self.weight_norm = lambda x: l2norm(x, dim=1)
-        if proj_bias:
-            self.bias = nn.Linear(base_proj_channels, out_channels)
-
-        print(self.kernel)
-
-    def forward(self, input, base_proj):
-        B, D, T = input.shape
-
-        print(f'input: {input.shape}')
-        print(f'base : {base_proj.shape}')
-        kernel = self.kernel(base_proj)
-        print('kernel:', kernel.shape) # B, (in, out/k, k, n)
-        b, fk, t = kernel.shape
-        kernel = kernel.view(
-            b, 
-            self.out_channels // self.groups, 
-            self.in_channels, 
-            self.kernel_size,
-            t,            
-        )
-        print('kernel:', kernel.shape) # B, (in, out/k, k, n)
-
-        exit()  
-
-class __ProjConv1d(nn.Module):
-
-    def __init__(
-        self, base_proj_channels, in_channels, out_channels,
-        kernel_size, padding=0, groups=1, proj_bias=True,
-        weightnorm='batchnorm',
-    ):
-        super().__init__()
-
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.kernel_size = kernel_size
-        self.padding = padding
-        self.proj_bias = proj_bias
-        self.base_proj_channels = base_proj_channels
-        self.groups = groups
-
-        if weightnorm == None:
-            weightnorm = False
-
-        self.weightnorm = weightnorm
-
         self.kernel = nn.Linear(
             base_proj_channels,
             (in_channels * out_channels * kernel_size) // groups
@@ -215,85 +158,6 @@ class __ProjConv1d(nn.Module):
 
 
 class ProjConv2d(nn.Module):
-
-    def __init__(
-        self, base_proj_channels, in_channels, out_channels,
-        kernel_size, padding=0, groups=1, proj_bias=True,
-        weightnorm=None,
-    ):
-        super().__init__()
-
-        if type(kernel_size) == int:
-            kernel_size = (1, kernel_size, kernel_size)
-
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.kernel_size = kernel_size
-        self.padding = (padding,)
-        self.dilation = (1,)
-        self.stride = (1,)
-        self.proj_bias = proj_bias
-        self.base_proj_channels = base_proj_channels
-        self.groups = groups
-
-        if weightnorm == None:
-            weightnorm = False
-
-        self.weightnorm = weightnorm
-
-        self.kernel = nn.Conv1d(
-            base_proj_channels,
-            (in_channels * out_channels * 
-            kernel_size[0] * kernel_size[1]) // groups,
-            kernel_size=1,
-        )
-
-        self.kernel_shape = (
-            in_channels, out_channels, *kernel_size
-        )
-
-        if weightnorm == 'batchnorm':
-            self.weight_norm = nn.BatchNorm2d(out_channels)
-        elif weightnorm == 'softmax':
-            self.weight_norm = nn.Softmax(dim=-1)
-        elif weightnorm == 'l2':
-            self.weight_norm = lambda x: l2norm(x, dim=1)
-        if proj_bias:
-            self.bias = nn.Linear(base_proj_channels, out_channels)        
-
-    def forward(self, input, base_proj):
-        '''
-            len(base_proj) must be 1 or == len(input)
-        '''
-
-        # kernel: 
-        kernel = self.kernel(base_proj)
-        n = kernel.shape[0]
-        kernel = kernel.view(
-            n,
-            self.out_channels,
-            self.in_channels // self.groups,
-            *self.kernel_size
-        )            
-
-    def extra_repr(self):
-        s = ('{in_channels}, {out_channels}, kernel_shape={kernel_shape}'
-             ', stride={stride}')
-        if self.padding != (0,) * len(self.padding):
-            s += ', padding={padding}'
-        if self.dilation != (1,) * len(self.dilation):
-            s += ', dilation={dilation}'
-        # if self.output_padding != (0,) * len(self.output_padding):
-        #     s += ', output_padding={output_padding}'
-        if self.groups != 1:
-            s += ', groups={groups}'
-        if self.bias is None:
-            s += ', bias=False'
-        return s.format(**self.__dict__)
-
-
-
-class __ProjConv2d(nn.Module):
 
     def __init__(
         self, base_proj_channels, in_channels, out_channels,
@@ -641,3 +505,4 @@ class DynamicConv1dTBC(nn.Module):
         if self.weight_dropout > 0.:
             s += ', weight_dropout={}'.format(self.weight_dropout)
         return s
+

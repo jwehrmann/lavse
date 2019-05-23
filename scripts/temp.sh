@@ -33,7 +33,7 @@ train.py \
 --data_path $DATA_PATH \
 --train_data f30k_precomp.en \
 --val_data f30k_precomp.en \
---outpath $OUT_PATH/temp/dyn1d_precomp0_b95_/ \
+--outpath $OUT_PATH/temp/dyn1d_precomp0_b99_r4_h8 \
 --workers 4 \
 --sim dynconv1d \
 --image_encoder hierarchical \
@@ -41,7 +41,7 @@ train.py \
 --text_pooling none \
 --image_pooling none \
 --lr 6e-4 \
---beta 0.95 \
+--beta 0.99 \
 --vocab vocab/f30k_vocab.json \
 --valid_interval 500 \
 --ngpu $NGPUS \

@@ -20,13 +20,17 @@ tokenizer = Tokenizer(
 fkt = Flickr('/opt/jonatas/datasets/lavse/f30k/', data_split='train')
 fkv = Flickr('/opt/jonatas/datasets/lavse/f30k/', data_split='dev')
 
-texts = flatten(fkv.image_captions.values())
-texts += flatten(fkt.image_captions.values())
+loader = data.loaders.get_loader('image', '/home/jonatas/data/', 'f30k', 'test', 128, 'vocab/f30k.json', 'word',)
+for i in loader:
+    print(i[0].shape)
 
-tokenizer = Tokenizer(
-    download_tokenizer=True, 
-    char_level=False,
-)
+# texts = flatten(fkv.image_captions.values())
+# texts += flatten(fkt.image_captions.values())
 
-tokenizer.fit(texts)
-tokenizer.save('vocab/f30k.json')
+# tokenizer = Tokenizer(
+#     download_tokenizer=True, 
+#     char_level=False,
+# )
+
+# tokenizer.fit(texts)
+# tokenizer.save('vocab/f30k.json')

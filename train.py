@@ -12,9 +12,11 @@ from lavse.model import imgenc, loss, model, txtenc
 from lavse.train import train
 from lavse.utils.logger import create_logger
 from lavse.utils import helper
+import torch.multiprocessing as mp
 
 
 if __name__ == '__main__':
+    mp.set_start_method('spawn')
 
     # loader_name = 'precomp'
     args = params.get_train_params()
@@ -190,6 +192,7 @@ if __name__ == '__main__':
         ml_criterion=multilanguage_criterion,
         lr_decay_rate=args.lr_decay_rate,
         lr_decay_interval=args.lr_decay_interval,
+        cnn_lr_factor=0.01,
         clip_grad=args.grad_clip,
         early_stop=args.early_stop,
         log_grad_norm=False,

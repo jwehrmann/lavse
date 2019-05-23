@@ -37,7 +37,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--text_repr', default='word', type=str,
-        help='Device to ',
+        help='Device to ', 
     )
     parser.add_argument(
         '--device', default='cuda:0', type=str,

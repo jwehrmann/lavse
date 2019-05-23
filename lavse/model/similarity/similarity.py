@@ -267,7 +267,7 @@ class DynConv1dSim(nn.Module):
             weight_softmax=True,
             renorm_padding=True,
             padding_l=1,
-            num_heads=reduce_proj,
+            num_heads=reduce_proj//2,
         )
 
         self.img_fc = nn.Linear(

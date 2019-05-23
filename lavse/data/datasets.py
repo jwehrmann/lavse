@@ -279,8 +279,12 @@ class ImageDataset(Dataset):
 
         filename = self.data_wrapper.get_filename_by_image_id(image_id)
         feat_path = self.full_path / filename
-        image = default_loader(feat_path)
-        image = self.transform(image)
+        try:
+            image = default_loader(feat_path)
+            image = self.transform(image)
+        except OSError:
+            print('Error to load image: ', feat_path)
+            image = torch.zeros(3, 224, 224,)
 
         return image
 
