@@ -41,6 +41,16 @@ _similarities = {
         'class': sim.AdaptiveEmbeddingI2T,
         'args': {},
     },
+    'adapt_i2t': {
+        'class': sim.AdaptiveEmbeddingI2T,
+        'args': {},
+    },
+    'adapt_i2t_g4': {
+        'class': sim.AdaptiveEmbeddingI2T,
+        'args': {
+            'groups': 4,
+        },
+    },
     'adaptive_i2t_feat_norm_bn': {
         'class': sim.AdaptiveEmbeddingI2T,
         'args': Dict(
@@ -106,22 +116,22 @@ _similarities = {
         ),
     },
     'dynconv': {
-        'class': sim.DynConv2dSim,
+        'class': sim.DynConvI2T,
         'args': Dict(
-            groups=1,
         ),
     },
-    'dynconv1d': {
-        'class': sim.DynConv1dSim,
+    'projconv': {
+        'class': sim.ProjConvI2T,
         'args': Dict(
-            groups=1,
+            kernel_size=3,
+            reduce_proj=8,
+            groups=512,
         ),
     },
-    'dynconv1d_p': {
-        'class': sim.DynConv1dSim,
+    'projrnn': {
+        'class': sim.ProjRNNReducedI2T,
         'args': Dict(
-            groups=1,
-            reduce_proj=4,
+            k=8
         ),
     },
 }

@@ -37,13 +37,12 @@ class ContrastiveLoss(nn.Module):
     """
 
     def __init__(
-            self, device,
-            margin=0.2, max_violation=True,
+            self, margin=0.2,
+            max_violation=True,
             weight=1., beta=0.999,
         ):
         super().__init__()
         self.margin = margin
-        self.device = device
         self.sim = cosine_sim
         self.weight = weight
         self.max_violation = max_violation
@@ -59,10 +58,10 @@ class ContrastiveLoss(nn.Module):
             the number of epochs
         """
         self.iteration += 1
-        
+
         if self.max_violation:
             self.k = 1
-            return 1.        
+            return 1.
 
         self.k = (1.-self.beta**np.float(self.iteration))
         return self.k
@@ -84,7 +83,7 @@ class ContrastiveLoss(nn.Module):
 
         # clear diagonals
         mask = torch.eye(scores.size(0)) > .5
-        I = mask.to(self.device)
+        I = mask#.cuda()
 
         cost_s = cost_s.masked_fill_(I, 0)
         cost_im = cost_im.masked_fill_(I, 0)

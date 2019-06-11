@@ -91,7 +91,7 @@ class RNNEncoder(nn.Module):
         # Embed word ids to vectors
         x = self.embed(x)
         # Forward propagate RNN
-        self.rnn.flatten_parameters()
+        # self.rnn.flatten_parameters()
         cap_emb, _ = self.rnn(x)
 
         if self.use_bi_gru:

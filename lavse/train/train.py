@@ -25,17 +25,16 @@ torch.manual_seed(0)
 random.seed(0, version=2)
 
 
-
 class Trainer:
 
     def __init__(
-        self, model=None, device='cuda:0',
-        args=None, sysoutlog=tqdm.write, 
+        self, model=None, device=torch.device('cuda'),
+        args=None, sysoutlog=tqdm.write,
         master=True,
     ):
 
-        self.device = torch.device(device)
-        self.model = model.to(self.device)
+        self.model = model
+        self.device = device
         self.train_logger = logger.LogCollector()
         self.val_logger = logger.LogCollector()
 
@@ -48,7 +47,7 @@ class Trainer:
 
     def setup_optim(
         self,
-        mm_criterion,
+        mm_criterion=None,
         ml_criterion=None,
         optimizer=torch.optim.Adam,
         lr=1e-3,
@@ -70,7 +69,7 @@ class Trainer:
         trainable_params = []
         for k, v in self.model.named_parameters():
             total_params += np.product(tuple(v.shape))
-            if 'img_enc.cnn' in k:
+            if 'img_enc' in k and 'cnn' in k:
                 if not finetune_convnet:
                     v.requires_grad = False
                 continue
@@ -78,27 +77,24 @@ class Trainer:
                 nb_trainable_params += np.product(tuple(v.shape))
                 trainable_params.append(v)
 
-        
+
         self.optimizer = optimizer(
             trainable_params, lr, **kwargs
         )
-        if hasattr(self.model, 'module'):
-            _params = self.model.module.img_enc.cnn.parameters()
-        else:
-            _params = self.model.img_enc.cnn.parameters()
-        
+
         if finetune_convnet:
+            _params = self.model.img_enc.module.cnn.parameters()
             self.optimizer.add_param_group({
                 'params': _params,
                 'lr': lr * cnn_lr_factor,
                 'name': 'cnn',
             })
-        
+
         count_params = lambda p: np.sum([
             np.product(tuple(x.shape)) for x in p
         ])
 
-        for k in self.optimizer.param_groups:                        
+        for k in self.optimizer.param_groups:
             self.sysoutlog(
                 f"lr: {k['lr']}, #layers: {len(k['params'])}, #params: {count_params(k['params']):,}"
             )
@@ -108,7 +104,11 @@ class Trainer:
             #f'Train Params: {nb_trainable_params:,}'
         )
 
-        self.mm_criterion = mm_criterion
+        #self.optimizer = nn.DataParallel(self.optimizer).cuda()
+        #self.optimizer.param_groups = self.optimizer.module.param_groups
+        #self.optimizer.step = self.optimizer.module.step
+
+        # self.mm_criterion = mm_criterion
         self.ml_criterion = ml_criterion
         self.initial_lr = lr
         self.lr_decay_rate = lr_decay_rate
@@ -132,7 +132,7 @@ class Trainer:
         if self.optimizer is None:
             print('You forgot to setup_optim.')
             exit()
-        
+
         # Set up tensorboard logger
         tb_writer = helper.get_tb_writer(path)
         path = tb_writer.file_writer.get_logdir()
@@ -175,10 +175,10 @@ class Trainer:
     def _forward_multimodal_loss(
         self, images, captions, lens
     ):
-        img_emb, cap_emb = self.model(images, captions, lens)        
-        sim_matrix = self.model.get_sim_matrix(img_emb, cap_emb, lens)        
-
-        loss = self.mm_criterion(sim_matrix)
+        img_emb, cap_emb = self.model(images, captions, lens)
+        sim_matrix = self.model.get_sim_matrix(img_emb, cap_emb, lens)
+        loss = self.model.mm_criterion(sim_matrix)
+        # loss = self.mm_criterion(sim_matrix)
         return loss
 
     def _forward_multilanguage_loss(
@@ -207,12 +207,12 @@ class Trainer:
         #     )
         #     for loader in lang_loaders
         # ]
-        
+
         pbar = lambda x: x
         if self.master:
             pbar = lambda x: tqdm(
-                x, total=len(x), 
-                desc='Steps ', 
+                x, total=len(x),
+                desc='Steps ',
                 leave=False,
             )
 
@@ -226,12 +226,14 @@ class Trainer:
             images, captions, lens, ids = instance
             images = images.to(self.device)
             captions = captions.to(self.device)
+            #images = nn.DataParallel(images).cuda()
+            #captions = nn.DataParallel(captions).cuda()
 
             multimodal_loss = self._forward_multimodal_loss(
                 images, captions, lens
             )
 
-            iteration = self.mm_criterion.iteration
+            iteration = self.model.mm_criterion.iteration
             adjusted_iter = self.world_size * iteration
 
             # Cross-language update
@@ -267,7 +269,7 @@ class Trainer:
                 'loss': multimodal_loss,
                 'iteration': iteration,
                 'total_loss': total_loss,
-                'k': self.mm_criterion.k,
+                'k': self.model.mm_criterion.k,
                 'batch_time': batch_time,
                 'learning_rate': self.learning_rate,
                 'countdown': self.count,
@@ -296,8 +298,8 @@ class Trainer:
                     self.count -= 1
                 elif not self.save_all:
                     self.count = self.early_stop
-                    self.best_val = val_metric                    
-                
+                    self.best_val = val_metric
+
                 if self.master:
                     self.save(
                         path=self.path,
@@ -305,10 +307,10 @@ class Trainer:
                         args=self.args,
                         rsum=val_metric,
                     )
-                    
+
                     # Log updates
                     for metric, values in metrics.items():
-                        self.tb_writer.add_scalar(metric, values, iteration)                    
+                        self.tb_writer.add_scalar(metric, values, iteration)
 
                 # Early stop
                 if self.count == 0 and self.master:
@@ -321,7 +323,7 @@ class Trainer:
                 if self.log_histograms:
                     logger.log_param_histograms(
                         self.model, self.tb_writer,
-                        iteration=self.mm_criterion.iteration,
+                        iteration=self.model.mm_criterion.iteration,
                     )
         return True
 
@@ -357,9 +359,9 @@ class Trainer:
             final_sum += result[f'{loader_name}/rsum']
 
         return loader_metrics, final_sum/float(nb_loaders)
-    
+
     def save(
-        self, path=None, 
+        self, path=None,
         is_best=False, args=None,
         **kwargs
     ):
@@ -369,7 +371,7 @@ class Trainer:
             optimizer=self.optimizer,
             is_best=is_best,
             save_all=self.save_all,
-            iteration=self.mm_criterion.iteration,
+            iteration=self.model.mm_criterion.iteration,
             args=self.args,
             **kwargs
         )

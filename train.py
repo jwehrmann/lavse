@@ -24,7 +24,7 @@ if __name__ == '__main__':
     torch.cuda.set_device(args.local_rank)
 
     loader_name = args.loader_name
-        
+
     logger = create_logger(level=args.log_level)
     if args.local_rank != 0:
         logger.propagate = False
@@ -91,8 +91,8 @@ if __name__ == '__main__':
                 )
             )
 
-    if args.device != 'cpu':
-        device = torch.device('cuda:{}'.format(args.local_rank))
+    # if args.device != 'cpu':
+    #     device = torch.device('cuda:{}'.format(args.local_rank))
 
     model_params = Dict(
         imgenc_name=args.image_encoder,
@@ -103,24 +103,10 @@ if __name__ == '__main__':
         txt_pooling=args.text_pooling,
         img_pooling=args.image_pooling,
         similarity_name=args.sim,
-        device=device,
+        loss_device='cuda'
     )
 
-    model = model.LAVSE(**model_params).to(device)
-    
-    if args.resume is not None:
-        logger.info(f'Resuming checkpoint: {args.resume}')
-        checkpoint = helper.restore_checkpoint(
-            path=args.resume,
-            model=model,
-        )
-        model = checkpoint['model']
-        logger.info((
-            f"Loaded checkpoint. Iteration: {checkpoint['iteration']}, "
-            f"rsum: {checkpoint['rsum']}, "
-            f"keys: {checkpoint.keys()}"
-        ))
-
+    model = model.LAVSE(**model_params)#.to(device)
     is_master = (args.local_rank == 0)
 
     # Distribute across distinct process on various GPUS
@@ -128,6 +114,7 @@ if __name__ == '__main__':
     # and the user wants to speed up the training
     world_size = args.ngpu
     if world_size > 1:
+        model = model.to('cuda')
         torch.distributed.init_process_group(
             'nccl',
             init_method='env://',
@@ -143,15 +130,34 @@ if __name__ == '__main__':
         )
         model.module.set_master_(is_master)
         model.master = is_master
+        model.module.set_devices_(['cuda'], ['cuda'], 'cuda')
     else:
         model.set_master_(is_master)
-        model.master = is_master
+        model.set_devices_(['cuda'], ['cuda'], 'cuda')
 
-    # Distribute the same process in GPUs 
-    # This is used when a single model cannot fit the memory
+    if args.resume is not None:
+        logger.info(f'Resuming checkpoint: {args.resume}')
+        checkpoint = helper.restore_checkpoint(
+            path=args.resume,
+            model=model,
+        )
+        model = checkpoint['model']
+        logger.info((
+            f"Loaded checkpoint. Iteration: {checkpoint['iteration']}, "
+            f"rsum: {checkpoint['rsum']}, "
+            f"keys: {checkpoint.keys()}"
+        ))
+
     if args.data_parallel:
-        import torch.nn as nn
-        model = nn.DataParallel(model).cuda()
+        model.set_devices_(
+            ['cuda:3'], ['cuda:0','cuda:1','cuda:2'], 'cuda:3'
+        )
+
+    # Distribute the same process in GPUs
+    # This is used when a single model cannot fit the memory
+    # if args.data_parallel:
+    #     import torch.nn as nn
+    #     model.img_enc = nn.DataParallel(model.img_enc, device_ids=[0,1,2], output_device=0)
 
     if hasattr(model, 'module'):
         model.get_sim_matrix = model.module.get_sim_matrix
@@ -161,15 +167,14 @@ if __name__ == '__main__':
     print_fn = (lambda x: x) if not is_master else tqdm.write
 
     trainer = train.Trainer(
+        device=torch.device('cuda'),
         model=model,
-        device=device,
         args={'args': args, 'model_args': model_params},
         sysoutlog=print_fn,
         master=is_master,
     )
 
     multimodal_criterion = loss.ContrastiveLoss(
-        device=device,
         margin=args.margin,
         max_violation=args.max_violation,
         weight=1.,
@@ -179,12 +184,14 @@ if __name__ == '__main__':
     )
 
     multilanguage_criterion = loss.ContrastiveLoss(
-        device=device,
         margin=args.margin,
         max_violation=args.max_violation,
         weight=1.,
         # initial_k=args.initial_k,
     )
+
+    # TODO: improve
+    model.mm_criterion = multimodal_criterion
 
     trainer.setup_optim(
         lr=args.lr,
@@ -192,7 +199,7 @@ if __name__ == '__main__':
         ml_criterion=multilanguage_criterion,
         lr_decay_rate=args.lr_decay_rate,
         lr_decay_interval=args.lr_decay_interval,
-        cnn_lr_factor=0.01,
+        cnn_lr_factor=1.,
         clip_grad=args.grad_clip,
         early_stop=args.early_stop,
         log_grad_norm=False,

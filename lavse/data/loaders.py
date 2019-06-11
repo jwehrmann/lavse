@@ -186,7 +186,10 @@ __loaders__ = {
     },
     'image': {
         'class': datasets.ImageDataset,
-    }
+    },
+    'birds': {
+        'class': datasets.Birds,
+    },
 }
 
 

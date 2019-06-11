@@ -6,7 +6,7 @@ import torch
 from ..utils import layers
 from ..model.loss import cosine_sim
 
-from tqdm import tqdm 
+from tqdm import tqdm
 
 
 def predict_loader(model, data_loader, device):
@@ -21,8 +21,8 @@ def predict_loader(model, data_loader, device):
     pbar_fn = lambda x: x
     if model.master:
         pbar_fn = lambda x: tqdm(
-            x, total=len(x), 
-            desc='Pred  ', 
+            x, total=len(x),
+            desc='Pred  ',
             leave=False,
         )
 
@@ -65,7 +65,7 @@ def predict_loader(model, data_loader, device):
                 np.arange(
                     start=0,
                     stop=img_embs.shape[0],
-                    step=5
+                    step=data_loader.dataset.captions_per_image,
                 ).astype(np.int),
             ]
 
@@ -92,14 +92,14 @@ def evaluate(
         )
         # sims = model.get_sim_matrix(
         #     embed_a=img_emb, embed_b=txt_emb,
-        #     lens=lengths, 
+        #     lens=lengths,
         # )
         sims = layers.tensor_to_numpy(sims)
 
     end_sim = dt()
 
     i2t_metrics = i2t(sims)
-    t2i_metrics = t2i(sims)    
+    t2i_metrics = t2i(sims)
 
     rsum = np.sum(i2t_metrics[:3]) + np.sum(t2i_metrics[:3])
 
@@ -125,14 +125,19 @@ def i2t(sims,):
     """
     (images, captions)
     """
-    npts = sims.shape[0]
+
+    npts, ncaps = sims.shape
+    captions_per_image = ncaps // npts
+
     ranks = np.zeros(npts)
     top1 = np.zeros(npts)
     for index in range(npts):
         inds = np.argsort(sims[index])[::-1]
         # Score
         rank = 1e20
-        for i in range(5 * index, 5 * index + 5, 1):
+        begin = captions_per_image * index
+        end = captions_per_image * index + captions_per_image
+        for i in range(begin, end, 1):
             tmp = np.where(inds == i)[0][0]
             if tmp < rank:
                 rank = tmp
@@ -153,17 +158,20 @@ def t2i(sims,):
     """
     (images, captions)
     """
-    npts = sims.shape[0]
-    ranks = np.zeros(5 * npts)
-    top1 = np.zeros(5 * npts)
+
+    npts, ncaps = sims.shape
+    captions_per_image = ncaps // npts
+
+    ranks = np.zeros(captions_per_image * npts)
+    top1 = np.zeros(captions_per_image * npts)
 
     # --> (5N(caption), N(image))
     sims = sims.T
     for index in range(npts):
-        for i in range(5):
-            inds = np.argsort(sims[5 * index + i])[::-1]
-            ranks[5 * index + i] = np.where(inds == index)[0][0]
-            top1[5 * index + i] = inds[0]
+        for i in range(captions_per_image):
+            inds = np.argsort(sims[captions_per_image * index + i])[::-1]
+            ranks[captions_per_image * index + i] = np.where(inds == index)[0][0]
+            top1[captions_per_image * index + i] = inds[0]
 
     # Compute metrics
     r1 = 100.0 * len(np.where(ranks < 1)[0]) / len(ranks)

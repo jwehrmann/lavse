@@ -82,14 +82,14 @@ class Aggregate(nn.Module):
 class ImageEncoder(nn.Module):
 
     def __init__(
-        self, cnn, img_dim, 
+        self, cnn, img_dim,
         latent_size, pretrained=True,
     ):
         super().__init__()
         self.latent_size = latent_size
-        
+
         # Full text encoder
-        self.cnn = BaseFeatures(cnn(pretrained))        
+        self.cnn = BaseFeatures(cnn(pretrained))
 
     def forward(self, images):
         """Extract image feature vectors."""
@@ -133,7 +133,7 @@ class VSEPPEncoder(nn.Module):
         # For efficient memory usage.
         for param in self.cnn.parameters():
             param.requires_grad = finetune
-        
+
         # Replace the last fully connected layer of CNN with a new one
         if cnn_type.startswith('vgg'):
             self.fc = nn.Linear(
@@ -161,7 +161,7 @@ class VSEPPEncoder(nn.Module):
             model = models.__dict__[arch](pretrained=True)
         else:
             print("=> creating model '{}'".format(arch))
-            model = models.__dict__[arch]()        
+            model = models.__dict__[arch]()
 
         return model
 
@@ -215,7 +215,7 @@ class VSEPPEncoder(nn.Module):
 class FullImageEncoder(nn.Module):
 
     def __init__(
-        self, cnn, img_dim, latent_size, 
+        self, cnn, img_dim, latent_size,
         no_imgnorm=False, pretrained=True,
         proj_regions=True, finetune=False
     ):
@@ -223,26 +223,26 @@ class FullImageEncoder(nn.Module):
         self.latent_size = latent_size
         self.proj_regions = proj_regions
         self.no_imgnorm = no_imgnorm
-        
+
         # Full text encoder
         self.cnn = BaseFeatures(cnn(pretrained))
-        
+
         # # For efficient memory usage.
         # for param in self.cnn.parameters():
         #     param.requires_grad = finetune
-        
+
         # Only applies pooling when region_pool is enabled
         self.region_pool = nn.AdaptiveAvgPool1d(1)
         # if proj_regions:
         #     self.region_pool = lambda x: x
-        
+
         self.fc = nn.Linear(img_dim, latent_size)
 
         # self.apply(default_initializer)
         self.init_weights()
 
         # self.aggregate = Aggregate()
-    
+
     def init_weights(self):
         """Xavier initialization for the fully connected layer
         """
@@ -256,17 +256,17 @@ class FullImageEncoder(nn.Module):
         """Extract image feature vectors."""
         # assuming that the precomputed features are already l2-normalized
         features = self.cnn(images)
-        
+
         features = features.view(features.shape[0], features.shape[1], -1)
         features = l2norm(features, dim=1)
 
         if not self.proj_regions:
             features = self.region_pool(features)
-        
-        features = features.permute(0, 2, 1)        
-        
+
+        features = features.permute(0, 2, 1)
+
         features = self.fc(features)
-        
+
         # normalize in the joint embedding space
         if not self.no_imgnorm:
             features = l2norm(features, dim=-1)
@@ -287,7 +287,7 @@ class FullImageEncoder(nn.Module):
 class FullHierImageEncoder(nn.Module):
 
     def __init__(
-        self, cnn, img_dim, latent_size, 
+        self, cnn, img_dim, latent_size,
         no_imgnorm=False, pretrained=True,
         proj_regions=True,
     ):
@@ -295,18 +295,18 @@ class FullHierImageEncoder(nn.Module):
         self.latent_size = latent_size
         self.proj_regions = proj_regions
         self.no_imgnorm = no_imgnorm
-        
+
         # Full text encoder
         self.cnn = HierarchicalFeatures(cnn(pretrained))
-        
+
         # Only applies pooling when region_pool is enabled
         self.region_pool = nn.AdaptiveAvgPool1d(1)
         # if proj_regions:
         #     self.region_pool = lambda x: x
-        
+
         self.fc = nn.Linear(5888, latent_size)
         self.max_pool = nn.AdaptiveMaxPool2d(1)
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)        
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
 
         self.apply(default_initializer)
 

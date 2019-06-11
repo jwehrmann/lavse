@@ -10,7 +10,7 @@ logger = get_logger()
 class Flickr:
 
     def __init__(self, data_path, data_split):
-        
+
         data_split = data_split.replace('dev', 'val')
 
         self.data_path = Path(data_path)
@@ -65,28 +65,40 @@ class Flickr:
 
 class Coco:
 
-    def __init__(self, path):
-        self.data = read_json(path)
+    def __init__(self, path, data_split):
+
+        data_split = data_split.replace('dev', 'val')
+
+        self.data_path = Path(path)
+        self.annotation_path = (
+            self.data_path / 'dataset_coco.json'
+        )
+        self.data = load_json(self.annotation_path)
 
         img_dict = {}
-        for img in self.data['images']:
-            img_dict[img['id']] = img
-
         annotations = defaultdict(list)
-        for ann in self.data['annotations']:
-            annotations[ann['image_id']].append(ann['caption'])
+        self.image_ids = []
+
+        for img in self.data['images']:
+            split = img['split'].lower().replace('restval', 'train')
+            if split != data_split.lower():
+                continue
+            img_dict[img['imgid']] = img
+            self.image_ids.append(img['imgid'])
+
+            annotations[img['imgid']].extend(
+                [x['raw'] for x in img['sentences']][:5]
+            )
+
+        for k, v in annotations.items():
+            assert len(v) == 5
 
         self.image_captions = annotations
-
-        ann_dict = defaultdict(list)
-        for ann in self.data['annotations']:
-            ann_dict[ann['image_id']] = ann
-
-        self.ann_dict = ann_dict
         self.img_dict = img_dict
-        self.image_ids = list(set([
-            x['image_id'] for x in self.data['annotations']
-        ]))
+        logger.info((
+            f'[Coco] Loaded {len(self.image_captions)} images '
+            f'and {len(self.image_captions)*5} annotations.'
+        ))
 
     def get_image_id_by_filename(self, filename):
         return self.img_dict[filename]['imgid']
@@ -95,11 +107,14 @@ class Coco:
         return self.image_captions[img_id]
 
     def get_filename_by_image_id(self, image_id):
-        return self.img_dict[image_id]['file_name']
+        return (
+            Path('images') /
+            self.img_dict[image_id]['filename'].split('_')[1] /
+            self.img_dict[image_id]['filename']
+        )
 
     def __call__(self, filename):
         return self.img_dict[filename]
 
     def __len__(self, ):
-        return len(self.image_ids)
-
+        return len(self.image_captions)

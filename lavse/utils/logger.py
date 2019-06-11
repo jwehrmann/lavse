@@ -58,11 +58,11 @@ class LogCollector(object):
         """
         for k, v in self.meters.items():
             tb_logger.add_scalar(prefix + k, v.val, step)
-    
+
     def update_dict(
-        self, val_metrics, 
+        self, val_metrics,
     ):
-        
+
         for metric_name, metric_val in val_metrics.items():
             try:
                 v = metric_val.item()
@@ -100,8 +100,8 @@ def tb_log_dict(tb_writer, data_dict, iteration, prefix=''):
 def log_param_histograms(model, tb_writer, iteration):
     for k, p in model.named_parameters():
         tb_writer.add_histogram(
-            f'params/{k}', 
-            p.data, 
+            f'params/{k}',
+            p.data,
             iteration,
         )
 
@@ -110,8 +110,8 @@ def log_grad_norm(model, tb_writer, iteration):
         if p.grad is None:
             continue
         tb_writer.add_scalar(
-            f'grads/{k}', 
-            p.grad.data.norm(2).item(), 
+            f'grads/{k}',
+            p.grad.data.norm(2).item(),
             iteration
         )
 
@@ -120,13 +120,13 @@ def print_log_param_stats(model, iteration):
     print('Iter s{}'.format(iteration))
     for k, v in model.txt_enc.named_parameters():
         print('{:35s}: {:8.5f}, {:8.5f}, {:8.5f}, {:8.5f}'.format(
-            k, v.data.cpu().min().numpy(), 
+            k, v.data.cpu().min().numpy(),
             v.data.cpu().mean().numpy(),
             v.data.cpu().max().numpy(),
             v.data.cpu().std().numpy(),
         ))
     for k, v in model.img_enc.named_parameters():
-        print('{:35s}: {:8.5f}, {:8.5f}, {:8.5f}, {:8.5f}'.format(                k, v.data.cpu().min().numpy(), 
+        print('{:35s}: {:8.5f}, {:8.5f}, {:8.5f}, {:8.5f}'.format(                k, v.data.cpu().min().numpy(),
             v.data.cpu().mean().numpy(),
             v.data.cpu().max().numpy(),
             v.data.cpu().std().numpy(),
@@ -135,7 +135,7 @@ def print_log_param_stats(model, iteration):
         if p.grad is None:
             continue
         print('{:35s}: {:8.5f}'.format(k, p.grad.data.norm(2).item(),))
-    
+
     for k, p in model.img_enc.named_parameters():
         if p.grad is None:
             continue

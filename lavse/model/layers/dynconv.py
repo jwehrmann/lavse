@@ -1,4 +1,4 @@
-import torch 
+import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from torch.nn import _VF
@@ -101,9 +101,9 @@ class MixedConv2d(nn.Module):
 class ProjConv1d(nn.Module):
 
     def __init__(
-        self, base_proj_channels, in_channels, out_channels,
+        self, query_size, in_channels, out_channels,
         kernel_size, padding=0, groups=1, proj_bias=True,
-        weightnorm='batchnorm',
+        weightnorm=None,
     ):
         super().__init__()
 
@@ -112,7 +112,7 @@ class ProjConv1d(nn.Module):
         self.kernel_size = kernel_size
         self.padding = padding
         self.proj_bias = proj_bias
-        self.base_proj_channels = base_proj_channels
+        self.query_size = query_size
         self.groups = groups
 
         if weightnorm == None:
@@ -121,7 +121,7 @@ class ProjConv1d(nn.Module):
         self.weightnorm = weightnorm
 
         self.kernel = nn.Linear(
-            base_proj_channels,
+            query_size,
             (in_channels * out_channels * kernel_size) // groups
         )
         if weightnorm == 'batchnorm':
@@ -131,7 +131,7 @@ class ProjConv1d(nn.Module):
         elif weightnorm == 'l2':
             self.weight_norm = lambda x: l2norm(x, dim=1)
         if proj_bias:
-            self.bias = nn.Linear(base_proj_channels, out_channels)
+            self.bias = nn.Linear(query_size, out_channels)
 
         print(self.kernel)
 
@@ -187,7 +187,7 @@ class ProjConv2d(nn.Module):
 
         self.kernel = nn.Linear(
             base_proj_channels,
-            (in_channels * out_channels * 
+            (in_channels * out_channels *
             kernel_size[0] * kernel_size[1]) // groups
         )
 
@@ -202,7 +202,7 @@ class ProjConv2d(nn.Module):
         elif weightnorm == 'l2':
             self.weight_norm = lambda x: l2norm(x, dim=1)
         if proj_bias:
-            self.bias = nn.Linear(base_proj_channels, out_channels)        
+            self.bias = nn.Linear(base_proj_channels, out_channels)
 
     def forward(self, input, base_proj):
         kernel = self.kernel(base_proj)
@@ -240,6 +240,7 @@ class ProjConv2d(nn.Module):
             s += ', bias=False'
         return s.format(**self.__dict__)
 
+import numpy as np
 
 class ProjRNN(nn.Module):
 
@@ -270,25 +271,27 @@ class ProjRNN(nn.Module):
         weight_ih = self.weight_ih(base_proj)
         weight_ih = weight_ih.view(
             self.weights_dim, self.rnn_input
-        )
+        ) * np.sqrt(1/self.rnn_input)
+
         weight_hh = self.weight_hh(base_proj)
         weight_hh = weight_hh.view(
             self.weights_dim, self.rnn_units
-        )
-        bias_ih = self.bias_ih(base_proj).view(-1)
-        bias_hh = self.bias_hh(base_proj).view(-1)
+        ) * np.sqrt(1/self.rnn_units)
+
+        bias_ih = self.bias_ih(base_proj).view(-1) * np.sqrt(1/self.weights_dim)
+        bias_hh = self.bias_hh(base_proj).view(-1) * np.sqrt(1/self.weights_dim)
 
         hx = torch.zeros(b,  self.rnn_units).to(self.device)
 
         outputs = []
         for i in range(t):
             input_vec = input[:,i]
-            out = _VF.gru_cell(
+            hx = _VF.gru_cell(
                 input_vec, hx,
                 weight_ih, weight_hh,
                 bias_ih, bias_hh,
             )
-            outputs.append(out)
+            outputs.append(hx)
         outputs = torch.stack(outputs, 0)
         outputs = outputs.permute(1, 0, 2)
         return outputs
@@ -457,7 +460,7 @@ class DynamicConv1dTBC(nn.Module):
         weight = weight.narrow(1, 0, K).contiguous()
         weight = weight.view(T, B*H, K).transpose(0, 1)
 
-        x = x.view(T, B*H, R).transpose(0, 1)
+        x = x.contiguous().view(T, B*H, R).transpose(0, 1)
         if self.weight_softmax and self.renorm_padding:
             # turn the convolution filters into band matrices
             weight_expanded = weight.new(B*H, T, T+K-1).fill_(float('-inf'))

@@ -1,18 +1,90 @@
+import os
+import pickle
 from pathlib import Path
 
 import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader
+from PIL import Image
+from torch.utils.data import DataLoader, Dataset
 from torchvision.datasets.folder import default_loader
 
-from .tokenizer import Tokenizer
-from ..utils.logger import get_logger
-from ..utils.file_utils import read_txt
-from .preprocessing import get_transform
-
 from . import collate_fns
+from ..utils.file_utils import read_txt
+from ..utils.logger import get_logger
+from .preprocessing import get_transform
+from .tokenizer import Tokenizer
 
 logger = get_logger()
+
+
+class Birds(Dataset):
+    def __init__(self, data_path, data_name, transform=None,
+                target_transform=None, data_split='train',
+                tokenizer=None, lang=None):
+
+        self.data_path = data_path
+        self.data_name = data_name
+        self.tokenizer = tokenizer
+
+        self.target_transform = target_transform
+        self.data_split = data_split
+        self.__dataset_path = Path(self.data_path) / self.data_name / data_split
+
+        with open(os.path.join(self.__dataset_path,
+                                'char-CNN-RNN-embeddings.pickle'), 'rb') as f:
+            self.embeddings = pickle.load(f, encoding='latin1')
+
+        with open(os.path.join(self.__dataset_path,
+                                'filenames.pickle'), 'rb') as f:
+            self.fnames = pickle.load(f, encoding='latin1')
+
+        with open(os.path.join(self.__dataset_path,
+                                '304images.pickle'), 'rb') as f:
+            self.images = pickle.load(f, encoding='latin1')
+
+        with open(os.path.join(self.__dataset_path,
+                                'class_info.pickle'), 'rb') as f:
+            self.class_info = pickle.load(f, encoding='latin1')
+
+        captions = []
+        for fname in self.fnames:
+            cap_file = Path(self.data_path) / self.data_name / 'text_c10' / f'{fname}.txt'
+            with open(cap_file, 'r') as f:
+                cap = f.readlines()
+                captions.extend(cap)
+
+        self.captions = captions
+        self.transform = get_transform(data_split,)
+
+        self.captions_per_image = 10
+
+        logger.info(f'[Birds] #Captions {len(self.captions)}')
+        logger.info(f'[Birds] #Images {len(self.images)}')
+        self.n = len(captions)
+        if data_split in ['test', 'dev']:
+            self.n = 10000
+
+    def __getitem__(self, ix):
+
+        img = Image.fromarray(self.images[ix//self.captions_per_image]).convert('RGB')
+        if self.transform is not None:
+            img = self.transform(img)
+
+        fname = self.fnames[ix//self.captions_per_image]
+
+        caption = self.captions[ix]
+        tokens = self.tokenizer(caption)
+
+        return img, tokens, ix, fname
+
+    def __len__(self):
+        return self.n
+
+    def __repr__(self):
+        return f'Birds.{self.data_name}.{self.data_split}'
+
+    def __str__(self):
+        return f'{self.data_name}.{self.data_split}'
 
 
 class PrecompDataset(Dataset):
@@ -44,6 +116,8 @@ class PrecompDataset(Dataset):
 
         if data_split == 'dev':
             self.length = 5000
+
+        self.captions_per_image = 5
 
         logger.debug(f'Read feature file. Shape: {len(self.images.shape)}')
 
@@ -247,12 +321,12 @@ class ImageDataset(Dataset):
 
         self.data_wrapper = (
             Flickr(
-                self.full_path, 
+                self.full_path,
                 data_split=data_split,
             ) if 'f30k' in data_name
             else Coco(
-                self.full_path / 'annotations' / 'coco.json', 
-                # data_split=data_split
+                self.full_path,
+                data_split=data_split,
             )
         )
 
@@ -262,6 +336,11 @@ class ImageDataset(Dataset):
         self.transform = get_transform(
             data_split, resize_to=resize_to, crop_size=crop_size
         )
+
+        self.captions_per_image = 5
+
+        if data_split == 'dev':
+            self.length = 5000
 
         logger.debug(f'Split size: {len(self.ids)}')
 
@@ -308,4 +387,3 @@ class ImageDataset(Dataset):
 
     def __str__(self):
         return f'{self.data_name}.{self.split}'
-

@@ -43,8 +43,8 @@ class Similarity(nn.Module):
         Computer pairwise i2t image-caption distance with locality sharding
         """
 
-        img_embed = img_embed.to(self.device)
-        cap_embed = cap_embed.to(self.device)
+        #img_embed = img_embed.to(self.device)
+        #cap_embed = cap_embed.to(self.device)
 
         n_im_shard = (len(img_embed)-1)//shared_size + 1
         n_cap_shard = (len(cap_embed)-1)//shared_size + 1
@@ -54,8 +54,8 @@ class Similarity(nn.Module):
         pbar_fn = lambda x: range(x)
         if self.master:
             pbar_fn = lambda x: tqdm(
-                range(x), total=x, 
-                desc='Test  ', 
+                range(x), total=x,
+                desc='Test  ',
                 leave=False,
             )
 
@@ -70,7 +70,7 @@ class Similarity(nn.Module):
                 s = cap_embed[cap_start:cap_end]
                 l = lens[cap_start:cap_end]
                 sim = self.forward(im, s, l)
-                d[im_start:im_end, cap_start:cap_end] = sim                
+                d[im_start:im_end, cap_start:cap_end] = sim
 
         logger.debug('Done computing shared similarities.')
         return d
@@ -85,7 +85,7 @@ class Cosine(nn.Module):
     def forward(self, img_embed, cap_embed, *args, **kwargs):
         img_embed = l2norm(img_embed, dim=1)
         cap_embed = l2norm(cap_embed, dim=1)
-        return cosine_sim(img_embed, cap_embed)
+        return cosine_sim(img_embed, cap_embed).cpu()
 
 
 class AdaptiveEmbedding(nn.Module):
@@ -117,8 +117,8 @@ class AdaptiveEmbedding(nn.Module):
             cap_embed: (B, T, latent_size)
         '''
         # (B, 1024, T)
-        cap_embed = cap_embed.permute(0, 2, 1).to(self.device)
-        img_embed = img_embed.permute(0, 2, 1).to(self.device)
+        cap_embed = cap_embed.permute(0, 2, 1) #.to(self.device)
+        img_embed = img_embed.permute(0, 2, 1) #.to(self.device)
 
         # (B, 1024)
         if self.norm:
@@ -172,10 +172,14 @@ class AdaptiveEmbeddingI2T(nn.Module):
         self.device = device
 
         # self.fc = nn.Conv1d(latent_size, latent_size*2, 1).to(device)
-        
-        self.cbn_txt = condbn.CondBatchNorm1d(latent_size, k, **kwargs)
+
+        self.cbn_txt = condbn.CondBatchNorm1d(
+            latent_size, k, **kwargs
+        ).to(device)
         if cond_vec:
-           self.cbn_vec = condbn.CondBatchNorm1d(latent_size, k, **kwargs)
+           self.cbn_vec = condbn.CondBatchNorm1d(
+               latent_size, k, **kwargs
+            ).to(device)
 
         # self.alpha = nn.Parameter(torch.ones(1))
         # self.beta = nn.Parameter(torch.zeros(1))
@@ -205,7 +209,7 @@ class AdaptiveEmbeddingI2T(nn.Module):
 
         sims = torch.zeros(
             img_embed.shape[0], cap_embed.shape[0]
-        ).to(self.device)
+        ).cpu()
 
         img_embed = img_embed.mean(-1)
 
@@ -234,197 +238,174 @@ class AdaptiveEmbeddingI2T(nn.Module):
         return sims
 
 
-
-class DynConv1dSim(nn.Module):
+class DynConvI2T(nn.Module):
 
     def __init__(
             self, device, latent_size=1024, reduce_proj=8, groups=1,
-            img_dim=2048,
+            img_dim=2048, kernel_size=7
         ):
         super().__init__()
 
         # 2048 -> 256
         self.img_reduce = nn.Conv1d(
-            in_channels=latent_size, 
-            out_channels=latent_size//reduce_proj, 
+            in_channels=latent_size,
+            out_channels=latent_size//reduce_proj,
             kernel_size=1,
         )
 
-        # self.img_proj = nn.Conv1d(
-        #     in_channels=latent_size, 
-        #     out_channels=latent_size, 
-        #     kernel_size=1,
-        # )
+        self.cap_reduce = nn.Conv1d(
+            in_channels=latent_size,
+            out_channels=latent_size//reduce_proj,
+            kernel_size=1,
+        )
 
         # self.cap_reduce = nn.Linear(
         #     latent_size, latent_size//reduce_proj,
         # )
 
         self.pconv1 = dynconv.DynamicConv1dTBC(
-            input_size=latent_size//reduce_proj,
-            query_size=latent_size+latent_size//reduce_proj,
-            kernel_size=3,
+            input_size=latent_size,
+            query_size=(latent_size//reduce_proj)*2,
+            kernel_size=kernel_size,
             weight_softmax=True,
             renorm_padding=True,
             padding_l=1,
-            num_heads=reduce_proj//2,
+            num_heads=1,
         )
 
-        self.img_fc = nn.Linear(
-            latent_size//reduce_proj+latent_size, latent_size
-        )
+        self.fc = nn.Linear(latent_size, latent_size)
 
-        self.sa = attention.SelfAttention(
-            latent_size, nn.LeakyReLU(0.1, inplace=True)
-        )
-
-        self.device = device        
+        self.device = device
 
     def forward(self, img_embed, cap_embed, lens, **kwargs):
         '''
             img_embed: (B, 36, latent_size)
             cap_embed: (B, T, latent_size)
         '''
-        
-        cap_embed = cap_embed.permute(0, 2, 1).to(self.device)
-        img_embed = img_embed.permute(0, 2, 1)           
 
-        B, D, R = img_embed.shape     
-    
-        img_reduced = self.img_reduce(img_embed)        
-        img_proj = self.sa(img_embed).mean(-1)
+        cap_embed = cap_embed.permute(0, 2, 1) #.to(self.device)
+        img_embed = img_embed.permute(0, 2, 1)
+        B, D, HW = img_embed.shape
+
+        img_reduced = self.img_reduce(img_embed)
+        _, Dr, _ = img_reduced.shape
+        cap_reduced = self.cap_reduce(cap_embed)
+        T = cap_reduced.shape[-1]
 
         sims = torch.zeros(
             img_embed.shape[0], cap_embed.shape[0]
-        ).to(self.device)
+        )
 
-        for i, cap_tensor in enumerate(cap_embed):
-            # cap: 1024, T
-            # img: 1024, 36
-            
-            n_words = lens[i]
-            cap_repr = cap_tensor[:,:n_words].mean(-1).unsqueeze(0)            
-            # cap_reduced = self.cap_reduce(cap_repr)
+        for i, img_tensor in enumerate(img_embed):
 
-            cap_repl = cap_repr.repeat(B, R).view(B, -1,R)
+            img_tensor = img_tensor.unsqueeze(0)
+            _img_vector = img_reduced[i].mean(-1)
 
-            img_red_flat = img_reduced.view(B, -1, R)
-            
-            cond = torch.cat([img_red_flat, cap_repl], dim=1)
-            a = self.pconv1(
-                img_red_flat.permute(2, 0, 1), 
+            img_reduced_rep = _img_vector.repeat(
+                cap_reduced.shape[0], 1, T).view(cap_reduced.shape[0], Dr, T)
+            cond = torch.cat([img_reduced_rep, cap_reduced], dim=1)
+
+            # print(cond.permute(2, 0, 1).shape)
+            # print(cap_embed.permute(2, 0, 1).shape)
+
+            txt_filtered = self.pconv1(
+                cap_embed.permute(2, 0, 1),
                 query=cond.permute(2, 0, 1),
-            )            
-            a = a.mean(0)
-            # img_vector = img_output.mean(-1).mean(-1)
-            img_vector = torch.cat([img_proj, a], dim=1)
-            img_vector = self.img_fc(img_vector)
+            ).permute(1, 2, 0)
+
+            txt_vector = txt_filtered.max(-1)[0]
+            txt_vector = self.fc(txt_vector)
+            img_vector = img_tensor.mean(-1)
 
             img_vector = l2norm(img_vector, dim=-1)
-            cap_vector = cap_repr
-            cap_vector = l2norm(cap_vector, dim=-1)
+            cap_vector = l2norm(txt_vector, dim=-1)
 
             sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
-            sims[:,i] = sim
+            sims[i,:] = sim
 
 
         return sims
 
 
-class DynConv2dSim(nn.Module):
+class ProjConvI2T(nn.Module):
 
     def __init__(
             self, device, latent_size=1024, reduce_proj=8, groups=1,
-            img_dim=2048,
+            img_dim=2048, kernel_size=3
         ):
         super().__init__()
 
         # 2048 -> 256
-        self.img_reduce = nn.Conv2d(
-            in_channels=latent_size, 
-            out_channels=latent_size//reduce_proj, 
+        self.img_reduce = nn.Conv1d(
+            in_channels=latent_size,
+            out_channels=latent_size//reduce_proj,
             kernel_size=1,
         )
 
-        # self.img_proj = nn.Conv1d(
-        #     in_channels=latent_size, 
-        #     out_channels=latent_size//, 
-        #     kernel_size=1,
-        # )
+        self.cap_reduce = nn.Conv1d(
+            in_channels=latent_size,
+            out_channels=latent_size//reduce_proj,
+            kernel_size=1,
+        )
 
         # self.cap_reduce = nn.Linear(
         #     latent_size, latent_size//reduce_proj,
         # )
 
-        self.pconv1 = dynconv.DynamicConv1dTBC(
-            input_size=latent_size//reduce_proj,
-            query_size=latent_size + latent_size//reduce_proj,
-            kernel_size=3,
-            weight_softmax=True,
-            renorm_padding=True,
-            padding_l=1,
-            num_heads=16,
+        self.pconv1 = dynconv.ProjConv1d(
+            in_channels=latent_size,
+            query_size=(latent_size//reduce_proj),
+            out_channels=latent_size//2,
+            kernel_size=kernel_size,
+            padding=1,
+            groups=latent_size//2,
+            weightnorm=None,
         )
 
-        self.img_fc = nn.Linear(
-            latent_size//reduce_proj+latent_size, latent_size
-        )
+        self.fc = nn.Conv1d(latent_size//2, latent_size, 1)
 
-        self.sa = attention.SelfAttention(
-            latent_size, nn.LeakyReLU(0.1, inplace=True)
-        )
-
-        self.device = device        
+        self.device = device
 
     def forward(self, img_embed, cap_embed, lens, **kwargs):
         '''
             img_embed: (B, 36, latent_size)
             cap_embed: (B, T, latent_size)
         '''
-        
-        cap_embed = cap_embed.permute(0, 2, 1).to(self.device)
+
+        cap_embed = cap_embed.permute(0, 2, 1) #.to(self.device)
         img_embed = img_embed.permute(0, 2, 1)
-        B, D, HW = img_embed.shape 
-        H = int(np.sqrt(HW))
-        img_flat = img_embed.view(B, D, H, H)
-    
-        img_reduced = self.img_reduce(img_flat)
-        # img_proj = self.img_proj(img_embed.view(B, D, H*H))
-        img_flat = img_flat.view(B, D, -1)
-        img_proj = self.sa(img_flat).mean(-1)
+        B, D, HW = img_embed.shape
+
+        img_reduced = self.img_reduce(img_embed)
+        _, Dr, _ = img_reduced.shape
+        cap_reduced = self.cap_reduce(cap_embed)
+        T = cap_reduced.shape[-1]
 
         sims = torch.zeros(
             img_embed.shape[0], cap_embed.shape[0]
-        ).to(self.device)
+        )
 
-        for i, cap_tensor in enumerate(cap_embed):
-            # cap: 1024, T
-            # img: 1024, 36
-            
-            n_words = lens[i]
-            cap_repr = cap_tensor[:,:n_words].mean(-1).unsqueeze(0)            
-            # cap_reduced = self.cap_reduce(cap_repr)
+        for i, img_tensor in enumerate(img_embed):
 
-            cap_repl = cap_repr.repeat(B, H*H).view(B, -1, H*H)
+            img_tensor = img_tensor.unsqueeze(0)
+            _img_vector = img_reduced[i].mean(-1)
 
-            img_red_flat = img_reduced.view(B, -1, H*H)
-            
-            cond = torch.cat([img_red_flat, cap_repl], dim=1)
-            a = self.pconv1(
-                img_red_flat.permute(2, 0, 1), 
-                query=cond.permute(2, 0, 1),
-            )            
-            a = a.mean(0)
-            # img_vector = img_output.mean(-1).mean(-1)
-            img_vector = torch.cat([img_proj, a], dim=1)
-            img_vector = self.img_fc(img_vector)
+            # print(cond.permute(2, 0, 1).shape)
+            # print(cap_embed.permute(2, 0, 1).shape)
+
+            txt_filtered = self.pconv1(
+                cap_embed,_img_vector,
+            )
+
+            txt_vector = self.fc(txt_filtered)
+            txt_vector = txt_vector.max(-1)[0]
+            img_vector = img_tensor.mean(-1)
 
             img_vector = l2norm(img_vector, dim=-1)
-            cap_vector = cap_repr
-            cap_vector = l2norm(cap_vector, dim=-1)
+            cap_vector = l2norm(txt_vector, dim=-1)
 
             sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
-            sims[:,i] = sim
+            sims[i,:] = sim
 
 
         return sims
@@ -440,28 +421,35 @@ class ProjRNNReducedI2T(nn.Module):
 
         self.device = device
 
-        self.reduce_img = nn.Conv1d(latent_size, latent_size//k, 1)
-        self.reduce_txt = nn.Conv1d(300, latent_size//k, 1)
+        self.img_reduce = nn.Sequential(
+            nn.Conv1d(
+                in_channels=latent_size,
+                out_channels=latent_size//k,
+                kernel_size=1,
+            ),
+            nn.BatchNorm1d(latent_size//k),
+            nn.ReLU(inplace=True)
+        )
 
-        self.proj_text = ProjRNN(
-            base_proj_channels=latent_size//k,
+        self.cap_reduce = nn.Sequential(
+            nn.Conv1d(
+                in_channels=latent_size,
+                out_channels=latent_size//k,
+                kernel_size=1,
+            ),
+            nn.BatchNorm1d(latent_size//k),
+            nn.ReLU(inplace=True)
+        )
+
+        self.prnn = dynconv.ProjRNN(
+            base_proj_channels=(latent_size//k),
             rnn_input=latent_size//k,
             rnn_units=latent_size//k,
             device=device,
         )
 
-        self.rnn = nn.GRU(
-            300, latent_size, 1,
-            batch_first=True, bidirectional=True,
-        )
-
-        self.sa1 = attention.SelfAttention(
-            latent_size,
-            nn.LeakyReLU(0.1, inplace=True),
-        )
-
         self.txt_fc = nn.Linear(
-            latent_size//k + latent_size, latent_size
+            latent_size//k, latent_size
         )
 
     def forward(self, img_embed, cap_embed, lens, **kwargs):
@@ -469,48 +457,43 @@ class ProjRNNReducedI2T(nn.Module):
             img_embed: (B, 36, latent_size)
             cap_embed: (B, T, latent_size)
         '''
-        # (B, 1024, T)
-        # cap_embed = cap_embed.permute(0, 2, 1).to(self.device)
-
-        txt_embed, _ = self.rnn(cap_embed)
-        txt_embed = (
-            txt_embed[:,:,:txt_embed.size(2)//2] + txt_embed[:,:,txt_embed.size(2)//2:]
-        )/2
-        txt_embed = self.sa1(txt_embed.permute(0, 2, 1))
-        txt_embed = mean_pooling(txt_embed.permute(0, 2, 1), lens)
-
-        img_embed = img_embed.permute(0, 2, 1).to(self.device)
-        img_embed_global = img_embed.mean(-1)
 
         cap_embed = cap_embed.permute(0, 2, 1).to(self.device)
+        img_embed = img_embed.permute(0, 2, 1).to(self.device)
+        B, D, HW = img_embed.shape
+
+        img_reduced = self.img_reduce(img_embed)
+        _, Dr, _ = img_reduced.shape
+        cap_reduced = self.cap_reduce(cap_embed)
+        T = cap_reduced.shape[-1]
 
         sims = torch.zeros(
             img_embed.shape[0], cap_embed.shape[0]
-        ).to(self.device)
+        )
 
-        cap_reduced = self.reduce_txt(cap_embed)
-        img_reduced = self.reduce_img(img_embed)
+        for i, img_tensor in enumerate(img_embed):
 
-        img_global_vec = img_reduced.mean(-1)
+            img_tensor = img_tensor.unsqueeze(0)
+            _img_vector = img_reduced[i].mean(-1)
 
-        for i, img_vector in enumerate(img_global_vec):
-            # cap: 1024, T
-            # img: 1024, 36
-            img_repr = img_vector.unsqueeze(0)
+            # print(cond.permute(2, 0, 1).shape)
+            # print(cap_embed.permute(2, 0, 1).shape)
 
-            txt_output = self.proj_text(
-                cap_reduced.permute(0, 2, 1), img_vector
-            ).permute(0, 2, 1)
-            txt_vector = txt_output.max(-1)[0]
-            txt_vector = self.txt_fc(
-                torch.cat([txt_embed, txt_vector], dim=1)
+            txt_filtered = self.prnn(
+                cap_reduced.permute(0, 2, 1),
+                _img_vector,
             )
 
-            txt_vector = l2norm(txt_vector, dim=-1)
-            img_vector = img_embed_global[i].unsqueeze(0)
+            txt_vector = txt_filtered.max(1)[0]
+            txt_vector = self.txt_fc(txt_vector)
+            img_vector = img_tensor.mean(-1)
+
             img_vector = l2norm(img_vector, dim=-1)
-            sim = cosine_sim(img_vector, txt_vector).squeeze(-1)
+            cap_vector = l2norm(txt_vector, dim=-1)
+
+            sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
             sims[i,:] = sim
+
 
         return sims
 

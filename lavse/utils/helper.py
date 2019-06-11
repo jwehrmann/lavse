@@ -7,10 +7,13 @@ def save_checkpoint(
         outpath, model, optimizer=None,
         is_best=False, save_all=False, **kwargs
     ):
-    
+
+    if hasattr(model, 'module'):
+        model = model.module
+
     state_dict = {
         'model': model.state_dict(),
-        'optimizer': optimizer,        
+        'optimizer': optimizer,
     }
 
     state_dict.update(**kwargs)
@@ -35,27 +38,30 @@ def restore_checkpoint(path, model=None, optimizer=False):
     state_dict = torch.load(
         path,  map_location=lambda storage, loc: storage
     )
-        
-    model.load_state_dict(state_dict['model'])        
+    new_state = {}
+    for k, v in state_dict['model'].items():
+        new_state[k.replace('module.', '')] = v
+
+    model.load_state_dict(new_state)
     state_dict['model'] = model
-    
+
     if optimizer:
         optimizer = state_dict['optimizer']
         state_dict['optimizer'] = None
-    
+
     return state_dict
 
 
 def adjust_learning_rate(
     optimizer, epoch, initial_lr,
-    interval=1, decay=0. 
+    interval=1, decay=0.
 ):
 
     lr = initial_lr * (decay ** (epoch // interval))
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
         if 'name' in param_group:
-            param_group['lr'] = lr/10.
+            param_group['lr'] = lr
 
     return lr
 

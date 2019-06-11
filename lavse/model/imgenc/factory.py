@@ -65,6 +65,14 @@ _image_encoders = {
             'proj_regions': False,
         },
     },
+    'resnet101_ft': {
+        'class': fullencoder.FullImageEncoder,
+        'args': {
+            'cnn': torchvision.models.resnet101,
+            'img_dim': 2048,
+            'finetune': True,
+        },
+    },
     'resnet152': {
         'class': fullencoder.FullImageEncoder,
         'args': {
@@ -84,7 +92,7 @@ _image_encoders = {
     'vsepp_pt': {
         'class': fullencoder.VSEPPEncoder,
         'args': {
-            'cnn_type': 'resnet152', 
+            'cnn_type': 'resnet152',
         },
     },
     'img_proj': {
