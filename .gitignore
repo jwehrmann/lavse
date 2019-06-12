@@ -4,7 +4,7 @@
 # *.json
 *.pth.tar
 .DS_Store
-data/
+#data/
 pycocotools/
 runs/
 temp/

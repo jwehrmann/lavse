@@ -2,177 +2,54 @@ import argparse
 from pathlib import Path
 
 import torch
-
-import profiles
 from addict import Dict
-from lavse import imgenc, loss, train, txtenc
-from lavse.data import get_loader, get_loaders
-from lavse.model import LAVSE
+from tqdm import tqdm
+
+import params
+import profiles
+from lavse.data.loaders import get_loader, get_loaders
+from lavse.model import imgenc, loss, model, txtenc
+from lavse.train import train
 from lavse.utils.logger import create_logger
+from lavse.utils import helper
+import torch.multiprocessing as mp
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--data_path',
-    )
-    parser.add_argument(
-        '--train_data', default='f30k_precomp.en',
-        help=(
-            'Data used to align images and captions.'
-            'Eg.: f30k_precomp.en'
-        ),
-    )
-    parser.add_argument(
-        '--val_data', default=['f30k_precomp.en'], nargs='+',
-        help=(
-            'Data used for evaluation during training.'
-            'Eg.: [f30k_precomp.en,m30k_precomp.de]'
-        ),
-    )
-    parser.add_argument(
-        '--adapt_data', default=None, nargs='+',
-        help=(
-            'Data used for training joint language space.'
-            'Eg.: [m30k_precomp.en-de,jap_precomp.en-jt]'
-        ),
-    )
-    parser.add_argument(
-        '--vocab_path', default='./vocab/complete.json',
-        help='Path to saved vocabulary json files.',
-    )
-    parser.add_argument(
-        '--margin', default=0.2, type=float,
-        help='Rank loss margin.',
-    )
-    parser.add_argument(
-        '--num_epochs', default=30, type=int,
-        help='Number of training epochs.',
-    )
-    parser.add_argument(
-        '--device', default='cuda:0', type=str,
-        help='Device to run the model.',
-    )
-    parser.add_argument(
-        '--batch_size', default=128, type=int,
-        help='Size of a training mini-batch.',
-    )
-    parser.add_argument(
-        '--embed_dim', default=300, type=int,
-        help='Dimensionality of the word embedding.',
-    )
-    parser.add_argument(
-        '--latent_size', default=1024, type=int,
-        help='Dimensionality of the joint embedding.',
-    )
-    parser.add_argument(
-        '--grad_clip', default=2., type=float,
-        help='Gradient clipping threshold.',
-    )
-    parser.add_argument(
-        '--outpath',
-        help='Path to save logs and models.',
-    )
-    parser.add_argument(
-        '--profile', default=None, 
-        choices=profiles.get_profile_names(),
-        help='Import pre-defined setup from profiles.py',
-    )
-    parser.add_argument(
-        '--text_encoder', default='gru',
-        choices=txtenc.get_available_txtenc(),
-        help='Path to save logs and models.',
-    )
-    parser.add_argument(
-        '--text_pooling', default='lens',
-        choices=['mean', 'max', 'lens'],
-        help='Path to save logs and models.',
-    )
-    parser.add_argument(
-        '--image_encoder', default='scan',
-        choices=imgenc.get_available_imgenc(),
-        help='Path to save logs and models.',
-    )
-    parser.add_argument(
-        '--text_repr', 
-        default='word',
-        help='Path to save logs and models.',
-    )
-    parser.add_argument(
-        '--lr', default=.0002, type=float,
-        help='Initial learning rate.',
-    )
-    parser.add_argument(
-        '--lr_decay_interval', default=15, type=int,
-        help='Number of epochs to update the learning rate.',
-    )
-    parser.add_argument(
-        '--lr_decay_rate', default=0.1, type=int,
-        help='Number of epochs to update the learning rate.',
-    )
-    parser.add_argument(
-        '--workers', default=10, type=int,
-        help='Number of data loader workers.',
-    )
-    parser.add_argument(
-        '--log_step', default=10, type=int,
-        help='Number of steps to print and record the log.',
-    )
-    parser.add_argument(
-        '--nb_epochs', default=45, type=int,
-        help='Number of epochs.',
-    )
-    parser.add_argument(
-        '--early_stop', default=5, type=int,
-        help='Early stop patience.',
-    )
-    parser.add_argument(
-        '--val_step', default=500, type=int,
-        help='Number of steps to run validation.',
-    )
-    parser.add_argument(
-        '--max_violation', action='store_true',
-        help='Use max instead of sum in the rank loss (i.e., k=1)',
-    )
-    parser.add_argument(
-        '--increase_k', default=.0, type=float,
-        help='Rate for linear increase of k hyper-parameter (used when not --max_violation). ',
-    )
-    parser.add_argument(
-        '--initial_k', default=1., type=float,
-        help='Initial value for k hyper-parameter (used when not --max_violation)',
-    )
-    parser.add_argument(
-        '--log_level', default='info',
-        choices=['debug', 'info'],
-        help='Log/verbosity level.',
-    )
+    mp.set_start_method('spawn')
 
-    
-    args = parser.parse_args()
-    args = Dict(vars(args))
-    
+    # loader_name = 'precomp'
+    args = params.get_train_params()
+
+    torch.cuda.set_device(args.local_rank)
+
+    loader_name = args.loader_name
+
     logger = create_logger(level=args.log_level)
+    if args.local_rank != 0:
+        logger.propagate = False
 
     if args.profile is not None:
         profile_args = profiles.get_profile(args.profile)
         args.update(profile_args)
         logger.info(f'Using profile {args.profile}')
-    
+
     logger.info(f'Used args: \n{args}')
 
     train_data = args.train_data
     data_name, lang = train_data.split('.')
     train_loader = get_loader(
         data_path=args.data_path,
-        data_name=data_name, 
-        loader_name='precomp',
+        data_name=data_name,
+        loader_name=loader_name,
         vocab_path=args.vocab_path,
         batch_size=args.batch_size,
         workers=args.workers,
         text_repr=args.text_repr,
-        data_split='train', 
+        data_split='train',
         lang=lang,
+        ngpu=args.ngpu,
+        local_rank=args.local_rank,
     )
 
     val_loaders = []
@@ -180,15 +57,17 @@ if __name__ == '__main__':
         data_name, lang = val_data.split('.')
         val_loaders.append(
             get_loader(
-                data_path=args.data_path, 
+                data_path=args.data_path,
                 data_name=data_name,
-                loader_name='precomp',
+                loader_name=loader_name,
                 vocab_path=args.vocab_path,
-                batch_size=args.batch_size,
+                batch_size=args.batch_size//4,
                 workers=args.workers,
                 text_repr=args.text_repr,
                 data_split='dev',
                 lang=lang,
+                ngpu=1,
+                local_rank=args.local_rank,
             )
         )
 
@@ -198,73 +77,150 @@ if __name__ == '__main__':
             data_name, lang = adapt_data.split('.')
             adapt_loaders.append(
                 get_loader(
-                    data_path=args.data_path, 
+                    data_path=args.data_path,
                     data_name=data_name,
                     loader_name='lang',
                     vocab_path=args.vocab_path,
                     batch_size=args.batch_size,
                     workers=args.workers,
                     text_repr=args.text_repr,
-                    data_split='train', 
+                    data_split='train',
                     lang=lang,
+                    ngpu=args.ngpu,
+                    local_rank=args.local_rank,
                 )
             )
 
-    device = torch.device(args.device)
+    # if args.device != 'cpu':
+    #     device = torch.device('cuda:{}'.format(args.local_rank))
 
     model_params = Dict(
         imgenc_name=args.image_encoder,
         txtenc_name=args.text_encoder,
         latent_size=args.latent_size,
-        img_dim=train_loader.dataset.get_img_dim(),
-        num_embeddings=train_loader.dataset.tokenizer.get_nb_words(),
+        num_embeddings=len(train_loader.dataset.tokenizer),
         embed_dim=args.embed_dim,
         txt_pooling=args.text_pooling,
+        img_pooling=args.image_pooling,
+        similarity_name=args.sim,
+        loss_device='cuda'
     )
 
-    model = LAVSE(**model_params).to(device)
-    print(model)
+    model = model.LAVSE(**model_params)#.to(device)
+    is_master = (args.local_rank == 0)
+
+    # Distribute across distinct process on various GPUS
+    # This is used when a single model can fit the memory
+    # and the user wants to speed up the training
+    world_size = args.ngpu
+    if world_size > 1:
+        model = model.to('cuda')
+        torch.distributed.init_process_group(
+            'nccl',
+            init_method='env://',
+            world_size=world_size,
+            rank=args.local_rank,
+        )
+        # model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+
+        model = torch.nn.parallel.DistributedDataParallel(
+            model,
+            device_ids=[args.local_rank],
+            output_device=args.local_rank,
+        )
+        model.module.set_master_(is_master)
+        model.master = is_master
+        model.module.set_devices_(['cuda'], ['cuda'], 'cuda')
+    else:
+        model.set_master_(is_master)
+        model.set_devices_(['cuda'], ['cuda'], 'cuda')
+
+    if args.resume is not None:
+        logger.info(f'Resuming checkpoint: {args.resume}')
+        checkpoint = helper.restore_checkpoint(
+            path=args.resume,
+            model=model,
+        )
+        model = checkpoint['model']
+        logger.info((
+            f"Loaded checkpoint. Iteration: {checkpoint['iteration']}, "
+            f"rsum: {checkpoint['rsum']}, "
+            f"keys: {checkpoint.keys()}"
+        ))
+
+    if args.data_parallel:
+        model.set_devices_(
+            ['cuda:3'], ['cuda:0','cuda:1','cuda:2'], 'cuda:3'
+        )
+
+    # Distribute the same process in GPUs
+    # This is used when a single model cannot fit the memory
+    # if args.data_parallel:
+    #     import torch.nn as nn
+    #     model.img_enc = nn.DataParallel(model.img_enc, device_ids=[0,1,2], output_device=0)
+
+    if hasattr(model, 'module'):
+        model.get_sim_matrix = model.module.get_sim_matrix
+        model.get_sim_matrix_shared = model.module.get_sim_matrix_shared
+        model.master = is_master
+
+    print_fn = (lambda x: x) if not is_master else tqdm.write
 
     trainer = train.Trainer(
+        device=torch.device('cuda'),
         model=model,
-        device=device,
         args={'args': args, 'model_args': model_params},
+        sysoutlog=print_fn,
+        master=is_master,
     )
 
     multimodal_criterion = loss.ContrastiveLoss(
-        device=device,
         margin=args.margin,
         max_violation=args.max_violation,
-        weight=1., 
-        initial_k=args.initial_k, 
-        increase_k=args.increase_k,
+        weight=1.,
+        beta=args.beta,
+        # initial_k=args.initial_k,
+        # increase_k=args.increase_k,
     )
 
     multilanguage_criterion = loss.ContrastiveLoss(
-        device=device,
         margin=args.margin,
         max_violation=args.max_violation,
-        weight=1., 
-        initial_k=args.initial_k, 
+        weight=1.,
+        # initial_k=args.initial_k,
     )
+
+    # TODO: improve
+    model.mm_criterion = multimodal_criterion
 
     trainer.setup_optim(
-        lr=args.lr, 
-        mm_criterion=multimodal_criterion, 
+        lr=args.lr,
+        mm_criterion=multimodal_criterion,
         ml_criterion=multilanguage_criterion,
-        lr_decay_rate=args.lr_decay_rate, 
+        lr_decay_rate=args.lr_decay_rate,
         lr_decay_interval=args.lr_decay_interval,
+        cnn_lr_factor=1.,
+        clip_grad=args.grad_clip,
+        early_stop=args.early_stop,
+        log_grad_norm=False,
+        log_histograms=False,
+        save_all=args.save_all,
+        finetune_convnet=args.finetune,
+        optimizer=torch.optim.Adam,
     )
 
-    result, rs = trainer.evaluate_loaders(
-        val_loaders
-    )
+    if args.eval_before_training:
+        result, rs = trainer.evaluate_loaders(
+            val_loaders
+        )
 
     trainer.fit(
-        train_loader=train_loader, 
-        valid_loaders=val_loaders, 
+        train_loader=train_loader,
+        # train_loader=val_loaders[0],
+        valid_loaders=val_loaders,
         lang_loaders=adapt_loaders,
-        nb_epochs=args.nb_epochs, 
-        early_stop=args.early_stop,
+        nb_epochs=args.nb_epochs,
         path=args.outpath,
+        valid_interval=args.valid_interval,
+        world_size=world_size
     )
