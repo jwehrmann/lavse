@@ -78,7 +78,7 @@ def get_train_params():
     parser.add_argument(
         '--data_parallel', action='store_true',
         help=(
-            'Whether to use several GPUs to train the model', 
+            'Whether to use several GPUs to train the model',
             '[use when a single model do not fit the GPU memory].'
         ),
     )
@@ -125,7 +125,7 @@ def get_train_params():
         help='Number of epochs to update the learning rate.',
     )
     parser.add_argument(
-        '--workers', default=10, type=int,
+        '--workers', default=4, type=int,
         help='Number of data loader workers.',
     )
     parser.add_argument(

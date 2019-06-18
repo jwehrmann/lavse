@@ -1,4 +1,5 @@
 from . import txtenc
+from . import embedding
 from . import pooling
 import torch.nn as nn
 
@@ -65,6 +66,62 @@ __text_encoders__ = {
         'class': txtenc.LiweGRU,
         'args': {
             'use_bi_gru': True,
+        },
+    },
+    'liwe_gru_gru': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'partial_class': embedding.PartialGRUs,
+        },
+    },
+    'liwe_gru_256': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [256, 256],
+        },
+    },
+    'liwe_gru_128_384': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [128, 384],
+        },
+    },
+    'liwe_convgru_256_256': {
+        'class': txtenc.LiweConvGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [256, 256],
+        },
+    },
+    'liwe_gru_512_512': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [512, 512],
+        },
+    },
+    'liwe_gru_1024_512': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [1024, 512],
+        },
+    },
+    'liwe_gru_128_512': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [128, 512],
+        },
+    },
+    'liwe_gru_384': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [384, 384],
         },
     },
     'emb_proj': {

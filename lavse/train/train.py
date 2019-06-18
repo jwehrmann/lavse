@@ -108,6 +108,7 @@ class Trainer:
         #self.optimizer.param_groups = self.optimizer.module.param_groups
         #self.optimizer.step = self.optimizer.module.step
 
+        # self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=45*1100)
         # self.mm_criterion = mm_criterion
         self.ml_criterion = ml_criterion
         self.initial_lr = lr

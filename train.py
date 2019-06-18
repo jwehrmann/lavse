@@ -107,6 +107,8 @@ if __name__ == '__main__':
     )
 
     model = model.LAVSE(**model_params)#.to(device)
+    logger.info(model)
+
     is_master = (args.local_rank == 0)
 
     # Distribute across distinct process on various GPUS

@@ -1,10 +1,13 @@
+# export OUT_PATH=/opt/jonatas/runs/iccv/
+# export DATA_PATH=/opt/jonatas/datasets/lavse/
+
 # Single dataset
 python train.py \
 --data_path $DATA_PATH \
 --train_data f30k_precomp.en \
 --val_data f30k_precomp.en \
 --profile liwe \
---outpath $OUT_PATH/lavse/liwe/f30k_precomp.en/
+--outpath $OUT_PATH/lavse/liwe/f30k_precomp.en/ \
 
 
 python train.py \
