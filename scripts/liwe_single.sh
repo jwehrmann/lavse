@@ -1,5 +1,5 @@
-# export OUT_PATH=/opt/jonatas/runs/iccv/
-# export DATA_PATH=/opt/jonatas/datasets/lavse/
+export OUT_PATH=/opt/jonatas/runs/iccv/
+export DATA_PATH=/opt/jonatas/datasets/lavse/
 
 # Single dataset
 python train.py \

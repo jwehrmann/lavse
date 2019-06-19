@@ -96,6 +96,20 @@ _profiles = {
         'beta': 0.991,
         'vocab_path': 'vocab/char.json',
     },
+    'liwe_512': {
+        'lr': 6e-4,
+        'margin': 0.2,
+        'latent_size': 1024,
+        'grad_clip': 2.,
+        'workers': 1,
+        'text_encoder': 'liwe_gru_512_512',
+        'image_encoder': 'hierarchical',
+        'text_pooling': 'mean',
+        'text_repr': 'liwe',
+        'nb_epochs': 45,
+        'beta': 0.991,
+        'vocab_path': 'vocab/char.json',
+    },
 }
 
 _profiles = Dict(_profiles)

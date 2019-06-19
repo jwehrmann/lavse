@@ -200,14 +200,14 @@ class Trainer:
         valid_interval=500, path=''
     ):
 
-        # lang_iters = [
-        #     DataIterator(
-        #         loader=loader,
-        #         device=self.device,
-        #         non_stop=True
-        #     )
-        #     for loader in lang_loaders
-        # ]
+        lang_iters = [
+            DataIterator(
+                loader=loader,
+                device=self.device,
+                non_stop=True
+            )
+            for loader in lang_loaders
+        ]
 
         pbar = lambda x: x
         if self.master:
@@ -239,15 +239,14 @@ class Trainer:
 
             # Cross-language update
             total_lang_loss = 0.
-            # for lang_iter in lang_iters:
+            loss_info = {}
+            for lang_iter in lang_iters:
 
-            #     lang_data = lang_iter.next()
+                lang_data = lang_iter.next()
 
-            #     lang_loss = self._forward_multilanguage_loss(*lang_data)
-            #     total_lang_loss += lang_loss
-            #     self.train_logger.update(
-            #         f'train_loss_{str(lang_iter)}', lang_loss, 1
-            #     )
+                lang_loss = self._forward_multilanguage_loss(*lang_data)
+                total_lang_loss += lang_loss
+                loss_info[f'train_loss_{str(lang_iter)}'] = lang_loss
 
             total_loss = multimodal_loss + total_lang_loss
             total_loss.backward()
@@ -276,6 +275,8 @@ class Trainer:
                 'countdown': self.count,
                 'epoch': epoch,
             })
+
+            train_info.update(loss_info)
 
             for param_group in self.optimizer.param_groups:
                 if 'name' in param_group:

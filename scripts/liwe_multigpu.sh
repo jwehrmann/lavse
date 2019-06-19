@@ -67,16 +67,16 @@ python train.py \
 --text_pooling mean \
 
 
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=2
 export NGPUS=1
 
 # Single dataset
 # python -m torch.distributed.launch  --nproc_per_node=$NGPUS --master_port 9992 \
 python train.py \
 --data_path $DATA_PATH \
---train_data m30k_precomp.en \
---val_data m30k_precomp.en \
---outpath $OUT_PATH/lavse/liwe_gru_384/m30k_precomp.en/ \
+--train_data m30k_precomp.de \
+--val_data m30k_precomp.de \
+--outpath $OUT_PATH/lavse/liwe_gru_384/m30k_precomp.de/ \
 --beta 0.991 \
 --lr 6e-4 \
 --workers 1 \
@@ -110,9 +110,9 @@ python train.py \
 
 python train.py \
 --data_path $DATA_PATH \
---train_data m30k_precomp.en \
---val_data m30k_precomp.en \
---outpath $OUT_PATH/lavse/liwe_gru_256_sum/m30k_precomp.en/ \
+--train_data f30k_precomp.en \
+--val_data f30k_precomp.en \
+--outpath $OUT_PATH/lavse/liwe_gru_256_sum/f30k_precomp.en/ \
 --beta 1. \
 --lr 6e-4 \
 --workers 1 \
