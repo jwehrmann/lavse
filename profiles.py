@@ -79,7 +79,7 @@ _profiles = {
         'text_repr': 'word',
         'nb_epochs': 30,
         'beta': 0.991,
-        'workers': 1,
+        'workers': 0,
         'increase_k': 0.1,
     },
     'clmr_gru': {

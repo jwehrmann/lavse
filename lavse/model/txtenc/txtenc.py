@@ -594,6 +594,18 @@ class LiweConvGRU(nn.Module):
             padding=2,
         )
 
+        activation = nn.LeakyReLU()
+
+        self.sa1 = attention.SelfAttention(latent_size, activation)
+        self.sa2 = attention.SelfAttention(latent_size, activation)
+        self.sa3 = attention.SelfAttention(latent_size, activation)
+        self.sa4 = attention.SelfAttention(latent_size, activation)
+
+        # self.fc = nn.Linear(
+        #     1024*4,
+        #     latent_size
+        # )
+
         self.fc = nn.Sequential(*[
             nn.Conv1d(latent_size*4, latent_size, 1, ),
             nn.LeakyReLU(0.1, ),
@@ -621,9 +633,16 @@ class LiweConvGRU(nn.Module):
 
         xt = x.permute(0, 2, 1)
         a = self.conv1(xt)[:,:,:t]
+        a = self.sa2(a)
+
         b = self.conv2(xt)[:,:,:t]
+        b = self.sa3(b)
+
         c = self.conv3(xt)[:,:,:t]
+        c = self.sa4(b)
+
         d = cap_emb.permute(0, 2, 1)
+        d = self.sa1(d)
 
         cap_emb = torch.cat([a, b, c, d], 1)
         cap_emb = self.fc(cap_emb)
