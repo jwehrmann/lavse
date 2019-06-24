@@ -9,6 +9,16 @@ python train.py \
 --outpath $OUT_PATH/lavse/clmr/f30k_precomp.en_m30k_precomp.de/
 
 
+# # Pair datasets
+python train.py \
+--data_path $DATA_PATH \
+--train_data f30k_precomp.en \
+--val_data f30k_precomp.en m30k_precomp.de \
+--adapt_data m30k_precomp.en-de \
+--profile clmr_gru \
+--outpath $OUT_PATH/lavse/clmr_gru/f30k_precomp.en_m30k_precomp.de/
+
+
 python train.py \
 --data_path $DATA_PATH \
 --train_data f30k_precomp.en \

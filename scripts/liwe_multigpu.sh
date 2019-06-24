@@ -13,36 +13,48 @@ python train.py \
 --lr 6e-4 \
 --workers 1 \
 --text_encoder gru \
---ngpu $NGPUS \
---vocab_path vocab/f30k_vocab.json \
+--vocab_path vocab/complete.json \
 --early_stop 100 \
 --image_encoder hierarchical \
 --text_repr word \
---text_pooling mean \
+--text_pooling lens \
 
 
 
 export CUDA_VISIBLE_DEVICES=2
-export NGPUS=1
 
-# Single dataset
-# python -m torch.distributed.launch  --nproc_per_node=$NGPUS --master_port 9992 \
 python train.py \
 --data_path $DATA_PATH \
 --train_data f30k_precomp.en \
---val_data f30k_precomp.en \
---outpath $OUT_PATH/lavse/liwe_gru_1024_512/f30k_precomp.en/ \
+--val_data f30k_precomp.en m30k_precomp.de \
+--adapt_data m30k_precomp.en-de \
+--outpath $OUT_PATH/lavse/liwe_gru_384_384/m30k_precomp.en-de/ \
 --beta 0.991 \
 --lr 6e-4 \
 --workers 1 \
---text_encoder liwe_gru_1024_512 \
---ngpu $NGPUS \
+--text_encoder liwe_gru_384_384 \
 --vocab_path vocab/char.json \
 --early_stop 100 \
 --image_encoder hierarchical \
 --text_repr liwe \
---text_pooling mean \
+--text_pooling lens \
 
+
+
+python train.py \
+--data_path $DATA_PATH \
+--train_data m30k_precomp.de \
+--val_data m30k_precomp.de \
+--outpath $OUT_PATH/lavse/liwe_gru_384_384/m30k_precomp.de/ \
+--beta 0.991 \
+--lr 6e-4 \
+--workers 1 \
+--text_encoder liwe_gru_384_384 \
+--vocab_path vocab/char.json \
+--early_stop 100 \
+--image_encoder hierarchical \
+--text_repr liwe \
+--text_pooling lens \
 
 
 export CUDA_VISIBLE_DEVICES=0
@@ -52,13 +64,13 @@ export NGPUS=1
 # python -m torch.distributed.launch  --nproc_per_node=$NGPUS --master_port 9992 \
 python train.py \
 --data_path $DATA_PATH \
---train_data f30k_precomp.en \
---val_data f30k_precomp.en \
---outpath $OUT_PATH/lavse/liwe_convgru_256_256/f30k_precomp.en/ \
+--train_data coco_precomp.en \
+--val_data coco_precomp.en \
+--outpath $OUT_PATH/lavse/liwe_gru_384/coco_precomp.en/ \
 --beta 0.991 \
 --lr 6e-4 \
 --workers 1 \
---text_encoder liwe_convgru_256_256 \
+--text_encoder liwe_gru_384 \
 --ngpu $NGPUS \
 --vocab_path vocab/char.json \
 --early_stop 100 \

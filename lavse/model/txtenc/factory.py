@@ -117,7 +117,7 @@ __text_encoders__ = {
             'liwe_neurons': [128, 512],
         },
     },
-    'liwe_gru_384': {
+    'liwe_gru_384_384': {
         'class': txtenc.LiweGRU,
         'args': {
             'use_bi_gru': True,
@@ -135,6 +135,7 @@ __text_encoders__ = {
     },
 }
 
+__text_encoders__['liwe_gru_384'] = __text_encoders__['liwe_gru_384_384']
 
 def get_available_txtenc():
     return __text_encoders__.keys()

@@ -42,6 +42,11 @@ def restore_checkpoint(path, model=None, optimizer=False):
     for k, v in state_dict['model'].items():
         new_state[k.replace('module.', '')] = v
 
+    if model is None:
+        from ..model.model import LAVSE
+        model_params = state_dict['args']['model_args']
+        model = LAVSE(**model_params)
+
     model.load_state_dict(new_state)
     state_dict['model'] = model
 

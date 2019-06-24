@@ -125,7 +125,7 @@ def get_train_params():
         help='Number of epochs to update the learning rate.',
     )
     parser.add_argument(
-        '--workers', default=4, type=int,
+        '--workers', default=1, type=int,
         help='Number of data loader workers.',
     )
     parser.add_argument(

@@ -181,15 +181,13 @@ if __name__ == '__main__':
         max_violation=args.max_violation,
         weight=1.,
         beta=args.beta,
-        # initial_k=args.initial_k,
-        # increase_k=args.increase_k,
     )
 
     multilanguage_criterion = loss.ContrastiveLoss(
         margin=args.margin,
         max_violation=args.max_violation,
         weight=1.,
-        # initial_k=args.initial_k,
+        beta=args.beta,
     )
 
     # TODO: improve
