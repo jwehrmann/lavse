@@ -19,6 +19,20 @@ python train.py \
 --text_repr word \
 --text_pooling lens \
 
+python train.py \
+--data_path $DATA_PATH \
+--train_data m30k_precomp.en \
+--val_data m30k_precomp.en \
+--outpath $OUT_PATH/lavse/clmr_gru/m30k_precomp.en/ \
+--beta 0.991 \
+--lr 6e-4 \
+--workers 1 \
+--text_encoder gru \
+--vocab_path vocab/complete.json \
+--early_stop 100 \
+--image_encoder hierarchical \
+--text_repr word \
+--text_pooling lens \
 
 
 export CUDA_VISIBLE_DEVICES=2
@@ -70,6 +84,43 @@ python train.py \
 --image_encoder hierarchical \
 --text_repr liwe \
 --text_pooling lens \
+
+
+python train.py \
+--data_path $DATA_PATH \
+--train_data f30k_precomp.en \
+--val_data f30k_precomp.en \
+--outpath $OUT_PATH/iccv/lavse/liwe_gru_256_256_256/f30k_precomp.en/ \
+--beta 0.991 \
+--lr 6e-4 \
+--workers 1 \
+--text_encoder liwe_gru_256_256_256 \
+--vocab_path vocab/char.json \
+--early_stop 100 \
+--image_encoder hierarchical \
+--text_repr liwe \
+--text_pooling lens \
+
+
+
+python train.py \
+--data_path $DATA_PATH \
+--train_data f30k_precomp.en \
+--val_data f30k_precomp.en \
+--outpath $OUT_PATH/iccv/lavse/liwe_gru_256_512/f30k_precomp.en/ \
+--beta 0.991 \
+--lr 6e-4 \
+--workers 1 \
+--text_encoder liwe_gru_256_512 \
+--vocab_path vocab/char.json \
+--early_stop 100 \
+--image_encoder hierarchical \
+--text_repr liwe \
+--text_pooling lens \
+
+
+
+python test.py --data_path $DATA_PATH --model_path $OUT_PATH/iccv/results/liwe_gru_384/coco_precomp.en/best_model.pkl --val_data coco_precomp.en --vocab_path vocab/char.json --text_repr liwe --outpath results/liwe_gru_384_coco_precomp.en.json
 
 
 
