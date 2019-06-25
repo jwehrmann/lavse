@@ -40,6 +40,21 @@ python train.py \
 --text_pooling lens \
 
 
+python train.py \
+--data_path $DATA_PATH \
+--train_data coco_precomp.en \
+--val_data coco_precomp.en \
+--outpath $OUT_PATH/lavse/liwe_gru_512_512/coco_precomp.en/ \
+--beta 0.991 \
+--lr 6e-4 \
+--workers 0 \
+--text_encoder liwe_gru_512_512 \
+--vocab_path vocab/char.json \
+--early_stop 100 \
+--image_encoder hierarchical \
+--text_repr liwe \
+--text_pooling lens \
+
 
 python train.py \
 --data_path $DATA_PATH \
@@ -71,7 +86,7 @@ python train.py \
 --early_stop 100 \
 --image_encoder hierarchical \
 --text_repr liwe \
---text_pooling lens \
+--text_pooling mean \
 
 
 
