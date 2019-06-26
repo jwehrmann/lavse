@@ -19,11 +19,12 @@ python train.py \
 --text_repr word \
 --text_pooling lens \
 
+
 python train.py \
 --data_path $DATA_PATH \
---train_data m30k_precomp.en \
---val_data m30k_precomp.en \
---outpath $OUT_PATH/lavse/clmr_gru/m30k_precomp.en/ \
+--train_data m30k_precomp.de \
+--val_data m30k_precomp.de \
+--outpath $OUT_PATH/lavse/clmr_gru/m30k_precomp.de/ \
 --beta 0.991 \
 --lr 6e-4 \
 --workers 1 \

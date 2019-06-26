@@ -55,7 +55,18 @@ python train.py \
 --train_data coco_precomp.en \
 --val_data coco_precomp.en jap_precomp.jt \
 --adapt_data jap_precomp.en-jt \
---profile liwe_512 \
---outpath $OUT_PATH/lavse/liwe_512/coco_precomp.en_jap_precomp.jt/
+--profile liwe_384 \
+--outpath $OUT_PATH/lavse/liwe_384/coco_precomp.en-jt/
+--lr_decay_interval 10 \
+
+
+# Coco Adapt
+python train.py \
+--data_path $DATA_PATH \
+--train_data jap_precomp.en \
+--val_data jap_precomp.en jap_precomp.jt \
+--adapt_data jap_precomp.en-jt \
+--profile liwe_384 \
+--outpath $OUT_PATH/lavse/liwe_384/jap_precomp.en-jt/
 --lr_decay_interval 10 \
 

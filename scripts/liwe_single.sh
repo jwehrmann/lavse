@@ -14,8 +14,16 @@ python train.py \
 --data_path $DATA_PATH \
 --train_data jap_precomp.jt \
 --val_data jap_precomp.jt \
---profile liwe \
---outpath $OUT_PATH/lavse/liwe/jap_precomp.jt/
+--profile liwe_384 \
+--outpath $OUT_PATH/lavse/liwe_384/jap_precomp.jt/
+
+
+python train.py \
+--data_path $DATA_PATH \
+--train_data jap_precomp.jt \
+--val_data jap_precomp.jt \
+--profile liwe_512 \
+--outpath $OUT_PATH/lavse/liwe_512/jap_precomp.jt/
 
 
 python train.py \
