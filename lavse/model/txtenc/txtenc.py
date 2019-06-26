@@ -498,7 +498,8 @@ class LiweGRU(nn.Module):
         num_layers=1, use_bi_gru=True, no_txtnorm=False,
         rnn_cell=nn.GRU, partial_class=PartialConcat,
         liwe_neurons=[128, 256], liwe_dropout=0.0,
-        liwe_wnorm=True, liwe_char_dim=24,
+        liwe_wnorm=True, liwe_char_dim=24, liwe_activation=nn.ReLU(),
+        liwe_batch_norm=True,
     ):
 
         super(LiweGRU, self).__init__()
@@ -512,10 +513,12 @@ class LiweGRU(nn.Module):
             num_embeddings=num_embeddings, embed_dim=embed_dim,
             liwe_neurons=liwe_neurons, liwe_dropout=liwe_dropout,
             liwe_wnorm=liwe_wnorm, liwe_char_dim=liwe_char_dim,
+            liwe_activation=liwe_activation, liwe_batch_norm=liwe_batch_norm,
         )
 
         # caption embedding
         self.use_bi_gru = True
+
         self.rnn = nn.GRU(
             embed_dim, latent_size, 1,
             batch_first=True, bidirectional=True

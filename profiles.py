@@ -57,7 +57,7 @@ _profiles = {
         'margin': 0.2,
         'latent_size': 1024,
         'grad_clip': 2.,
-        'text_encoder': 'scan',
+        'text_encoder': 'gru',
         'image_encoder': 'scan',
         'text_pooling': 'none',
         'image_pooling': 'none',

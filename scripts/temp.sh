@@ -3,6 +3,42 @@
 # export CUDA_VISIBLE_DEVICES=0,1
 # export NGPUS=2
 
+
+
+python train.py \
+--data_path $DATA_PATH \
+--train_data f30k_precomp.en \
+--val_data f30k_precomp.en \
+--outpath $OUT_PATH/lavse/clmr_gru_max_violation/f30k_precomp.en/ \
+--beta 0.991 \
+--max_violation \
+--lr 6e-4 \
+--workers 0 \
+--text_encoder gru \
+--vocab_path vocab/complete.json \
+--early_stop 100 \
+--image_encoder hierarchical \
+--text_repr word \
+--text_pooling lens \
+
+
+python train.py \
+--data_path $DATA_PATH \
+--train_data f30k_precomp.en \
+--val_data f30k_precomp.en \
+--outpath $OUT_PATH/lavse/clmr_gru_sum_violation/f30k_precomp.en/ \
+--beta 1. \
+--lr 6e-4 \
+--workers 0 \
+--text_encoder gru \
+--vocab_path vocab/complete.json \
+--early_stop 100 \
+--image_encoder hierarchical \
+--text_repr word \
+--text_pooling lens \
+
+
+
 # python -m torch.distributed.launch --nproc_per_node=$NGPUS --master_port 9991 \
 # train.py \
 # --data_path $DATA_PATH \

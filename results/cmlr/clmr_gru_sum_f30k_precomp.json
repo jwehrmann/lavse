@@ -1,0 +1,15 @@
+{
+    "f30k_precomp.test.en/pred_time": 0.028048473061062396,
+    "f30k_precomp.test.en/sim_time": 0.16073063295334578,
+    "f30k_precomp.test.en/i2t_r1": 60.4,
+    "f30k_precomp.test.en/i2t_r5": 85.7,
+    "f30k_precomp.test.en/i2t_r10": 92.2,
+    "f30k_precomp.test.en/i2t_medr": 1.0,
+    "f30k_precomp.test.en/i2t_meanr": 6.975,
+    "f30k_precomp.test.en/t2i_r1": 43.78,
+    "f30k_precomp.test.en/t2i_r5": 74.12,
+    "f30k_precomp.test.en/t2i_r10": 83.28,
+    "f30k_precomp.test.en/t2i_medr": 2.0,
+    "f30k_precomp.test.en/t2i_meanr": 14.618,
+    "f30k_precomp.test.en/rsum": 439.48
+}

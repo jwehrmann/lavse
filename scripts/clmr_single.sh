@@ -19,7 +19,7 @@ python train.py \
 --outpath $OUT_PATH/lavse/clmr/m30k_precomp.de/
 
 
-python test.py --data_path $DATA_PATH --model_path $OUT_PATH/ --val_data jap_precomp.jt --vocab_path vocab/complete.json --text_repr word --outpath results/liwe_gru_384_coco_precomp.en.json
+python test.py --data_path $DATA_PATH --model_path $OUT_PATH/ --val_data jap_precomp.jt --vocab_path vocab/complete.json --text_repr word --outpath results/
 
 
 python train.py \

@@ -3,6 +3,17 @@ from . import embedding
 from . import pooling
 import torch.nn as nn
 
+import torch
+import math
+
+
+class GELU(nn.Module):
+    """
+    Paper Section 3.4, last paragraph notice that BERT used the GELU instead of RELU
+    """
+
+    def forward(self, x):
+        return 0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
 
 __text_encoders__ = {
     'gru': {
@@ -68,11 +79,29 @@ __text_encoders__ = {
             'use_bi_gru': True,
         },
     },
+    'liwe_gru_scale_384': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'partial_class': embedding.PartialConcatScale,
+            'liwe_activation': GELU(),
+            'liwe_batch_norm': True,
+            'liwe_neurons': [384, 384],
+            # 'liwe_dropout': 0.1,
+        },
+    },
     'liwe_gru_gru': {
         'class': txtenc.LiweGRU,
         'args': {
             'use_bi_gru': True,
             'partial_class': embedding.PartialGRUs,
+        },
+    },
+    'liwe_gru_gru_proj': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'partial_class': embedding.PartialGRUProj,
         },
     },
     'liwe_gru_256': {
