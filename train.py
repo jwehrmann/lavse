@@ -107,6 +107,8 @@ if __name__ == '__main__':
     )
 
     model = model.LAVSE(**model_params)#.to(device)
+    logger.info(model)
+
     is_master = (args.local_rank == 0)
 
     # Distribute across distinct process on various GPUS
@@ -148,6 +150,7 @@ if __name__ == '__main__':
             f"keys: {checkpoint.keys()}"
         ))
 
+
     if args.data_parallel:
         model.set_devices_(
             ['cuda:3'], ['cuda:0','cuda:1','cuda:2'], 'cuda:3'
@@ -179,15 +182,13 @@ if __name__ == '__main__':
         max_violation=args.max_violation,
         weight=1.,
         beta=args.beta,
-        # initial_k=args.initial_k,
-        # increase_k=args.increase_k,
     )
 
     multilanguage_criterion = loss.ContrastiveLoss(
         margin=args.margin,
         max_violation=args.max_violation,
         weight=1.,
-        # initial_k=args.initial_k,
+        beta=args.beta,
     )
 
     # TODO: improve

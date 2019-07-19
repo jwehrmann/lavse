@@ -220,56 +220,43 @@ class ImageProj(nn.Module):
 
 
 
-class SAImgEncoder(nn.Module):
+class MultiheadAttentionEncoder(nn.Module):
 
     def __init__(
-            self, img_dim, latent_size,
+            self, img_dim, latent_size, dropout=0.
         ):
-        super(SAImgEncoder, self).__init__()
+        super(MultiheadAttentionEncoder, self).__init__()
         self.latent_size = latent_size
 
-        self.sa1 = attention.SelfAttention(img_dim, nn.LeakyReLU(0.1))
-        self.sa2 = attention.SelfAttention(latent_size, nn.LeakyReLU(0.1))
-        self.sa3 = attention.SelfAttention(latent_size, nn.LeakyReLU(0.1))
-        self.sa4 = attention.SelfAttention(latent_size, activation=lambda x: x)
-
         self.fc1 = nn.Sequential(*[
-            nn.Conv1d(img_dim, latent_size, 1,),
-            nn.LeakyReLU(0.1, ),
+            nn.Conv1d(img_dim, img_dim//4, 1,),
+            nn.BatchNorm1d(img_dim//4),
+            nn.LeakyReLU(0.1),
+            nn.Dropout(dropout),
         ])
-        # self.fc2 = nn.Sequential(*[
-        #     nn.Conv1d(latent_size, latent_size, 1,),
-        #     nn.LeakyReLU(0.1, ),
-        # ])
-        # self.fc3 = nn.Sequential(*[
-        #     nn.Conv1d(latent_size, latent_size, 1,),
-        #     nn.LeakyReLU(0.1, ),
-        # ])
+
+        self.multihead = attention.MultiHeadAttention(
+            img_dim//4, h=4, k=4, r=4,
+            inner_activation=nn.LeakyReLU(0.1),
+            dropout=dropout
+        )
+
+        self.fc2 = nn.Sequential(*[
+            nn.Conv1d(img_dim//4, latent_size, 1,),
+            nn.LeakyReLU(0.1),
+        ])
 
         self.apply(default_initializer)
 
     def forward(self, images):
         """Extract image feature vectors."""
         x = images.permute(0, 2, 1)
+        a = self.fc1(x)
+        a = self.multihead(a)
+        a = self.fc2(a)
+        a = a.permute(0, 2, 1)
 
-        a = self.fc1(self.sa1(x))
-        # print(x.shape)
-
-        b = self.sa2(a)
-        # print(x.shape)
-        b = b + a
-        c = self.sa2(b)
-        c = c + b
-
-        d = self.sa3(b)
-        x = d + c
-
-        # c = self.fc3(self.sa3(b))
-        # x = c + b
-
-        x = x.permute(0, 2, 1)
-
-        return x
+        return a
 
     def load_state_dict(self, state_dict):
         """Copies parameters. overwritting the default one to
@@ -279,65 +266,32 @@ class SAImgEncoder(nn.Module):
             state_dict=state_dict, own_state=self.state_dict()
         )
 
-        super(SAImgEncoder, self).load_state_dict(new_state)
+        super(MultiheadAttentionEncoder, self).load_state_dict(new_state)
 
 
 
-class SAGRUImgEncoder(nn.Module):
+class GRUImgEncoder(nn.Module):
 
     def __init__(
             self, img_dim, latent_size,
         ):
-        super(SAGRUImgEncoder, self).__init__()
+        super(GRUImgEncoder, self).__init__()
         self.latent_size = latent_size
 
-        self.proj = nn.Conv1d(img_dim, latent_size, 1, )
-        self.sa1 = attention.SelfAttention(latent_size, nn.LeakyReLU(0.1))
-        self.sa2 = attention.SelfAttention(latent_size, nn.LeakyReLU(0.1))
-
-        self.gru = nn.GRU(latent_size, latent_size, 1,
+        self.gru = nn.GRU(img_dim, latent_size, 1,
             batch_first=True, bidirectional=True)
-
-        self.projection = nn.Sequential(*[
-            nn.Conv1d(1024*2, latent_size, 1, ),
-            nn.LeakyReLU(0.1, ),
-        ])
-
-        # self.fc2 = nn.Sequential(*[
-        #     nn.Conv1d(latent_size, latent_size, 1,),
-        #     nn.LeakyReLU(0.1, ),
-        # ])
-        # self.fc3 = nn.Sequential(*[
-        #     nn.Conv1d(latent_size, latent_size, 1,),
-        #     nn.LeakyReLU(0.1, ),
-        # ])
 
         self.apply(default_initializer)
 
     def forward(self, images):
         """Extract image feature vectors."""
-        x = self.proj(images.permute(0, 2, 1))
 
-        feat = self.sa1(x)
-
-        a, _ = self.gru(feat.permute(0, 2, 1))
-
-        b, t, d = a.shape
-        a = a.view(b, t, 2, d//2).mean(-2)
-
-        a = a.permute(0, 2, 1)
-        # print(x.shape)
-        b = self.sa2(a)
-
-        x = torch.cat([feat, b], dim=1)
-        x = self.projection(x)
-        # c = self.fc3(self.sa3(b))
-        # x = c + b
-
-        x = x.permute(0, 2, 1)
+        x, _ = self.gru(images)
+        b, t, d = x.shape
+        x = x.view(b, t, 2, d//2).mean(-2)
 
         # if not self.no_txtnorm:
-        x = l2norm(x, dim=-1)
+        #     x = l2norm(x, dim=-1)
 
         return x
 

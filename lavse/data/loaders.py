@@ -21,13 +21,6 @@ def prepare_ml_data(instance, device):
     return targ_a, lens_a, targ_b, lens_b, ids
 
 
-def prepare_mm_data(instance, device):
-    images, captions, lengths, ids = instance
-    images = images.to(device)
-    captions = captions.to(device).long()
-    return images, captions, lengths, ids
-
-
 class DataIterator:
 
     def __init__(self, loader, device, non_stop=False):
@@ -36,8 +29,6 @@ class DataIterator:
         self.non_stop = non_stop
         self.device = device
 
-        self.cross_language = isinstance(loader.dataset, CrossLanguageLoader)
-
     def __str__(self):
         return f'{self.loader.dataset.data_name}.{self.loader.dataset.data_split}'
 
@@ -45,24 +36,15 @@ class DataIterator:
         try:
             instance = next(self.data_iter)
 
-            if self.cross_language:
-                targ_a, lens_a, targ_b, lens_b, ids = prepare_ml_data(instance, self.device)
-                logger.debug((
-                    f'DataIter - CrossLang - Images: {targ_a.shape} '
-                    f'DataIter - CrossLang - Target: {targ_a.shape} '
-                    f'DataIter - CrossLang - Ids: {ids[:10]}\n'
-                ))
-                return targ_a, lens_a, targ_b, lens_b, ids
-
-            images, captions, lengths, ids = prepare_mm_data(instance, self.device)
-            #  = prepare_ml_data(instance, self.device)
+            targ_a, lens_a, targ_b, lens_b, ids = prepare_ml_data(
+                instance, self.device
+            )
             logger.debug((
-                f'DataIter - Precomp - Images: {images.shape} {images.mean()} '
-                f'DataIter - Precomp - Target: {captions.shape} '
-                f'DataIter - Precomp - Lens: {np.sum(lengths)} '
-                f'DataIter - Precomp - Ids: {ids[:10]}\n'
+                f'DataIter - CrossLang - Images: {targ_a.shape} '
+                f'DataIter - CrossLang - Target: {targ_a.shape} '
+                f'DataIter - CrossLang - Ids: {ids[:10]}\n'
             ))
-            return images, captions, lengths, ids
+            return targ_a, lens_a, targ_b, lens_b, ids
 
         except StopIteration:
             if self.non_stop:

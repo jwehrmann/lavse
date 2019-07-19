@@ -5,9 +5,10 @@ import torch
 
 import profiles
 from addict import Dict
-from lavse import imgenc, loss, train, txtenc
-from lavse.data import get_loader, get_loaders
-from lavse.model import LAVSE
+from lavse.model import imgenc, loss, txtenc
+from lavse.model.model import LAVSE
+from lavse.train import train
+from lavse.data.loaders import get_loader, get_loaders
 from lavse.utils.logger import create_logger
 from lavse.utils import helper, file_utils
 
@@ -37,7 +38,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         '--text_repr', default='word', type=str,
-        help='Device to ', 
+        help='Device to ',
     )
     parser.add_argument(
         '--device', default='cuda:0', type=str,
@@ -89,16 +90,21 @@ if __name__ == '__main__':
     device = torch.device(args.device)
 
     checkpoint = helper.restore_checkpoint(args.model_path)
+    model = checkpoint['model'].to(device)
     model_params = checkpoint['args']['model_args']
 
-    model = LAVSE(**model_params).to(device)
-    model.load_state_dict(checkpoint['model'])
+    # model = LAVSE(**model_params).to(device)
+    # model.load_state_dict(checkpoint['model'])
     print(model)
+
+    model.set_master_(True)
+    model.set_devices_(['cuda'], ['cuda'], 'cuda')
 
     trainer = train.Trainer(
         model=model,
         device=device,
         args={'args': args, 'model_args': model_params},
+        master=True,
     )
 
     result, rs = trainer.evaluate_loaders(

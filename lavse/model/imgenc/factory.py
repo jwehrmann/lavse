@@ -11,16 +11,24 @@ _image_encoders = {
             'img_dim': 2048,
         },
     },
-    'sa': {
-        'class': precomp.SAImgEncoder,
+    'multihead': {
+        'class': precomp.MultiheadAttentionEncoder,
+        'args': {
+            'img_dim': 2048,
+            'dropout': 0.1,
+        },
+    },
+    'img_gru': {
+        'class': precomp.GRUImgEncoder,
         'args': {
             'img_dim': 2048,
         },
     },
-    'sagru': {
-        'class': precomp.SAGRUImgEncoder,
+    'img_gru_k8': {
+        'class': precomp.GRUImgEncoder,
         'args': {
             'img_dim': 2048,
+            'k': 8,
         },
     },
     'scan': {

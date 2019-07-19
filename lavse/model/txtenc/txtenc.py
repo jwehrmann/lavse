@@ -25,7 +25,6 @@ class EncoderText(nn.Module):
         # word embedding
         self.embed = nn.Embedding(num_embeddings, embed_dim)
 
-        # caption embedding
         self.use_bi_gru = use_bi_gru
         self.rnn = nn.GRU(embed_dim, latent_size, num_layers, batch_first=True, bidirectional=use_bi_gru)
 
@@ -498,7 +497,8 @@ class LiweGRU(nn.Module):
         num_layers=1, use_bi_gru=True, no_txtnorm=False,
         rnn_cell=nn.GRU, partial_class=PartialConcat,
         liwe_neurons=[128, 256], liwe_dropout=0.0,
-        liwe_wnorm=True, liwe_char_dim=24,
+        liwe_wnorm=True, liwe_char_dim=24, liwe_activation=nn.ReLU(),
+        liwe_batch_norm=True,
     ):
 
         super(LiweGRU, self).__init__()
@@ -512,10 +512,12 @@ class LiweGRU(nn.Module):
             num_embeddings=num_embeddings, embed_dim=embed_dim,
             liwe_neurons=liwe_neurons, liwe_dropout=liwe_dropout,
             liwe_wnorm=liwe_wnorm, liwe_char_dim=liwe_char_dim,
+            liwe_activation=liwe_activation, liwe_batch_norm=liwe_batch_norm,
         )
 
         # caption embedding
         self.use_bi_gru = True
+
         self.rnn = nn.GRU(
             embed_dim, latent_size, 1,
             batch_first=True, bidirectional=True
@@ -536,6 +538,117 @@ class LiweGRU(nn.Module):
         if self.use_bi_gru:
             b, t, d = cap_emb.shape
             cap_emb = cap_emb.view(b, t, 2, d//2).mean(-2)
+
+        if not self.no_txtnorm:
+            cap_emb = l2norm(cap_emb, dim=-1)
+
+        return cap_emb, lens
+
+
+
+class LiweConvGRU(nn.Module):
+
+    def __init__(
+        self,
+        num_embeddings, embed_dim, latent_size,
+        num_layers=1, use_bi_gru=True, no_txtnorm=False,
+        rnn_cell=nn.GRU, partial_class=PartialConcat,
+        liwe_neurons=[128, 256], liwe_dropout=0.0,
+        liwe_wnorm=True, liwe_char_dim=24,
+    ):
+
+        super(LiweConvGRU, self).__init__()
+
+        __max_char_in_words = 30
+        self.latent_size = latent_size
+        self.embed_dim = embed_dim
+        self.no_txtnorm = no_txtnorm
+
+        self.embed = partial_class(
+            num_embeddings=num_embeddings, embed_dim=embed_dim,
+            liwe_neurons=liwe_neurons, liwe_dropout=liwe_dropout,
+            liwe_wnorm=liwe_wnorm, liwe_char_dim=liwe_char_dim,
+        )
+
+        # caption embedding
+        self.use_bi_gru = True
+        self.rnn = nn.GRU(
+            embed_dim, latent_size, 1,
+            batch_first=True, bidirectional=True
+        )
+
+        self.conv1 = convblocks.ConvBlock(
+            in_channels=embed_dim,
+            out_channels=latent_size,
+            kernel_size=1,
+            padding=0,
+        )
+        self.conv2 = convblocks.ConvBlock(
+            in_channels=embed_dim,
+            out_channels=latent_size,
+            kernel_size=2,
+            padding=1,
+        )
+        self.conv3 = convblocks.ConvBlock(
+            in_channels=embed_dim,
+            out_channels=latent_size,
+            kernel_size=3,
+            padding=2,
+        )
+
+        activation = nn.LeakyReLU()
+
+        self.sa1 = attention.SelfAttention(latent_size, activation)
+        self.sa2 = attention.SelfAttention(latent_size, activation)
+        self.sa3 = attention.SelfAttention(latent_size, activation)
+        self.sa4 = attention.SelfAttention(latent_size, activation)
+
+        # self.fc = nn.Linear(
+        #     1024*4,
+        #     latent_size
+        # )
+
+        self.fc = nn.Sequential(*[
+            nn.Conv1d(latent_size*4, latent_size, 1, ),
+            nn.LeakyReLU(0.1, ),
+        ])
+
+        self.apply(default_initializer)
+
+    def forward(self, x, lens=None):
+
+        B, W, Ct = x.size()
+        b, t, e = x.shape
+
+
+        word_embed = self.embed(x).contiguous()
+        x = word_embed.permute(0, 2, 1).contiguous()
+
+        # Forward propagate RNN
+        cap_emb, _ = self.rnn(x)
+
+        # Reshape *final* output to (batch_size, hidden_size)
+
+        if self.use_bi_gru:
+            b, t, d = cap_emb.shape
+            cap_emb = cap_emb.view(b, t, 2, d//2).mean(-2)
+
+        xt = x.permute(0, 2, 1)
+        a = self.conv1(xt)[:,:,:t]
+        a = self.sa2(a)
+
+        b = self.conv2(xt)[:,:,:t]
+        b = self.sa3(b)
+
+        c = self.conv3(xt)[:,:,:t]
+        c = self.sa4(b)
+
+        d = cap_emb.permute(0, 2, 1)
+        d = self.sa1(d)
+
+        cap_emb = torch.cat([a, b, c, d], 1)
+        cap_emb = self.fc(cap_emb)
+        cap_emb = cap_emb.permute(0, 2, 1)
 
         if not self.no_txtnorm:
             cap_emb = l2norm(cap_emb, dim=-1)

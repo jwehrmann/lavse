@@ -1,0 +1,15 @@
+{
+    "coco_precomp.testall.en/pred_time": 2.2617328650085256,
+    "coco_precomp.testall.en/sim_time": 1063.9421409469796,
+    "coco_precomp.testall.en/i2t_r1": 45.92,
+    "coco_precomp.testall.en/i2t_r5": 75.6,
+    "coco_precomp.testall.en/i2t_r10": 85.3,
+    "coco_precomp.testall.en/i2t_medr": 2.0,
+    "coco_precomp.testall.en/i2t_meanr": 7.399,
+    "coco_precomp.testall.en/t2i_r1": 35.044,
+    "coco_precomp.testall.en/t2i_r5": 65.708,
+    "coco_precomp.testall.en/t2i_r10": 77.48,
+    "coco_precomp.testall.en/t2i_medr": 3.0,
+    "coco_precomp.testall.en/t2i_meanr": 19.53108,
+    "coco_precomp.testall.en/rsum": 385.052
+}

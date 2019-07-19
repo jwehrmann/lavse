@@ -84,7 +84,7 @@ class ContrastiveLoss(nn.Module):
         # clear diagonals
         mask = torch.eye(scores.size(0)) > .5
         I = mask#.cuda()
-
+        I = I.to(cost_s.device)
         cost_s = cost_s.masked_fill_(I, 0)
         cost_im = cost_im.masked_fill_(I, 0)
 

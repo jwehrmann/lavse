@@ -1,18 +1,29 @@
+export OUT_PATH=/opt/jonatas/runs/iccv/
+export DATA_PATH=/opt/jonatas/datasets/lavse/
+
 # Single dataset
 python train.py \
 --data_path $DATA_PATH \
 --train_data f30k_precomp.en \
 --val_data f30k_precomp.en \
 --profile liwe \
---outpath $OUT_PATH/lavse/liwe/f30k_precomp.en/
+--outpath $OUT_PATH/lavse/liwe/f30k_precomp.en/ \
 
 
 python train.py \
 --data_path $DATA_PATH \
 --train_data jap_precomp.jt \
 --val_data jap_precomp.jt \
---profile liwe \
---outpath $OUT_PATH/lavse/liwe/jap_precomp.jt/
+--profile liwe_384 \
+--outpath $OUT_PATH/lavse/liwe_384/jap_precomp.jt/
+
+
+python train.py \
+--data_path $DATA_PATH \
+--train_data jap_precomp.jt \
+--val_data jap_precomp.jt \
+--profile liwe_512 \
+--outpath $OUT_PATH/lavse/liwe_512/jap_precomp.jt/
 
 
 python train.py \

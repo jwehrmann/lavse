@@ -1,6 +1,19 @@
 from . import txtenc
+from . import embedding
 from . import pooling
 import torch.nn as nn
+
+import torch
+import math
+
+
+class GELU(nn.Module):
+    """
+    Paper Section 3.4, last paragraph notice that BERT used the GELU instead of RELU
+    """
+
+    def forward(self, x):
+        return 0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
 
 
 __text_encoders__ = {
@@ -9,7 +22,6 @@ __text_encoders__ = {
         'args': {
             'use_bi_gru': True,
             'rnn_type': nn.GRU,
-
         },
     },
     'scan': {
@@ -67,6 +79,134 @@ __text_encoders__ = {
             'use_bi_gru': True,
         },
     },
+    'liwe_gru_scale_384_relu': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'partial_class': embedding.PartialConcatScale,
+            'liwe_activation': nn.ReLU(),
+            # 'liwe_activation': GELU(),
+            'liwe_batch_norm': True,
+            'liwe_neurons': [384, 384],
+            # 'liwe_dropout': 0.1,
+        },
+    },
+    'liwe_gru_scale_384_gelu_nobn': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'partial_class': embedding.PartialConcatScale,
+            # 'liwe_activation': nn.ReLU(),
+            'liwe_activation': GELU(),
+            'liwe_batch_norm': False,
+            'liwe_neurons': [384, 384],
+            # 'liwe_dropout': 0.1,
+        },
+    },
+    'liwe_gru_gru': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'partial_class': embedding.PartialGRUs,
+        },
+    },
+    'liwe_gru_gru_proj': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'partial_class': embedding.PartialGRUProj,
+        },
+    },
+    'liwe_gru_256': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [256, 256],
+        },
+    },
+    'liwe_gru_128_384': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [128, 384],
+        },
+    },
+    'liwe_convgru_256_256': {
+        'class': txtenc.LiweConvGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [256, 256],
+        },
+    },
+    'liwe_gru_256_256_256': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [256, 256, 256],
+        },
+    },
+    'liwe_gru_256_512': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [256, 512,],
+        },
+    },
+    'liwe_convgru_384_384': {
+        'class': txtenc.LiweConvGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [384, 384],
+        },
+    },
+    'liwe_gru_384_384_gelu': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [384, 384],
+            'partial_class': embedding.PartialConcat,
+            'liwe_activation': GELU(),
+            'liwe_batch_norm': False,
+        },
+    },
+    'liwe_gru_384_384_gelu_withbn': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [384, 384],
+            'partial_class': embedding.PartialConcat,
+            'liwe_activation': GELU(),
+            'liwe_batch_norm': True,
+        },
+    },
+    'liwe_gru_512_512': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [512, 512],
+        },
+    },
+    'liwe_gru_1024_512': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [1024, 512],
+        },
+    },
+    'liwe_gru_128_512': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [128, 512],
+        },
+    },
+    'liwe_gru_384_384': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [384, 384],
+        },
+    },
     'emb_proj': {
         'class': txtenc.WordEmbeddingProj,
         'args': {
@@ -78,6 +218,7 @@ __text_encoders__ = {
     },
 }
 
+__text_encoders__['liwe_gru_384'] = __text_encoders__['liwe_gru_384_384']
 
 def get_available_txtenc():
     return __text_encoders__.keys()

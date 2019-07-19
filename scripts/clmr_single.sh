@@ -19,12 +19,15 @@ python train.py \
 --outpath $OUT_PATH/lavse/clmr/m30k_precomp.de/
 
 
+python test.py --data_path $DATA_PATH --model_path $OUT_PATH/ --val_data jap_precomp.jt --vocab_path vocab/complete.json --text_repr word --outpath results/
+
+
 python train.py \
 --data_path $DATA_PATH \
 --train_data jap_precomp.jt \
 --val_data jap_precomp.jt \
---profile clmr \
---outpath $OUT_PATH/lavse/clmr/jap_precomp.jt/
+--profile clmr_gru \
+--outpath $OUT_PATH/lavse/clmr_gru/jap_precomp.jt/
 
 
 python train.py \
