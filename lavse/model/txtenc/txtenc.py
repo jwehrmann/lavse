@@ -25,7 +25,6 @@ class EncoderText(nn.Module):
         # word embedding
         self.embed = nn.Embedding(num_embeddings, embed_dim)
 
-        # caption embedding
         self.use_bi_gru = use_bi_gru
         self.rnn = nn.GRU(embed_dim, latent_size, num_layers, batch_first=True, bidirectional=use_bi_gru)
 

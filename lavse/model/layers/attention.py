@@ -60,6 +60,61 @@ class SelfAttention(nn.Module):
         return out, attention
 
 
+
+class MultiHeadAttention(nn.Module):
+
+    def __init__(
+            self, input_dim, h=8,
+            k=8, r=8, inner_activation=nn.Identity(),
+            dropout=0.1
+        ):
+        super(MultiHeadAttention, self).__init__()
+
+        self.num_heads = h
+        if inner_activation is None:
+            inner_activation = nn.Identity()
+
+        self_attentions = []
+        for i in range(h):
+            sa = SelfAttention(input_dim, inner_activation, k=k)
+            self_attentions.append(sa)
+
+        self.fcs = nn.Sequential(
+            nn.Linear(input_dim, input_dim//r, 1),
+            # nn.BatchNorm1d(input_dim//r//h),
+            nn.ReLU(inplace=True),
+            nn.Dropout(dropout),
+            nn.Linear(input_dim//r, input_dim // h, 1),
+            # nn.BatchNorm1d(input_dim//h),
+            nn.ReLU(inplace=True),
+            nn.Dropout(dropout),
+        )
+        self.inner_size = input_dim // h
+
+        self.self_attentions = nn.ModuleList(self_attentions)
+
+    def forward(self, x):
+        """Extract image feature vectors."""
+        residual = x
+
+        outs = []
+        for sa in self.self_attentions:
+            _x = sa(x)
+            outs.append(_x)
+
+        out = torch.stack(outs, 2)
+        b, d, heads, regions = out.shape
+
+        out = out.view(out.shape[0], out.shape[1], -1).permute(0, 2, 1)
+        out = self.fcs(out)
+        out = out.permute(0, 2, 1).contiguous()
+        out = out.view(b, self.inner_size * self.num_heads, regions)
+
+        out = out + residual
+
+        return out
+
+
 class ModuleSelfAttention(nn.Module):
 
     """ Self attention Layer """

@@ -150,6 +150,7 @@ if __name__ == '__main__':
             f"keys: {checkpoint.keys()}"
         ))
 
+
     if args.data_parallel:
         model.set_devices_(
             ['cuda:3'], ['cuda:0','cuda:1','cuda:2'], 'cuda:3'

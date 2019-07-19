@@ -129,8 +129,8 @@ class PrecompDataset(Dataset):
         else:
             self.im_div = 1
         # the development set for coco is large and so validation would be slow
-        if data_split == 'dev' and self.length > 5000:
-            self.length = 5000
+        # if data_split == 'dev' and self.length > 5000:
+        #     self.length = 5000
 
         print('Image div', self.im_div)
 

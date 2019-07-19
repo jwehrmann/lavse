@@ -15,13 +15,13 @@ class GELU(nn.Module):
     def forward(self, x):
         return 0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
 
+
 __text_encoders__ = {
     'gru': {
         'class': txtenc.RNNEncoder,
         'args': {
             'use_bi_gru': True,
             'rnn_type': nn.GRU,
-
         },
     },
     'scan': {
@@ -79,13 +79,26 @@ __text_encoders__ = {
             'use_bi_gru': True,
         },
     },
-    'liwe_gru_scale_384': {
+    'liwe_gru_scale_384_relu': {
         'class': txtenc.LiweGRU,
         'args': {
             'use_bi_gru': True,
             'partial_class': embedding.PartialConcatScale,
-            'liwe_activation': GELU(),
+            'liwe_activation': nn.ReLU(),
+            # 'liwe_activation': GELU(),
             'liwe_batch_norm': True,
+            'liwe_neurons': [384, 384],
+            # 'liwe_dropout': 0.1,
+        },
+    },
+    'liwe_gru_scale_384_gelu_nobn': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'partial_class': embedding.PartialConcatScale,
+            # 'liwe_activation': nn.ReLU(),
+            'liwe_activation': GELU(),
+            'liwe_batch_norm': False,
             'liwe_neurons': [384, 384],
             # 'liwe_dropout': 0.1,
         },
@@ -144,6 +157,26 @@ __text_encoders__ = {
         'args': {
             'use_bi_gru': True,
             'liwe_neurons': [384, 384],
+        },
+    },
+    'liwe_gru_384_384_gelu': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [384, 384],
+            'partial_class': embedding.PartialConcat,
+            'liwe_activation': GELU(),
+            'liwe_batch_norm': False,
+        },
+    },
+    'liwe_gru_384_384_gelu_withbn': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+            'liwe_neurons': [384, 384],
+            'partial_class': embedding.PartialConcat,
+            'liwe_activation': GELU(),
+            'liwe_batch_norm': True,
         },
     },
     'liwe_gru_512_512': {

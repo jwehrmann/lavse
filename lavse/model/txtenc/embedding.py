@@ -12,7 +12,10 @@ class PartialConcat(nn.Module):
             liwe_neurons=[128, 256],
             liwe_dropout=0.0,
             liwe_wnorm=True,
-            max_chars = 26
+            liwe_batch_norm=True,
+            liwe_activation=nn.ReLU(inplace=True),
+            max_chars = 26,
+            **kwargs
         ):
         super(PartialConcat, self).__init__()
 
@@ -24,10 +27,13 @@ class PartialConcat(nn.Module):
         liwe_neurons = liwe_neurons + [embed_dim]
         in_sizes = [liwe_char_dim * max_chars] + liwe_neurons
 
-        if not liwe_wnorm:
-            weight_norm = lambda x: x
-        else:
+        weight_norm = nn.Identity
+        if liwe_wnorm:
             from torch.nn.utils import weight_norm
+
+        batch_norm = nn.BatchNorm1d
+        if not liwe_batch_norm:
+            batch_norm = nn.Identity
 
         for n, i in zip(liwe_neurons, in_sizes):
             layer = nn.Sequential(*[
@@ -35,8 +41,8 @@ class PartialConcat(nn.Module):
                     nn.Conv1d(i, n, 1)
                 ),
                 nn.Dropout(liwe_dropout),
-                nn.BatchNorm1d(n),
-                nn.ReLU(inplace=True),
+                batch_norm(n),
+                liwe_activation,
             ])
             layers.append(layer)
 
@@ -121,7 +127,13 @@ class PartialConcatScale(nn.Module):
         ):
         super(PartialConcatScale, self).__init__()
 
-        self.embed = nn.Embedding(num_embeddings, liwe_char_dim)
+
+        if not liwe_wnorm:
+            weight_norm = nn.Identity
+        else:
+            from torch.nn.utils import weight_norm
+
+        self.embed = weight_norm(nn.Embedding(num_embeddings, liwe_char_dim))
         self.embed_dim = embed_dim
         self.max_chars = max_chars
         self.total_embed_size = liwe_char_dim * max_chars
@@ -129,11 +141,6 @@ class PartialConcatScale(nn.Module):
         layers = []
         liwe_neurons = liwe_neurons + [embed_dim]
         in_sizes = [liwe_char_dim * max_chars] + liwe_neurons
-
-        if not liwe_wnorm:
-            weight_norm = nn.Identity
-        else:
-            from torch.nn.utils import weight_norm
 
         batch_norm = nn.BatchNorm1d
         if not liwe_batch_norm:
