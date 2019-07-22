@@ -57,18 +57,18 @@ def restore_checkpoint(path, model=None, optimizer=False):
     return state_dict
 
 
-def adjust_learning_rate(
-    optimizer, epoch, initial_lr,
-    interval=1, decay=0.
-):
+# def adjust_learning_rate(
+#     optimizer, epoch, initial_lr,
+#     interval=1, decay=0.
+# ):
 
-    lr = initial_lr * (decay ** (epoch // interval))
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
-        if 'name' in param_group:
-            param_group['lr'] = lr
+#     lr = initial_lr * (decay ** (epoch // interval))
+#     for param_group in optimizer.param_groups:
+#         param_group['lr'] = lr
+#         if 'name' in param_group:
+#             param_group['lr'] = lr
 
-    return lr
+#     return lr
 
 
 def get_tb_writer(logger_path):

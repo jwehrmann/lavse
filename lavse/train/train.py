@@ -20,6 +20,8 @@ from ..data.loaders import DataIterator
 from ..model.loss import cosine_sim, cosine_sim_numpy
 from ..utils import helper, layers, logger
 from .evaluation import i2t, t2i
+from .lr_scheduler import get_scheduler
+
 
 torch.manual_seed(0)
 random.seed(0, version=2)
@@ -51,15 +53,11 @@ class Trainer:
         ml_criterion=None,
         optimizer=torch.optim.Adam,
         lr=1e-3,
-        cnn_lr_factor=0.1,
-        lr_decay_rate=0.1,
-        lr_decay_interval=15,
+        lr_scheduler=None,
         clip_grad=2.,
-        log_histograms=True,
-        log_grad_norm=True,
+        log_histograms=False,
+        log_grad_norm=False,
         early_stop=50,
-        save_all=False,
-        finetune_convnet=False,
         **kwargs
     ):
 
@@ -67,28 +65,21 @@ class Trainer:
         total_params = 0
         nb_trainable_params = 0
         trainable_params = []
-        for k, v in self.model.named_parameters():
-            total_params += np.product(tuple(v.shape))
-            if 'img_enc' in k and 'cnn' in k:
-                if not finetune_convnet:
-                    v.requires_grad = False
-                continue
-            if v.requires_grad:
-                nb_trainable_params += np.product(tuple(v.shape))
-                trainable_params.append(v)
 
+        trainable_params = [x for x in self.model.parameters() if x.requires_grad]
 
         self.optimizer = optimizer(
-            trainable_params, lr, **kwargs
+            trainable_params, lr
         )
 
-        if finetune_convnet:
-            _params = self.model.img_enc.module.cnn.parameters()
-            self.optimizer.add_param_group({
-                'params': _params,
-                'lr': lr * cnn_lr_factor,
-                'name': 'cnn',
-            })
+        print(lr_scheduler)
+        print(lr_scheduler.name)
+
+        scheduler = get_scheduler(
+            optimizer=self.optimizer,
+            name=lr_scheduler.name,
+            **lr_scheduler.params,
+        )
 
         count_params = lambda p: np.sum([
             np.product(tuple(x.shape)) for x in p
@@ -112,8 +103,7 @@ class Trainer:
         # self.mm_criterion = mm_criterion
         self.ml_criterion = ml_criterion
         self.initial_lr = lr
-        self.lr_decay_rate = lr_decay_rate
-        self.lr_decay_interval = lr_decay_interval
+        self.lr_scheduler = scheduler
         self.clip_grad = clip_grad
         self.log_histograms = log_histograms
         self.log_grad_norm = log_grad_norm
@@ -121,7 +111,6 @@ class Trainer:
         self.best_val = 0
         self.count = early_stop
         self.early_stop = early_stop
-        self.save_all = save_all
 
     def fit(
         self, train_loader, valid_loaders, lang_loaders=[],
@@ -150,15 +139,6 @@ class Trainer:
 
         for epoch in pbar(nb_epochs):
         # for epoch in range(nb_epochs):
-
-            # Update learning rate
-            self.learning_rate = helper.adjust_learning_rate(
-                optimizer=self.optimizer,
-                initial_lr=self.initial_lr,
-                interval=self.lr_decay_interval,
-                decay=self.lr_decay_rate,
-                epoch=epoch,
-            )
 
             # Train a single epoch
             continue_training = self.train_epoch(
@@ -261,6 +241,7 @@ class Trainer:
                 clip_grad_norm_(self.model.parameters(), self.clip_grad)
 
             self.optimizer.step()
+            self.lr_scheduler.step()
 
             end_backward = dt()
             batch_time = end_backward-begin_forward
@@ -271,7 +252,6 @@ class Trainer:
                 'total_loss': total_loss,
                 'k': self.model.mm_criterion.k,
                 'batch_time': batch_time,
-                'learning_rate': self.learning_rate,
                 'countdown': self.count,
                 'epoch': epoch,
             })

@@ -14,82 +14,75 @@ logger = get_logger()
 class LAVSE(nn.Module):
 
     def __init__(
-        self, imgenc_name, txtenc_name,
-        num_embeddings, embed_dim=300,
-        latent_size=1024, txt_pooling='lens',
-        img_pooling='mean', similarity_name='cosine',
-        loss_device='cuda', **kwargs
+        self, txt_enc={}, img_enc={}, similarity={},
+        tokenizer=None, latent_size=1024, **kwargs
     ):
         super(LAVSE, self).__init__()
 
         self.latent_size = latent_size
-        self.loss_device = torch.device(f'{loss_device}')
-
         self.img_enc = get_image_encoder(
-            model_name=imgenc_name,
+            name=img_enc.name,
             latent_size=latent_size,
+            **img_enc.params
         )
 
         logger.info((
             'Image encoder created: '
-            f'{imgenc_name}'
+            f'{img_enc.name,}'
         ))
 
         self.txt_enc = get_text_encoder(
-            model_name=txtenc_name,
+            name = txt_enc.name,
             latent_size=latent_size,
-            embed_dim=embed_dim,
-            num_embeddings=num_embeddings,
+            num_embeddings=len(tokenizer),
+            **txt_enc.params,
         )
 
-        self.txt_pool = get_txt_pooling(txt_pooling)
-        self.img_pool = get_img_pooling(img_pooling)
+        self.txt_pool = get_txt_pooling(txt_enc.pooling)
+        self.img_pool = get_img_pooling(img_enc.pooling)
 
         logger.info((
             'Text encoder created: '
-            f'{txtenc_name}'
+            f'{txt_enc.name}'
         ))
 
         sim_obj = get_similarity_object(
-            similarity_name,
-            device=self.loss_device,
-            **kwargs
+            similarity.name,
+            **similarity.params
         )
 
         self.similarity = Similarity(
             similarity_object=sim_obj,
-            device=self.loss_device,
+            device=similarity.device,
             latent_size=latent_size,
             **kwargs
-        ).to(self.loss_device)
+        )
 
-        logger.info(f'Using similarity: {similarity_name}')
+        logger.info(f'Using similarity: {similarity.name,}')
 
     def set_devices_(
         self, txt_devices=['cuda'],
         img_devices=['cuda'], loss_device='cuda',
     ):
-
-        if len(img_devices) > 1:
-            self.img_enc = nn.DataParallel(
-                self.img_enc.cuda(),
-                device_ids=img_devices,
-                output_device=loss_device,
-            )
-            self.img_device = img_devices
-        else:
-            self.img_device = torch.device(f'{img_devices[0]}')
-            self.img_enc = self.img_enc.to(self.img_device)
+        from . import data_parallel
 
         if len(txt_devices) > 1:
-            self.txt_enc = nn.DataParallel(
-                self.txt_enc,
-                device_ids=txt_devices,
-                output_device=loss_device,
-            )
-        else:
-            self.txt_device = torch.device(f'{txt_devices[0]}')
-            self.txt_enc = self.txt_enc.to(self.txt_device)
+            self.txt_enc = data_parallel.DataParallel(self.txt_enc)
+            self.txt_device = torch.device('cuda')
+        elif len(txt_devices) == 1:
+            self.txt_device = torch.device(txt_devices[0])
+            self.txt_enc.to(txt_devices[0])
+
+        if len(img_devices) > 1:
+            self.img_enc = data_parallel.DataParallel(self.img_device)
+            self.img_device = torch.device('cuda')
+        elif len(img_devices) == 1:
+            self.img_device = torch.device(img_devices[0])
+            self.img_enc.to(img_devices[0])
+
+        self.loss_device = torch.device(
+            loss_device
+        )
 
         logger.info((
             f'Setting devices: '
@@ -97,10 +90,6 @@ class LAVSE(nn.Module):
             f'txt: {self.txt_device}, '
             f'loss: {self.loss_device}'
         ))
-
-    def set_master_(self, is_master=True):
-        self.master = is_master
-        self.similarity.set_master_(is_master)
 
     def extract_caption_features(
         self, captions, lengths,
@@ -111,6 +100,7 @@ class LAVSE(nn.Module):
     def extract_image_features(
         self, images,
     ):
+        images = images.to(self.img_device)
         return self.img_enc(images)
 
     def embed_caption_features(self, cap_features, lengths):

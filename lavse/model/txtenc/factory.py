@@ -220,18 +220,23 @@ __text_encoders__ = {
 
 __text_encoders__['liwe_gru_384'] = __text_encoders__['liwe_gru_384_384']
 
+
 def get_available_txtenc():
     return __text_encoders__.keys()
 
-
-def get_text_encoder(model_name, **kwargs):
-    model_settings = __text_encoders__[model_name]
-    model_class = model_settings['class']
-    model_args = model_settings['args']
-    arg_dict = dict(kwargs)
-    arg_dict.update(model_args)
-    model = model_class(**arg_dict)
+def get_text_encoder(name, **kwargs):
+    model_class = __text_encoders__[name]['class']
+    model = model_class(**kwargs)
     return model
+
+# def get_text_encoder(name, **kwargs):
+#     model_settings = __text_encoders__[name]
+#     model_class = model_settings['class']
+#     model_args = model_settings['args']
+#     arg_dict = dict(kwargs)
+#     arg_dict.update(model_args)
+#     model = model_class(**arg_dict)
+#     return model
 
 
 def get_txt_pooling(pool_name):

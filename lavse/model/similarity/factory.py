@@ -137,8 +137,8 @@ _similarities = {
 }
 
 
-def get_similarity_object(similarity_name, **kwargs):
-    settings = _similarities[similarity_name]
+def get_similarity_object(name, **kwargs):
+    settings = _similarities[name]
     args_dict = settings['args']
     args_dict.update(**kwargs)
     return settings['class'](**args_dict)
