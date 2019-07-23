@@ -55,7 +55,7 @@ class Trainer:
         self,
         mm_criterion=None,
         ml_criterion=None,
-        optimizer=torch.optim.Adam,
+        optimizer={},
         lr=1e-3,
         lr_scheduler=None,
         clip_grad=2.,
@@ -65,6 +65,7 @@ class Trainer:
         freeze_modules=[],
         **kwargs
     ):
+        from . import optimizers
         count_params = lambda p: np.sum([
             np.product(tuple(x.shape)) for x in p
         ])
@@ -81,15 +82,22 @@ class Trainer:
             if x.requires_grad
         ]
 
-        self.optimizer = optimizer(
-            trainable_params, lr
+        self.optimizer = optimizers.get_optimizer(
+            optimizer.name,
+            trainable_params,
+            **optimizer.params,
         )
+        # self.optimizer = optimizer(
+        #     trainable_params, lr
+        # )
 
-        scheduler = get_scheduler(
-            optimizer=self.optimizer,
-            name=lr_scheduler.name,
-            **lr_scheduler.params,
-        )
+        scheduler = None
+        if lr_scheduler.name is not None:
+            scheduler = get_scheduler(
+                optimizer=self.optimizer,
+                name=lr_scheduler.name,
+                **lr_scheduler.params,
+            )
 
 
         for k in self.optimizer.param_groups:
@@ -249,7 +257,8 @@ class Trainer:
                 clip_grad_norm_(self.model.parameters(), self.clip_grad)
 
             self.optimizer.step()
-            self.lr_scheduler.step()
+            if self.lr_scheduler is not None:
+                self.lr_scheduler.step()
 
             end_backward = dt()
             batch_time = end_backward-begin_forward

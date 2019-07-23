@@ -1,5 +1,17 @@
 # Language-Agnostic Visual-Semantic Embeddings (LAVSE)
 
+## Todo
+
+- [x] Optimizer Adamax 
+- [] Avg Rich Embedding
+- [] Lr_multiplier 
+- [] Data Parallel 
+- [] Distributed Data Parallel
+- [] Fix `if master`
+- [] Auto vocab cache
+- [] Liwe + Word emb (glove)
+- [] Batch and collate via dict
+
 ## Setup
 
 ```

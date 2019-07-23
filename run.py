@@ -235,7 +235,7 @@ if __name__ == '__main__':
         ml_criterion=multilanguage_criterion,
         log_grad_norm=False,
         log_histograms=False,
-        optimizer=torch.optim.Adam,
+        optimizer=opt.optimizer,
         freeze_modules=opt.model.freeze_modules
     )
 
