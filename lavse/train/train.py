@@ -26,6 +26,10 @@ from .lr_scheduler import get_scheduler
 torch.manual_seed(0)
 random.seed(0, version=2)
 
+def freeze(module):
+     for x in module.parameters():
+         x.requires_grad = False
+
 
 class Trainer:
 
@@ -58,22 +62,28 @@ class Trainer:
         log_histograms=False,
         log_grad_norm=False,
         early_stop=50,
+        freeze_modules=[],
         **kwargs
     ):
-
+        count_params = lambda p: np.sum([
+            np.product(tuple(x.shape)) for x in p
+        ])
         # TODO: improve this! :S
-        total_params = 0
-        nb_trainable_params = 0
-        trainable_params = []
+        total_params = count_params(self.model.parameters())
 
-        trainable_params = [x for x in self.model.parameters() if x.requires_grad]
+        # if freeze_modules is not None and len(freeze_modules) > 0:
+        for fmod in freeze_modules:
+            print(f'Freezing {fmod}')
+            freeze(eval(f'self.{fmod}'))
+
+        trainable_params = [
+            x for x in self.model.parameters()
+            if x.requires_grad
+        ]
 
         self.optimizer = optimizer(
             trainable_params, lr
         )
-
-        print(lr_scheduler)
-        print(lr_scheduler.name)
 
         scheduler = get_scheduler(
             optimizer=self.optimizer,
@@ -81,14 +91,12 @@ class Trainer:
             **lr_scheduler.params,
         )
 
-        count_params = lambda p: np.sum([
-            np.product(tuple(x.shape)) for x in p
-        ])
 
         for k in self.optimizer.param_groups:
             self.sysoutlog(
                 f"lr: {k['lr']}, #layers: {len(k['params'])}, #params: {count_params(k['params']):,}"
             )
+
         self.sysoutlog(
             #f'Trainable layers: {len(trainable_params)}, '
             f'Total Params: {total_params:,}, '
@@ -106,8 +114,8 @@ class Trainer:
         self.lr_scheduler = scheduler
         self.clip_grad = clip_grad
         self.log_histograms = log_histograms
-        self.log_grad_norm = log_grad_norm
-
+        self.log_grad_norm = False
+        self.save_all = False
         self.best_val = 0
         self.count = early_stop
         self.early_stop = early_stop

@@ -24,6 +24,11 @@ __text_encoders__ = {
             'rnn_type': nn.GRU,
         },
     },
+    'gru_glove': {
+        'class': txtenc.GloveRNNEncoder,
+        'args': {
+        },
+    },
     'scan': {
         'class': txtenc.EncoderText,
         'args': {

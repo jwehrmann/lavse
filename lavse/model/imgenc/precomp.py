@@ -66,6 +66,7 @@ class VSEImageEncoder(nn.Module):
         self.latent_size = latent_size
         self.no_imgnorm = no_imgnorm
         self.fc = nn.Linear(img_dim, latent_size)
+        self.pool = nn.AdaptiveAvgPool1d(1)
 
         self.apply(default_initializer)
 
@@ -73,9 +74,9 @@ class VSEImageEncoder(nn.Module):
         """Extract image feature vectors."""
         # assuming that the precomputed features are already l2-normalized
 
-        images = images.mean(1) # Global pooling
+        images = self.pool(images.permute(0, 2, 1)) # Global pooling
+        images = images.permute(0, 2, 1)
         features = self.fc(images)
-        features = features.unsqueeze(1)
         # normalize in the joint embedding space
         if not self.no_imgnorm:
             features = l2norm(features, dim=-1)

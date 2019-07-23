@@ -124,7 +124,7 @@ if __name__ == '__main__':
     )
 
     val_loaders = []
-    for val_data in args.val_data:
+    for val_data in opt.dataset.val.data:
         data_name, lang = parse_loader_name(val_data)
         val_loaders.append(
             get_loader(
@@ -140,6 +140,8 @@ if __name__ == '__main__':
                 **opt.dataset.val,
             )
         )
+
+    assert len(val_loaders) > 0
 
     adapt_loaders = []
     if args.adapt_data is not None:
@@ -205,6 +207,7 @@ if __name__ == '__main__':
     #     import torch.nn as nn
     #     model.img_enc = nn.DataParallel(model.img_enc, device_ids=[0,1,2], output_device=0)
     is_master = True
+    model.master = is_master # FIXME: Replace "if print" by built_in print
     print_fn = (lambda x: x) if not is_master else tqdm.write
 
     trainer = train.Trainer(
@@ -233,6 +236,7 @@ if __name__ == '__main__':
         log_grad_norm=False,
         log_histograms=False,
         optimizer=torch.optim.Adam,
+        freeze_modules=opt.model.freeze_modules
     )
 
     if opt.engine.eval_before_training:

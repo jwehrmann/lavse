@@ -1,7 +1,8 @@
 import argparse
+import sys
+sys.path.append('../')
 from lavse.utils.logger import create_logger
-from lavse.data import get_loaders
-from lavse.tokenizer import Tokenizer
+from lavse.data.tokenizer import Tokenizer
 from pathlib import Path
 
 
@@ -23,15 +24,15 @@ if __name__ == '__main__':
         '--outpath',
     )
     args = parser.parse_args()
-    
+
     logger = create_logger(level='debug')
 
     data_path = Path(args.data_path)
     outpath = Path(args.outpath)
-    
+
     files = []
     tokenizer = Tokenizer(
-        download_tokenizer=True, 
+        download_tokenizer=True,
         char_level=args.char_level
     )
 
@@ -41,7 +42,7 @@ if __name__ == '__main__':
             data_path / data_name / f'train_caps.{lang}.txt',
             data_path / data_name / f'dev_caps.{lang}.txt',
         ])
-    
+
     logger.info(f'Building vocab on {files}')
     tokenizer.fit_on_files(files)
     tokenizer.save(outpath)

@@ -253,3 +253,46 @@ class PartialGRUProj(nn.Module):
         embed_word = embed_word.view(self.B, self.W, -1)
 
         return embed_word.permute(0, 2, 1)
+
+
+
+class GloveEmb(nn.Module):
+
+    def __init__(
+            self,
+            num_embeddings,
+            glove_dim,
+            glove_path,
+            add_rand_embed=False,
+            rand_dim=None,
+            **kwargs
+        ):
+        super().__init__()
+
+        self.num_embeddings = num_embeddings
+        self.add_rand_embed = add_rand_embed
+        self.glove_dim = glove_dim
+        self.final_word_emb = glove_dim + rand_dim
+
+        # word embedding
+        self.glove = nn.Embedding(num_embeddings, glove_dim)
+        glove = nn.Parameter(torch.load(glove_path))
+        self.glove.weight = glove
+
+        if add_rand_embed:
+            self.embed = nn.Embedding(num_embeddings, rand_dim)
+
+    def get_word_embed_size(self,):
+        return self.final_word_emb
+
+
+    def forward(self, x):
+        '''
+            x: (batch, nb_words, nb_characters [tokens])
+        '''
+        emb = self.glove(x)
+        if self.add_rand_embed:
+            emb2 = self.embed(x)
+            emb = torch.cat([emb, emb2], dim=2)
+
+        return emb

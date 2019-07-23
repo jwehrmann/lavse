@@ -108,8 +108,14 @@ class Tokenizer(object):
     def save(self, outpath):
         logger.debug(f'Saving vocab to {outpath}')
 
+        state = {
+            'word2idx': self.vocab.word2idx,
+            'char_level': self.char_level,
+            'max_len': self.maxlen
+        }
+
         with open(outpath, "w") as f:
-            json.dump(self.vocab.word2idx, f)
+            json.dump(state, f)
 
         logger.info(
             f'Vocab stored into {outpath} with {len(self.vocab)} tokens.'
@@ -118,12 +124,15 @@ class Tokenizer(object):
     def load(self, path):
         logger.debug(f'Loading vocab from {path}')
         with open(path) as f:
-            word2idx = json.load(f)
+            state = json.load(f)
+
         vocab = Vocabulary()
-        vocab.word2idx = word2idx
+        vocab.word2idx = state['word2idx']
         vocab.idx2word = {v: k for k, v in vocab.word2idx.items()}
         vocab.idx = max(vocab.idx2word)
         self.vocab = vocab
+        self.char_level = state['char_level']
+        self.maxlen = state['max_len']
         logger.info(f'Loaded vocab containing {len(self.vocab)} tokens')
         return self
 
