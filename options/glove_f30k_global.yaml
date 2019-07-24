@@ -1,0 +1,14 @@
+__include__: glove_840_f30k.yaml
+exp:
+  outpath: runs/f30k_precomp/txt:gloveglobal_img:hierarchical/
+model:
+  txt_enc:
+    name: gru_glove_global
+    params:
+      embed_dim: 300
+      use_bi_gru: true
+      glove_path: '.vocab_cache/glove_840B_f30k_precomp.json.pkl'
+      add_rand_embed: true
+    pooling: mean
+    devices: [cuda,]
+  

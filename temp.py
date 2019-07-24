@@ -1,41 +1,24 @@
 import torch
-from lavse.utils.logger import create_logger
-from lavse import data
-from lavse.data.tokenizer import Tokenizer
-from lavse.data.adapters import Flickr, Coco
-from pathlib import Path
+from torch.optim import lr_scheduler
 import numpy as np
 
-from lavse.utils import helper
+def update_lr(curr_lr, gamma=0.25):
+    return curr_lr * gamma
 
-flatten = lambda l: [item for sublist in l for item in sublist]
+iters = [16000, 80000, 10000]
+it = range(*iters)
+print(it)
 
-logger = create_logger(level='debug')
+gamma = 0.25
+curr_lr = 0.002
+lrs = {}
+for i in range(22*4000):
+    if i not in it:
+        continue
+    curr_lr = update_lr(curr_lr, gamma=gamma)
+    lrs[curr_lr] = i / 4000
 
-# tokenizer = Tokenizer(
-#     download_tokenizer=True,
-#     char_level=False,
-# )
 
-# birds_train = data.datasets.Birds(
-#     '/opt/jonatas/datasets/lavse/', data_name='birds', data_split='train',
-# )
-
-# birds_test = data.datasets.Birds(
-#     '/opt/jonatas/datasets/lavse/', data_name='birds', data_split='test',
-# )
-
-fkt = Coco('/opt/jonatas/datasets/lavse/coco/', data_split='train')
-fkv = Coco('/opt/jonatas/datasets/lavse/coco/', data_split='dev')
-
-texts = flatten(fkv.image_captions.values())
-texts += flatten(fkt.image_captions.values())
-
-tokenizer = Tokenizer(
-    download_tokenizer=True,
-    char_level=False,
-)
-
-tokenizer.fit(texts)
-tokenizer.save('vocab/coco.json')
-
+epochs = np.array(it) / 4000.
+print(epochs)
+print(lrs)

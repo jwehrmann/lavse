@@ -8,7 +8,7 @@ import profiles
 def get_train_params():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--options', '-o',
+        'options',
     )
     parser.add_argument('--local_rank', type=int, default=0)
     # parser.add_argument('--ngpu', type=int, default=1)

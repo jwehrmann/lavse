@@ -9,6 +9,7 @@ from torch.nn.utils.rnn import pad_packed_sequence
 
 from ...model.layers import attention, convblocks
 from .embedding import PartialConcat, GloveEmb
+from . import pooling
 
 import numpy as np
 
@@ -89,7 +90,7 @@ class GloveRNNEncoder(nn.Module):
             bidirectional=use_bi_gru
         )
 
-        self.apply(default_initializer)
+        self.embed.embed.weight.data.uniform_(-0.1, 0.1)
 
     def forward(self, x, lengths):
         """Handles variable size captions
@@ -104,6 +105,69 @@ class GloveRNNEncoder(nn.Module):
         if self.use_bi_gru:
             b, t, d = cap_emb.shape
             cap_emb = cap_emb.view(b, t, 2, d//2).mean(-2)
+
+        # normalization in the joint embedding space
+        if not self.no_txtnorm:
+            cap_emb = l2norm(cap_emb, dim=-1)
+
+        return cap_emb, lengths
+
+
+
+# RNN Based Language Model
+class GloveRNNEncoderGlobal(nn.Module):
+
+    def __init__(
+        self, num_embeddings, embed_dim, latent_size,
+        num_layers=1, use_bi_gru=True, no_txtnorm=False,
+        rnn_type=nn.GRU, glove_path=None, add_rand_embed=False):
+
+        super().__init__()
+        self.latent_size = latent_size
+        self.no_txtnorm = no_txtnorm
+
+        self.embed = GloveEmb(
+            num_embeddings,
+            glove_dim=embed_dim,
+            glove_path=glove_path,
+            add_rand_embed=add_rand_embed,
+            rand_dim=embed_dim,
+        )
+
+
+        self.fc = nn.Linear(
+            self.embed.final_word_emb+latent_size, latent_size
+        )
+
+        # caption embedding
+        self.use_bi_gru = use_bi_gru
+        self.rnn = rnn_type(
+            self.embed.final_word_emb,
+            latent_size, num_layers,
+            batch_first=True,
+            bidirectional=use_bi_gru
+        )
+
+        self.embed.embed.weight.data.uniform_(-0.1, 0.1)
+
+    def forward(self, x, lengths):
+        """Handles variable size captions
+        """
+        # Embed word ids to vectors
+        emb = self.embed(x)
+
+        # Forward propagate RNN
+        # self.rnn.flatten_parameters()
+        cap_emb, _ = self.rnn(emb)
+
+        if self.use_bi_gru:
+            b, t, d = cap_emb.shape
+            cap_emb = cap_emb.view(b, t, 2, d//2).mean(-2)
+
+        latent = pooling.last_hidden_state_pool(cap_emb, lengths)
+        bag = pooling.mean_pooling(emb, lengths)
+        cap_emb = torch.cat([latent, bag], dim=1)
+        cap_emb = self.fc(cap_emb.unsqueeze(1))
 
         # normalization in the joint embedding space
         if not self.no_txtnorm:

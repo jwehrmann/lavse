@@ -1,6 +1,6 @@
 __include__: abstract.yaml
 exp:
-  outpath: runs/coco_precomp/txt:glove_img:hierarchical/
+  outpath: logs/coco_precomp/adapt_i2t/glove/
   resume: null # last, best_[...], or empty (from scratch)
 dataset:  
   vocab_path: .vocab_cache/coco_precomp.json
@@ -8,11 +8,11 @@ dataset:
   loader_name: precomp
   train:
     data: coco_precomp.en
-    workers: 0
+    workers: 1
     batch_size: 128
   val: 
     data: [coco_precomp.en]
-    workers: 0
+    workers: 1
     batch_size: 32
     limit: 5000
 model:
@@ -25,23 +25,23 @@ model:
       use_bi_gru: true
       glove_path: '.vocab_cache/glove_840B_coco_precomp.json.pkl'
       add_rand_embed: true
-    pooling: lens
+    pooling: none
     devices: [cuda,]
   img_enc:
     name: hierarchical
     params:
       img_dim: 2048
     devices: [cuda,]
-    pooling: mean
+    pooling: none
   similarity:
-    name: cosine
+    name: adapt_i2t
     params:
-      device: cuda
-    device: cuda
-criterion:
-  margin: 0.2
-  max_violation: False
-  beta: 0.995
+      latent_size: 1024
+      k: 1
+      norm: False
+      cond_vec: False
+      device: cuda # FIXME
+    device: cuda # FIXME
 optimizer:
   name: adamax
   params:

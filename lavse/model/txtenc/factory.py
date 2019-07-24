@@ -29,6 +29,11 @@ __text_encoders__ = {
         'args': {
         },
     },
+    'gru_glove_global': {
+        'class': txtenc.GloveRNNEncoderGlobal,
+        'args': {
+        },
+    },
     'scan': {
         'class': txtenc.EncoderText,
         'args': {

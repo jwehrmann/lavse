@@ -29,9 +29,8 @@ def none(x, l):
 # def last_hidden_state_pool(texts, lengths):
 #     I = torch.LongTensor(lengths).view(-1, 1, 1)
 #     I = I.expand(texts.size(0), 1, texts[0].size(1))-1
-    
+
 #     if torch.cuda.is_available():
 #         I = I.cuda()
-    
+
 #     out = torch.gather(texts, 1, I).squeeze(1)
-        
