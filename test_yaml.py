@@ -56,11 +56,17 @@ if __name__ == '__main__':
     tokenizer = loader.dataset.tokenizer
     model = model.LAVSE(**opt.model, tokenizer=tokenizer)#.to(device)
 
+    # import pickle
+    # with open(Path(opt.exp.outpath) / 'best_model.pkl', 'rb', 0) as f:
+    #     pickle.load(f)
+
     print(model)
     checkpoint = helper.restore_checkpoint(
         path=Path(opt.exp.outpath) / 'best_model.pkl',
         model=model,
     )
+
+
     model = checkpoint['model']
     logger.info((
         f"Loaded checkpoint. Iteration: {checkpoint['iteration']}, "

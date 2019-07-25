@@ -82,7 +82,7 @@ class BanOptimizer():
         return state
 
     def load_state_dict(self, state):
-        self.optimizer.load_state_dict(state['optimizer'])
+        self.optimizer.load_state_dict(state['optsimizer'])
 
     def __getattr__(self, key):
         return self.optimizer.__getattribute__(key)

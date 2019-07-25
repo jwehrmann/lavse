@@ -84,6 +84,7 @@ class LAVSE(nn.Module):
         self.loss_device = torch.device(
             loss_device
         )
+        self.similarity = self.similarity.to(self.loss_device)
 
         logger.info((
             f'Setting devices: '

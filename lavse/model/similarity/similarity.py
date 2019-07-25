@@ -31,12 +31,12 @@ class Similarity(nn.Module):
     def set_master_(self, is_master=True):
         self.master = is_master
 
-    def forward(self, img_embed, cap_embed, batch, shared=False):
+    def forward(self, img_embed, cap_embed, lens, shared=False):
         logger.debug((
             f'Similarity - img_shape: {img_embed.shape} '
             'cap_shape: {cap_embed.shape}'
         ))
-        return self.similarity(img_embed, cap_embed, batch)
+        return self.similarity(img_embed, cap_embed, lens)
 
     def forward_shared(self, img_embed, cap_embed, lens, shared_size=128):
         """
@@ -88,7 +88,7 @@ class Cosine(nn.Module):
         return cosine_sim(img_embed, cap_embed).cpu()
 
 
-class AdaptiveEmbedding(nn.Module):
+class AdaptiveEmbeddingT2I(nn.Module):
 
     def __init__(
             self, device, latent_size=1024, k=8, norm=False, task='t2i'
@@ -100,18 +100,18 @@ class AdaptiveEmbedding(nn.Module):
         # self.fc = nn.Conv1d(latent_size, latent_size*2, 1).to(device)
 
         self.cbn_img = condbn.CondBatchNorm1d(latent_size, k)
-        self.cbn_txt = condbn.CondBatchNorm1d(latent_size, k)
+        # self.cbn_txt = condbn.CondBatchNorm1d(latent_size, k)
 
         # self.alpha = nn.Parameter(torch.ones(1))
         # self.beta = nn.Parameter(torch.zeros(1))
 
-        self.softmax = nn.Softmax(dim=-1)
+        # self.softmax = nn.Softmax(dim=-1)
         self.norm = norm
         if norm:
             self.feature_norm = ClippedL2Norm()
         self.task = task
 
-    def forward(self, img_embed, cap_embed, batch, **kwargs):
+    def forward(self, img_embed, cap_embed, lens, **kwargs):
         '''
             img_embed: (B, 36, latent_size)
             cap_embed: (B, T, latent_size)
@@ -119,7 +119,6 @@ class AdaptiveEmbedding(nn.Module):
         # (B, 1024, T)
         cap_embed = cap_embed.permute(0, 2, 1) #.to(self.device)
         img_embed = img_embed.permute(0, 2, 1) #.to(self.device)
-
         # (B, 1024)
         if self.norm:
             cap_embed = self.feature_norm(cap_embed)
@@ -133,28 +132,17 @@ class AdaptiveEmbedding(nn.Module):
             # cap: 1024, T
             # img: 1024, 36
 
-            if self.task == 't2i':
-                n_words = lens[i]
-                cap_repr = cap_tensor[:,:n_words].mean(-1).unsqueeze(0)
+            n_words = lens[i]
+            cap_repr = cap_tensor[:,:n_words].mean(-1).unsqueeze(0)
 
-                img_output = self.cbn_img(img_embed, cap_repr)
-                img_vector = img_output.mean(-1)
+            img_output = self.cbn_img(img_embed, cap_repr)
+            img_vector = img_output.mean(-1)
 
-                img_vector = l2norm(img_vector, dim=-1)
-                cap_vector = cap_repr
-                cap_vector = l2norm(cap_vector, dim=-1)
+            img_vector = l2norm(img_vector, dim=-1)
+            cap_vector = cap_repr
+            cap_vector = l2norm(cap_vector, dim=-1)
 
-                sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
-
-            if self.task == 'i2t':
-                img_vectors = img_embed.mean(-1)
-                cap_i_expand = cap_tensor.repeat(img_vectors.shape[0], 1, 1)
-                txt_output = self.cbn_txt(cap_i_expand, img_vectors).mean(-1, keepdim=True)
-
-                sim = cosine_similarity(
-                    img_vectors.unsqueeze(2), txt_output, 1,
-                )
-
+            sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
             sims[:,i] = sim
 
 

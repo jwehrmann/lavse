@@ -39,7 +39,7 @@ class SCANImagePrecomp(nn.Module):
     def forward(self, batch):
         """Extract image feature vectors."""
         # assuming that the precomputed features are already l2-normalized
-        images = batch.image
+        images = batch['image'].to(self.device)
         features = self.fc(images)
 
         # normalize in the joint embedding space
@@ -75,7 +75,7 @@ class VSEImageEncoder(nn.Module):
         """Extract image feature vectors."""
         # assuming that the precomputed features are already l2-normalized
 
-        images = batch['image'].to(self.device)
+        images = batch['image'].to(self.device).to(self.device)
 
         images = self.pool(images.permute(0, 2, 1)) # Global pooling
         images = images.permute(0, 2, 1)
@@ -131,7 +131,7 @@ class HierarchicalEncoder(nn.Module):
 
     def forward(self, batch):
         """Extract image feature vectors."""
-        images = batch.image
+        images = batch['image'].to(self.device)
         images = images.permute(0, 2, 1)
         if self.use_sa:
             images = self.sa1(images)
@@ -255,7 +255,7 @@ class MultiheadAttentionEncoder(nn.Module):
 
     def forward(self, batch):
         """Extract image feature vectors."""
-        images = batch.image
+        images = batch['image'].to(self.device)
         x = images.permute(0, 2, 1)
         a = self.fc1(x)
         a = self.multihead(a)
@@ -291,7 +291,7 @@ class GRUImgEncoder(nn.Module):
 
     def forward(self, batch):
         """Extract image feature vectors."""
-        images = batch.image
+        images = batch['image'].to(self.device)
         x, _ = self.gru(images)
         b, t, d = x.shape
         x = x.view(b, t, 2, d//2).mean(-2)

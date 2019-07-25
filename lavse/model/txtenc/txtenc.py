@@ -41,7 +41,7 @@ class EncoderText(nn.Module):
         # Embed word ids to vectors
 
         captions = batch['caption']
-        x = self.embed(x)
+        x = self.embed(captions)
         packed = pack_padded_sequence(x, lengths, batch_first=True)
 
         # Forward propagate RNN
@@ -97,10 +97,10 @@ class GloveRNNEncoder(nn.Module):
     def forward(self, batch):
         """Handles variable size captions
         """
-        captions = batch['caption']
-        lengths = batch['lengths']
+        captions, lengths = batch['caption']
+        captions = captions.to(self.device)
         # Embed word ids to vectors
-        emb = self.embed(x)
+        emb = self.embed(captions)
 
         # Forward propagate RNN
         # self.rnn.flatten_parameters()
@@ -114,7 +114,7 @@ class GloveRNNEncoder(nn.Module):
         if not self.no_txtnorm:
             cap_emb = l2norm(cap_emb, dim=-1)
 
-        return cap_emb, lenghts
+        return cap_emb, lengths
 
 
 

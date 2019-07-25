@@ -17,29 +17,11 @@ _similarities = {
             lambda_lse=None, smooth=4,
         ),
     },
-    'adaptive': {
-        'class': sim.AdaptiveEmbedding,
+    'adapt_t2i': {
+        'class': sim.AdaptiveEmbeddingT2I,
         'args': Dict(
             task='t2i',
         ),
-    },
-    'adaptive_norm': {
-        'class': sim.AdaptiveEmbedding,
-        'args': Dict(
-            task='t2i',
-            norm=True,
-        ),
-    },
-    'adaptive_k4': {
-        'class': sim.AdaptiveEmbedding,
-        'args': Dict(
-            task='t2i',
-            k=4,
-        ),
-    },
-    'adaptive_i2t': {
-        'class': sim.AdaptiveEmbeddingI2T,
-        'args': {},
     },
     'adapt_i2t': {
         'class': sim.AdaptiveEmbeddingI2T,

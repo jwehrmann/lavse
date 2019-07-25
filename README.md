@@ -2,18 +2,21 @@
 
 ## Todo
 
-- [x] Avg Rich Embedding
-- [] Save yaml !
-- [x] Test with yaml !
 - [] Liwe + Word emb (glove)
-- [] Batch and collate via dict
+- [] Ensemble
 - [] Lr_multiplier 
 - [] Data Parallel 
 - [] Distributed Data Parallel
 - [] Fix `if master`
 - [] Auto vocab cache
+- [x] Avg Rich Embedding
+- [x] Save yaml !
+- [x] Test with yaml !
+- [x] Batch and collate via dict
 - [x] Optimizer Adamax 
 - [x] Fix __include__ from yaml
+- [x] Test via yaml
+- [x] Fix t2i
 
 ## Setup
 
