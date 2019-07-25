@@ -8,6 +8,8 @@ from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision.datasets.folder import default_loader
 
+from addict import Dict
+
 from . import collate_fns
 from ..utils.file_utils import read_txt
 from ..utils.logger import get_logger
@@ -161,7 +163,14 @@ class PrecompDataset(Dataset):
         caption = self.captions[index]
         tokens = self.tokenizer(caption)
 
-        return image, tokens, index, img_id
+        batch = Dict(
+            image=image,
+            caption=tokens,
+            index=index,
+            img_id=img_id,
+        )
+
+        return batch
 
     def __len__(self):
         return self.length

@@ -13,6 +13,7 @@ from lavse.model import txtenc, data_parallel
 from lavse.train import train
 from lavse.utils.logger import create_logger
 from lavse.utils import helper
+from lavse.utils.file_utils import load_yaml_opts, parse_loader_name
 # from lavse.utils import options
 import yaml
 import os
@@ -59,44 +60,6 @@ def setup_for_distributed(is_master):
 
     __builtin__.print = print
 
-
-def merge_dictionaries(dict1, dict2):
-    for key in dict2:
-        if key in dict1 and isinstance(dict1[key], dict) and isinstance(dict2[key], dict):
-            merge_dictionaries(dict1[key], dict2[key])
-        else:
-            dict1[key] = dict2[key]
-
-
-def load_yaml_opts(path_yaml):
-    """ Load options dictionary from a yaml file
-    """
-    result = {}
-    with open(path_yaml, 'r') as yaml_file:
-        options_yaml = yaml.safe_load(yaml_file)
-        includes = options_yaml.get('__include__', False)
-        if includes:
-            if type(includes) != list:
-                includes = [includes]
-            for include in includes:
-                filename = '{}/{}'.format(os.path.dirname(path_yaml), include)
-                if os.path.isfile(filename):
-                    parent = load_yaml_opts(filename)
-                else:
-                    parent = load_yaml_opts(include)
-                merge_dictionaries(result, parent)
-        merge_dictionaries(result, options_yaml) # to be sure the main options overwrite the parent options
-    result.pop('__include__', None)
-    result = Dict(result)
-    return result
-
-
-def parse_loader_name(data_name):
-    if '.' in data_name:
-        name, lang = data_name.split('.')
-        return name, lang
-    else:
-        return data_name, None
 
 
 if __name__ == '__main__':
@@ -236,7 +199,7 @@ if __name__ == '__main__':
 
     trainer = train.Trainer(
         model=model,
-        args={'args': args, 'model_args': opt.model},
+        args=opt,
         sysoutlog=print_fn,
     )
 

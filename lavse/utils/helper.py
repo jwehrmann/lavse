@@ -13,7 +13,7 @@ def save_checkpoint(
 
     state_dict = {
         'model': model.state_dict(),
-        'optimizer': optimizer,
+        'optimizer': optimizer.state_dict(),
     }
 
     state_dict.update(**kwargs)

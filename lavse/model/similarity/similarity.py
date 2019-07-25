@@ -31,12 +31,12 @@ class Similarity(nn.Module):
     def set_master_(self, is_master=True):
         self.master = is_master
 
-    def forward(self, img_embed, cap_embed, lens, shared=False):
+    def forward(self, img_embed, cap_embed, batch, shared=False):
         logger.debug((
             f'Similarity - img_shape: {img_embed.shape} '
             'cap_shape: {cap_embed.shape}'
         ))
-        return self.similarity(img_embed, cap_embed, lens)
+        return self.similarity(img_embed, cap_embed, batch)
 
     def forward_shared(self, img_embed, cap_embed, lens, shared_size=128):
         """
@@ -111,7 +111,7 @@ class AdaptiveEmbedding(nn.Module):
             self.feature_norm = ClippedL2Norm()
         self.task = task
 
-    def forward(self, img_embed, cap_embed, lens, **kwargs):
+    def forward(self, img_embed, cap_embed, batch, **kwargs):
         '''
             img_embed: (B, 36, latent_size)
             cap_embed: (B, T, latent_size)

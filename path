@@ -1,0 +1,331 @@
+&id025 !!python/object/new:addict.addict.Dict
+args:
+- !!python/tuple
+  - exp
+  - &id001 !!python/object/new:addict.addict.Dict
+    args:
+    - !!python/tuple
+      - outpath
+      - logs/dev/
+    - !!python/tuple
+      - resume
+      - null
+    dictitems:
+      outpath: logs/dev/
+      resume: null
+    state: *id001
+- !!python/tuple
+  - dataset
+  - &id005 !!python/object/new:addict.addict.Dict
+    args:
+    - !!python/tuple
+      - vocab_path
+      - .vocab_cache/f30k_precomp.json
+    - !!python/tuple
+      - text_repr
+      - word
+    - !!python/tuple
+      - loader_name
+      - precomp
+    - !!python/tuple
+      - train
+      - &id002 !!python/object/new:addict.addict.Dict
+        args:
+        - !!python/tuple
+          - data
+          - f30k_precomp.en
+        - !!python/tuple
+          - workers
+          - 0
+        - !!python/tuple
+          - batch_size
+          - 128
+        dictitems:
+          batch_size: 128
+          data: f30k_precomp.en
+          workers: 0
+        state: *id002
+    - !!python/tuple
+      - val
+      - &id004 !!python/object/new:addict.addict.Dict
+        args:
+        - !!python/tuple
+          - data
+          - &id003
+            - f30k_precomp.en
+        - !!python/tuple
+          - workers
+          - 0
+        - !!python/tuple
+          - batch_size
+          - 32
+        - !!python/tuple
+          - limit
+          - 5000
+        dictitems:
+          batch_size: 32
+          data: *id003
+          limit: 5000
+          workers: 0
+        state: *id004
+    dictitems:
+      loader_name: precomp
+      text_repr: word
+      train: *id002
+      val: *id004
+      vocab_path: .vocab_cache/f30k_precomp.json
+    state: *id005
+- !!python/tuple
+  - model
+  - &id015 !!python/object/new:addict.addict.Dict
+    args:
+    - !!python/tuple
+      - latent_size
+      - 1024
+    - !!python/tuple
+      - freeze_modules
+      - &id014 []
+    - !!python/tuple
+      - txt_enc
+      - &id008 !!python/object/new:addict.addict.Dict
+        args:
+        - !!python/tuple
+          - name
+          - gru
+        - !!python/tuple
+          - params
+          - &id006 !!python/object/new:addict.addict.Dict
+            args:
+            - !!python/tuple
+              - embed_dim
+              - 300
+            - !!python/tuple
+              - use_bi_gru
+              - true
+            dictitems:
+              embed_dim: 300
+              use_bi_gru: true
+            state: *id006
+        - !!python/tuple
+          - pooling
+          - lens
+        - !!python/tuple
+          - devices
+          - &id007
+            - cuda
+        dictitems:
+          devices: *id007
+          name: gru
+          params: *id006
+          pooling: lens
+        state: *id008
+    - !!python/tuple
+      - img_enc
+      - &id011 !!python/object/new:addict.addict.Dict
+        args:
+        - !!python/tuple
+          - name
+          - vsepp_precomp
+        - !!python/tuple
+          - params
+          - &id009 !!python/object/new:addict.addict.Dict
+            args:
+            - !!python/tuple
+              - img_dim
+              - 2048
+            dictitems:
+              img_dim: 2048
+            state: *id009
+        - !!python/tuple
+          - devices
+          - &id010
+            - cuda
+        - !!python/tuple
+          - pooling
+          - mean
+        dictitems:
+          devices: *id010
+          name: vsepp_precomp
+          params: *id009
+          pooling: mean
+        state: *id011
+    - !!python/tuple
+      - similarity
+      - &id013 !!python/object/new:addict.addict.Dict
+        args:
+        - !!python/tuple
+          - name
+          - cosine
+        - !!python/tuple
+          - params
+          - &id012 !!python/object/new:addict.addict.Dict
+            args:
+            - !!python/tuple
+              - device
+              - cuda
+            dictitems:
+              device: cuda
+            state: *id012
+        - !!python/tuple
+          - device
+          - cuda
+        dictitems:
+          device: cuda
+          name: cosine
+          params: *id012
+        state: *id013
+    dictitems:
+      freeze_modules: *id014
+      img_enc: *id011
+      latent_size: 1024
+      similarity: *id013
+      txt_enc: *id008
+    state: *id015
+- !!python/tuple
+  - criterion
+  - &id016 !!python/object/new:addict.addict.Dict
+    args:
+    - !!python/tuple
+      - margin
+      - 0.2
+    - !!python/tuple
+      - max_violation
+      - false
+    - !!python/tuple
+      - beta
+      - 0.991
+    dictitems:
+      beta: 0.991
+      margin: 0.2
+      max_violation: false
+    state: *id016
+- !!python/tuple
+  - optimizer
+  - &id022 !!python/object/new:addict.addict.Dict
+    args:
+    - !!python/tuple
+      - import
+      - lavse.optimizers.factory
+    - !!python/tuple
+      - name
+      - adamax
+    - !!python/tuple
+      - params
+      - &id019 !!python/object/new:addict.addict.Dict
+        args:
+        - !!python/tuple
+          - lr
+          - 0.001
+        - !!python/tuple
+          - gradual_warmup_steps
+          - &id017
+            - 0.5
+            - 2.0
+            - 4000
+        - !!python/tuple
+          - lr_decay_epochs
+          - &id018
+            - 10000
+            - 20000
+            - 2000
+        - !!python/tuple
+          - lr_decay_rate
+          - 0.25
+        dictitems:
+          gradual_warmup_steps: *id017
+          lr: 0.001
+          lr_decay_epochs: *id018
+          lr_decay_rate: 0.25
+        state: *id019
+    - !!python/tuple
+      - lr_scheduler
+      - &id021 !!python/object/new:addict.addict.Dict
+        args:
+        - !!python/tuple
+          - name
+          - null
+        - !!python/tuple
+          - params
+          - &id020 !!python/object/new:addict.addict.Dict
+            args:
+            - !!python/tuple
+              - step_size
+              - 1000
+            - !!python/tuple
+              - gamma
+              - 1
+            dictitems:
+              gamma: 1
+              step_size: 1000
+            state: *id020
+        dictitems:
+          name: null
+          params: *id020
+        state: *id021
+    - !!python/tuple
+      - grad_clip
+      - 2.0
+    dictitems:
+      grad_clip: 2.0
+      import: lavse.optimizers.factory
+      lr_scheduler: *id021
+      name: adamax
+      params: *id019
+    state: *id022
+- !!python/tuple
+  - engine
+  - &id023 !!python/object/new:addict.addict.Dict
+    args:
+    - !!python/tuple
+      - eval_before_training
+      - false
+    - !!python/tuple
+      - debug
+      - false
+    - !!python/tuple
+      - print_freq
+      - 10
+    - !!python/tuple
+      - nb_epochs
+      - 22
+    - !!python/tuple
+      - early_stop
+      - 50
+    - !!python/tuple
+      - valid_interval
+      - 500
+    dictitems:
+      debug: false
+      early_stop: 50
+      eval_before_training: false
+      nb_epochs: 22
+      print_freq: 10
+      valid_interval: 500
+    state: *id023
+- !!python/tuple
+  - misc
+  - &id024 !!python/object/new:addict.addict.Dict
+    args:
+    - !!python/tuple
+      - cuda
+      - true
+    - !!python/tuple
+      - distributed
+      - false
+    - !!python/tuple
+      - seed
+      - 1337
+    dictitems:
+      cuda: true
+      distributed: false
+      seed: 1337
+    state: *id024
+dictitems:
+  criterion: *id016
+  dataset: *id005
+  engine: *id023
+  exp: *id001
+  misc: *id024
+  model: *id015
+  optimizer: *id022
+state: *id025

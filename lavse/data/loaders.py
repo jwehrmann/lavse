@@ -93,12 +93,14 @@ def get_loader(
         )
         shuffle = False
 
+    collate = collate_fns.Collate()
+
     loader = DataLoader(
         dataset=dataset,
         batch_size=batch_size,
         shuffle=shuffle,
         pin_memory=True,
-        collate_fn=collate_fn,
+        collate_fn=collate,
         num_workers=workers,
         sampler=sampler,
     )

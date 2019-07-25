@@ -1,6 +1,93 @@
 import torch
 import numpy as np
 
+import torch
+import numpy as np
+from addict import Dict
+
+
+def default_padding(captions, device=None):
+    lengths = [len(cap) for cap in captions]
+    targets = torch.zeros(len(captions), max(lengths)).long()
+
+    for i, cap in enumerate(captions):
+        end = lengths[i]
+        targets[i, :end] = cap[:end]
+
+    if device is None:
+        return targets, lengths
+
+    return targets.to(device), lengths
+
+
+def liwe_padding(captions):
+    splitted_caps = []
+    for caption in captions:
+        sc = split_array(caption)
+        splitted_caps.append(sc)
+    sent_lens = np.array([len(x) for x in splitted_caps])
+    max_nb_steps = max(sent_lens)
+    word_maxlen = 26
+    targets = torch.zeros(len(captions), max_nb_steps, word_maxlen).long()
+    for i, cap in enumerate(splitted_caps):
+        end_sentence = sent_lens[i]
+        for j, word in enumerate(cap):
+            end_word = word_maxlen if len(word) > word_maxlen else len(word)
+            targets[i, j, :end_word] = word[:end_word]
+
+    return targets, sent_lens
+
+
+def stack(x,):
+    return torch.stack(x, 0)
+
+
+def no_preprocess(x,):
+    return x
+
+
+def to_numpy(x,):
+    return np.array(x)
+
+
+_preprocessing_fn = {
+    'image': stack,
+    'caption': default_padding,
+    'index': to_numpy,
+    'img_id': to_numpy,
+    'attributes': stack,
+}
+
+
+class Collate:
+
+    def __init__(self,):
+        pass
+
+    def __call__(self, data):
+        attributes = data[0].keys()
+
+        batch = Dict({
+            att: _preprocessing_fn[att](
+                [x[att] for x in data]
+            )
+            for att in attributes
+        })
+
+        return batch
+
+
+def split_array(iterable, splitters=[0, 1, 2]):
+    import itertools
+    return [
+        torch.LongTensor(list(g))
+        for k, g in itertools.groupby(
+            iterable, lambda x: x in splitters
+        )
+        if not k
+    ]
+
+
 
 def default_padding(captions):
     lengths = [len(cap) for cap in captions]

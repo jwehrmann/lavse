@@ -34,11 +34,13 @@ class EncoderText(nn.Module):
     def init_weights(self):
         self.embed.weight.data.uniform_(-0.1, 0.1)
 
-    def forward(self, x, lengths):
+    def forward(self, batch):
         """Handles variable size captions
+            batch: {captions: torch.Tensor, lenghts: List[int]}
         """
         # Embed word ids to vectors
 
+        captions = batch['caption']
         x = self.embed(x)
         packed = pack_padded_sequence(x, lengths, batch_first=True)
 
@@ -92,9 +94,11 @@ class GloveRNNEncoder(nn.Module):
 
         self.embed.embed.weight.data.uniform_(-0.1, 0.1)
 
-    def forward(self, x, lengths):
+    def forward(self, batch):
         """Handles variable size captions
         """
+        captions = batch['caption']
+        lengths = batch['lengths']
         # Embed word ids to vectors
         emb = self.embed(x)
 
@@ -110,7 +114,7 @@ class GloveRNNEncoder(nn.Module):
         if not self.no_txtnorm:
             cap_emb = l2norm(cap_emb, dim=-1)
 
-        return cap_emb, lengths
+        return cap_emb, lenghts
 
 
 
@@ -201,11 +205,14 @@ class RNNEncoder(nn.Module):
 
         self.apply(default_initializer)
 
-    def forward(self, x, lengths):
+    def forward(self, batch):
         """Handles variable size captions
         """
+        captions, lengths = batch['caption']
+        captions = captions.to(self.device)
+
         # Embed word ids to vectors
-        x = self.embed(x)
+        x = self.embed(captions)
         # Forward propagate RNN
         # self.rnn.flatten_parameters()
         cap_emb, _ = self.rnn(x)

@@ -105,7 +105,9 @@ def log_param_histograms(model, tb_writer, iteration):
             iteration,
         )
 
-def log_grad_norm(model, tb_writer, iteration):
+def log_grad_norm(model, tb_writer, iteration, reduce=sum):
+
+    grads = []
     for k, p in model.named_parameters():
         if p.grad is None:
             continue
@@ -114,6 +116,9 @@ def log_grad_norm(model, tb_writer, iteration):
             p.grad.data.norm(2).item(),
             iteration
         )
+        grads.append(p.grad.data.norm(2).item())
+    return reduce(grads)
+
 
 def print_log_param_stats(model, iteration):
 

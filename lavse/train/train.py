@@ -18,7 +18,7 @@ from tqdm import tqdm
 from . import evaluation
 from ..data.loaders import DataIterator
 from ..model.loss import cosine_sim, cosine_sim_numpy
-from ..utils import helper, layers, logger
+from ..utils import helper, layers, logger, file_utils
 from .evaluation import i2t, t2i
 from .lr_scheduler import get_scheduler
 
@@ -141,7 +141,18 @@ class Trainer:
 
         # Set up tensorboard logger
         tb_writer = helper.get_tb_writer(path)
+        if os.path.exists(path):
+            a = input('Current outpath already exists! Do you want to rewrite? [y/n] ')
+            if a.lower() == 'y':
+                import shutil
+                shutil.rmtree(path)
+                tb_writer = helper.get_tb_writer(path)
+            else:
+                exit()
+
         path = tb_writer.file_writer.get_logdir()
+        file_utils.save_yaml_opts(Path(path) / 'options.yaml', self.args)
+
         self.tb_writer = tb_writer
         # Path to store the best models
         self.best_model_path = Path(path) / Path('best_model.pkl')
@@ -170,10 +181,10 @@ class Trainer:
                 break
 
     def _forward_multimodal_loss(
-        self, images, captions, lens
+        self, batch
     ):
-        img_emb, cap_emb = self.model(images, captions, lens)
-        sim_matrix = self.model.get_sim_matrix(img_emb, cap_emb, lens)
+        img_emb, cap_emb = self.model.forward_batch(batch)
+        sim_matrix = self.model.get_sim_matrix(img_emb, cap_emb, batch)
         loss = self.model.mm_criterion(sim_matrix)
         # loss = self.mm_criterion(sim_matrix)
         return loss
@@ -213,22 +224,15 @@ class Trainer:
                 leave=False,
             )
 
-        for instance in pbar(train_loader):
+        for batch in pbar(train_loader):
             self.model.train()
 
             # Update progress bar
             self.optimizer.zero_grad()
 
             begin_forward = dt()
-            images, captions, lens, ids = instance
-            images = images.to(self.device)
-            captions = captions.to(self.device)
-            #images = nn.DataParallel(images).cuda()
-            #captions = nn.DataParallel(captions).cuda()
 
-            multimodal_loss = self._forward_multimodal_loss(
-                images, captions, lens
-            )
+            multimodal_loss = self._forward_multimodal_loss(batch)
 
             iteration = self.model.mm_criterion.iteration
             adjusted_iter = self.world_size * iteration
@@ -247,14 +251,18 @@ class Trainer:
             total_loss = multimodal_loss + total_lang_loss
             total_loss.backward()
 
-            if self.log_grad_norm and self.master:
-                logger.log_grad_norm(
-                    self.model, self.tb_writer,
-                    iteration=iteration,
-                )
-
+            # if self.log_grad_norm and self.master:
+            #     norm = logger.log_grad_norm(
+            #         self.model, self.tb_writer,
+            #         iteration=iteration,
+            #         reduce=sum,
+            #     )
+            norm = 0.
             if self.clip_grad > 0:
-                clip_grad_norm_(self.model.parameters(), self.clip_grad)
+                norm = clip_grad_norm_(
+                    self.model.parameters(),
+                    self.clip_grad
+                )
 
             self.optimizer.step()
             if self.lr_scheduler is not None:
@@ -271,6 +279,7 @@ class Trainer:
                 'batch_time': batch_time,
                 'countdown': self.count,
                 'epoch': epoch,
+                'norm': norm,
             })
 
             train_info.update(loss_info)
@@ -349,6 +358,7 @@ class Trainer:
 
             for k, v in result.items():
                 self.sysoutlog(f'{k:<10s}: {v:>6.1f}')
+
             result = {
                 f'{loader_name}/{metric_name}': v
                 for metric_name, v in result.items()
