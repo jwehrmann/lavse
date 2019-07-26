@@ -46,15 +46,18 @@ if __name__ == '__main__':
         local_rank=args.local_rank,
         lang=lang,
         text_repr=opt.dataset.text_repr,
-        vocab_path=opt.dataset.vocab_path,
+        vocab_paths=opt.dataset.vocab_paths,
         ngpu=ngpu,
         **opt.dataset.val,
     )
 
     device = torch.device(args.device)
 
-    tokenizer = loader.dataset.tokenizer
-    model = model.LAVSE(**opt.model, tokenizer=tokenizer)#.to(device)
+    tokenizers = loader.dataset.tokenizers
+    if type(tokenizers) != list:
+        tokenizers = [tokenizers]
+
+    model = model.LAVSE(**opt.model, tokenizers=tokenizers)#.to(device)
 
     # import pickle
     # with open(Path(opt.exp.outpath) / 'best_model.pkl', 'rb', 0) as f:

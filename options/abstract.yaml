@@ -1,7 +1,7 @@
 exp:
   resume: null # last, best_[...], or empty (from scratch)
 dataset:  
-  vocab_path: .vocab_cache/f30k_precomp.json
+  vocab_paths: [.vocab_cache/f30k_precomp.json,]
   text_repr: word
   loader_name: precomp
   train:

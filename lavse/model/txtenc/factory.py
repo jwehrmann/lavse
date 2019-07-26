@@ -189,6 +189,11 @@ __text_encoders__ = {
             'liwe_batch_norm': True,
         },
     },
+    'liwe_gru_glove': {
+        'class': txtenc.LiweGRUGlove,
+        'args': {
+        },
+    },
     'liwe_gru_512_512': {
         'class': txtenc.LiweGRU,
         'args': {
@@ -234,9 +239,9 @@ __text_encoders__['liwe_gru_384'] = __text_encoders__['liwe_gru_384_384']
 def get_available_txtenc():
     return __text_encoders__.keys()
 
-def get_text_encoder(name, **kwargs):
+def get_text_encoder(name, tokenizers, **kwargs):
     model_class = __text_encoders__[name]['class']
-    model = model_class(**kwargs)
+    model = model_class(tokenizers=tokenizers, **kwargs)
     return model
 
 # def get_text_encoder(name, **kwargs):

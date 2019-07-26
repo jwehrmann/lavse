@@ -101,7 +101,7 @@ if __name__ == '__main__':
         local_rank=args.local_rank,
         lang=lang,
         text_repr=opt.dataset.text_repr,
-        vocab_path=opt.dataset.vocab_path,
+        vocab_paths=opt.dataset.vocab_paths,
         ngpu=ngpu,
         **opt.dataset.train,
         # vocab_path=args.vocab_path,
@@ -122,7 +122,7 @@ if __name__ == '__main__':
                 local_rank=args.local_rank,
                 lang=lang,
                 text_repr=opt.dataset.text_repr,
-                vocab_path=opt.dataset.vocab_path,
+                vocab_paths=opt.dataset.vocab_paths,
                 ngpu=1,
                 **opt.dataset.val,
             )
@@ -139,7 +139,7 @@ if __name__ == '__main__':
                     data_path=args.data_path,
                     data_name=data_name,
                     loader_name='lang',
-                    vocab_path=args.vocab_path,
+                    vocab_paths=args.vocab_paths,
                     batch_size=args.batch_size,
                     workers=args.workers,
                     text_repr=args.text_repr,
@@ -165,8 +165,11 @@ if __name__ == '__main__':
     # )
 
 
-    tokenizer = train_loader.dataset.tokenizer
-    model = model.LAVSE(**opt.model, tokenizer=tokenizer)#.to(device)
+    tokenizers = train_loader.dataset.tokenizers
+    if type(tokenizers) != list:
+        tokenizers = [tokenizers]
+
+    model = model.LAVSE(**opt.model, tokenizers=tokenizers)#.to(device)
     logger.info(model)
 
     if opt.exp.resume is not None:

@@ -97,10 +97,10 @@ class PrecompDataset(Dataset):
 
     def __init__(
         self, data_path, data_name,
-        data_split, tokenizer, lang='en'
+        data_split, tokenizers, lang='en'
     ):
-        logger.debug(f'Precomp dataset\n {[data_path, data_split, tokenizer, lang]}')
-        self.tokenizer = tokenizer
+        logger.debug(f'Precomp dataset\n {[data_path, data_split, tokenizers, lang]}')
+        self.tokenizers = tokenizers
         self.lang = lang
         self.data_split = '.'.join([data_split, lang])
         self.data_path = Path(data_path)
@@ -161,11 +161,15 @@ class PrecompDataset(Dataset):
 
         # caption = self.precomp_captions[index]
         caption = self.captions[index]
-        tokens = self.tokenizer(caption)
+
+        ret_caption = []
+        for tokenizer in self.tokenizers:
+            tokens = tokenizer(caption)
+            ret_caption.append(tokens)
 
         batch = Dict(
             image=image,
-            caption=tokens,
+            caption=ret_caption,
             index=index,
             img_id=img_id,
         )

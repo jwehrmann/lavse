@@ -272,7 +272,7 @@ class GloveEmb(nn.Module):
         self.num_embeddings = num_embeddings
         self.add_rand_embed = add_rand_embed
         self.glove_dim = glove_dim
-        self.final_word_emb = glove_dim + rand_dim
+        self.final_word_emb = glove_dim
 
         # word embedding
         self.glove = nn.Embedding(num_embeddings, glove_dim)
@@ -281,6 +281,7 @@ class GloveEmb(nn.Module):
 
         if add_rand_embed:
             self.embed = nn.Embedding(num_embeddings, rand_dim)
+            self.final_word_emb = glove_dim + rand_dim
 
     def get_word_embed_size(self,):
         return self.final_word_emb

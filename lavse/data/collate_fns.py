@@ -64,20 +64,39 @@ class Collate:
     def __init__(self,):
         pass
 
+    # def __call__(self, data):
+    #     attributes = data[0].keys()
+
+    #     batch = Dict({
+    #         att: _preprocessing_fn[att](
+    #             [x[att] for x in data]
+    #         )
+    #         for att in attributes
+    #     })
+
+    #     return batch
+
     def __call__(self, data):
         attributes = data[0].keys()
 
-        batch = Dict({
-            att: _preprocessing_fn[att](
-                [x[att] for x in data]
-            )
-            for att in attributes
-        })
+        batch = Dict()
+        if len(data[0]['caption']) == 2:
+            words, chars = zip(*[x['caption'] for x in data])
+            words = default_padding(words)
+            char = liwe_padding(chars)
+            batch['caption'] = (words, char)
+        else:
+            batch['caption'] = default_padding([x['caption'][0] for x in data])
+
+        for att in attributes:
+            if att == 'caption':
+                continue
+            batch[att] = _preprocessing_fn[att]([x[att] for x in data])
 
         return batch
 
 
-def split_array(iterable, splitters=[0, 1, 2]):
+def split_array(iterable, splitters=[4,]):
     import itertools
     return [
         torch.LongTensor(list(g))
@@ -209,12 +228,3 @@ def liwe_padding(captions):
     return targets, sent_lens
 
 
-def split_array(iterable, splitters=[0, 1, 2]):
-    import itertools
-    return [
-        torch.LongTensor(list(g))
-        for k, g in itertools.groupby(
-            iterable, lambda x: x in splitters
-        )
-        if not k
-    ]

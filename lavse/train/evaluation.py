@@ -29,12 +29,15 @@ def predict_loader(model, data_loader, device):
 
     # for i, (images, captions, lengths, ids) in enumerate(data_loader):
     #     max_n_word = max(max_n_word, max(lengths))
-    max_n_word = 70
+    max_n_word = 77
 
     for batch in pbar_fn(data_loader):
 
         ids = batch['index']
-        cap, lengths = batch['caption']
+        if len(batch['caption'][0]) == 2:
+            (_, _), (_, lengths) = batch['caption']
+        else:
+            cap, lengths = batch['caption']
         img_emb, cap_emb = model.forward_batch(batch)
 
         if img_embs is None:
@@ -73,7 +76,7 @@ def predict_loader(model, data_loader, device):
 @torch.no_grad()
 def evaluate(
     model, img_emb, txt_emb, lengths,
-    device, shared_size=128
+    device, shared_size=128, return_sims=False
 ):
     model.eval()
     _metrics_ = ('r1', 'r5', 'r10', 'medr', 'meanr')
@@ -111,6 +114,9 @@ def evaluate(
     metrics.update(i2t_metrics)
     metrics.update(t2i_metrics)
     metrics['rsum'] = rsum
+
+    if return_sims:
+        return metrics, sims
 
     return metrics
 

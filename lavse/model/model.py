@@ -15,7 +15,7 @@ class LAVSE(nn.Module):
 
     def __init__(
         self, txt_enc={}, img_enc={}, similarity={},
-        tokenizer=None, latent_size=1024, **kwargs
+        tokenizers=None, latent_size=1024, **kwargs
     ):
         super(LAVSE, self).__init__()
 
@@ -34,7 +34,7 @@ class LAVSE(nn.Module):
         self.txt_enc = get_text_encoder(
             name = txt_enc.name,
             latent_size=latent_size,
-            num_embeddings=len(tokenizer),
+            tokenizers=tokenizers,
             **txt_enc.params,
         )
 

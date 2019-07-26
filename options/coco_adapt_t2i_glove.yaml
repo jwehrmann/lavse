@@ -1,6 +1,6 @@
 __include__: abstract.yaml
 exp:
-  outpath: logs/coco_precomp/adapt_i2t/glove+rand-/
+  outpath: logs/coco_precomp/adapt_t2i/glove+rand/
   resume: null # last, best_[...], or empty (from scratch)
 dataset:  
   vocab_paths: [.vocab_cache/coco_precomp.json]
@@ -34,12 +34,11 @@ model:
     devices: [cuda,]
     pooling: none
   similarity:
-    name: adapt_i2t
+    name: adapt_t2i
     params:
       latent_size: 1024
-      k: 1
+      # k: 8
       norm: False
-      cond_vec: False
       device: cuda # FIXME
     device: cuda # FIXME
 optimizer:

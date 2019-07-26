@@ -58,7 +58,7 @@ class DataIterator:
 
 def get_loader(
     loader_name, data_path, data_name, data_split,
-    batch_size, vocab_path, text_repr,
+    batch_size, vocab_paths, text_repr,
     lang='en', workers=4, ngpu=1, local_rank=0, **kwargs
 ):
 
@@ -66,19 +66,22 @@ def get_loader(
     dataset_class = get_dataset_class(loader_name)
     logger.debug(f'Dataset class is {dataset_class}')
 
-    collate_fn, tokenizer = get_text_processing_objects(
-        text_repr=text_repr,
-        vocab_path=vocab_path,
-        lang_adapt=('-' in lang)
-    )
+    # collate_fn, tokenizer = get_text_processing_objects(
+    #     text_repr=text_repr,
+    #     vocab_path=vocab_path,
+    #     lang_adapt=('-' in lang)
+    # )
 
-    logger.debug(f'Tokenizer built: {tokenizer}')
+    tokenizers = []
+    for vocab_path in vocab_paths:
+        tokenizers.append(Tokenizer(vocab_path))
+        logger.debug(f'Tokenizer built: {tokenizers[-1]}')
 
     dataset = dataset_class(
         data_path=data_path,
         data_name=data_name,
         data_split=data_split,
-        tokenizer=tokenizer,
+        tokenizers=tokenizers,
         lang=lang,
     )
     logger.debug(f'Dataset built: {dataset}')
@@ -177,50 +180,37 @@ __loaders__ = {
 }
 
 
-__text_representation__ = {
-    'word': {
-        'collate_fn': collate_fns.collate_fn_word,
-        'collate_fn_lang': collate_fns.collate_lang_word,
-        'tokenizer_args': {'char_level': False},
-    },
-    'char': {
-        'collate_fn': collate_fns.collate_lang_word,
-        'collate_fn_lang': collate_fns.collate_lang_word,
-        'tokenizer_args': {'char_level': True},
-    },
-    'liwe': {
-        'collate_fn': collate_fns.collate_fn_liwe,
-        'collate_fn_lang': collate_fns.collate_lang_liwe,
-        'tokenizer_args': {'char_level': True},
-    },
-}
+# __text_representation__ = {
+#     'word': {
+#         'collate_fn': collate_fns.collate_fn_word,
+#         'collate_fn_lang': collate_fns.collate_lang_word,
+#         'tokenizer_args': {'char_level': False},
+#     },
+#     'char': {
+#         'collate_fn': collate_fns.collate_lang_word,
+#         'collate_fn_lang': collate_fns.collate_lang_word,
+#         'tokenizer_args': {'char_level': True},
+#     },
+#     'liwe': {
+#         'collate_fn': collate_fns.collate_fn_liwe,
+#         'collate_fn_lang': collate_fns.collate_lang_liwe,
+#         'tokenizer_args': {'char_level': True},
+#     },
+# }
 
 
-def get_text_processing_objects(
-    text_repr, vocab_path=None, lang_adapt=False,
-):
+# def get_text_processing_objects(
+#     text_repr, vocab_paths=None, lang_adapt=False,
+# ):
 
-    logger.debug(
-        f'Getting text preprocessing {(text_repr, vocab_path)} '
-    )
+#     logger.debug(
+#         f'Getting text preprocessing {(text_repr, vocab_path)} '
+#     )
 
-    settings = __text_representation__[text_repr]
-    logger.debug(f'Settings {settings}')
+#     tokenizer = Tokenizer(**tokenizer_args)
+#     logger.debug(f'Tokenizer {tokenizer}')
 
-    if lang_adapt:
-        collate_fn = settings['collate_fn_lang']
-    else:
-        collate_fn = settings['collate_fn']
-
-    tokenizer_args = settings['tokenizer_args']
-    tokenizer_args.update({'vocab_path': vocab_path})
-    logger.debug(f'Collate fn {collate_fn}')
-    logger.debug(f'Tokenizer args {tokenizer_args}')
-
-    tokenizer = Tokenizer(**tokenizer_args)
-    logger.debug(f'Tokenizer {tokenizer}')
-
-    return collate_fn, tokenizer
+#     return collate_fn, tokenizer
 
 
 def get_dataset_class(loader_name):

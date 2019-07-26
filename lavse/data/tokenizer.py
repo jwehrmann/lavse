@@ -72,7 +72,8 @@ class Tokenizer(object):
         if vocab_path is not None:
             self.load(vocab_path)
 
-        logger.debug(f'Created tokenizer with init {len(self.vocab)} tokens.')
+        logger.info(f'Loaded from {vocab_path}.')
+        logger.info(f'Created tokenizer with init {len(self.vocab)} tokens.')
 
     def fit_on_files(self, txt_files):
         logger.debug('Fit on files.')
