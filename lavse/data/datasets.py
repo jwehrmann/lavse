@@ -256,11 +256,11 @@ class CrossLanguageLoader(Dataset):
 
     def __init__(
         self, data_path, data_name, data_split,
-        tokenizer, lang='en-de',
+        tokenizers, lang='en-de',
     ):
         logger.debug((
             'CrossLanguageLoader dataset\n '
-            f'{[data_path, data_split, tokenizer, lang]}'
+            f'{[data_path, data_split, tokenizers, lang]}'
         ))
 
         self.data_path = Path(data_path)
@@ -269,7 +269,10 @@ class CrossLanguageLoader(Dataset):
         self.data_split = '.'.join([data_split, lang])
 
         self.lang = lang
-        self.tokenizer = tokenizer
+
+        assert len(tokenizers) == 1 # TODO: implement multi-tokenizer
+
+        self.tokenizer = tokenizers[0]
 
         lang_base, lang_target = lang.split('-')
         base_filename = f'{data_split}_caps.{lang_base}.txt'

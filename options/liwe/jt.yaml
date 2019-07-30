@@ -1,0 +1,16 @@
+__include__: 'abstract.yaml'
+exp:
+  outpath: logs/jap_precomp.jt/liwe384/
+dataset:
+  train:
+    data: jap_precomp.jt
+  val: 
+    data: [jap_precomp.jt]
+  adapt:
+    data: []
+optimizer:
+  lr_scheduler: 
+    params:
+      step_size: 7600
+      gamma: 0.1
+

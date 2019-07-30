@@ -131,39 +131,24 @@ if __name__ == '__main__':
     assert len(val_loaders) > 0
 
     adapt_loaders = []
-    if args.adapt_data is not None:
-        for adapt_data in args.adapt_data:
-            data_name, lang = adapt_data.split('.')
-            adapt_loaders.append(
-                get_loader(
-                    data_path=args.data_path,
-                    data_name=data_name,
-                    loader_name='lang',
-                    vocab_paths=args.vocab_paths,
-                    batch_size=args.batch_size,
-                    workers=args.workers,
-                    text_repr=args.text_repr,
-                    data_split='train',
-                    lang=lang,
-                    ngpu=args.ngpu,
-                    local_rank=args.local_rank,
-                )
+    for adapt_data in opt.dataset.adapt.data:
+        data_name, lang = parse_loader_name(adapt_data)
+        adapt_loaders.append(
+            get_loader(
+                data_split='train',
+                data_path=data_path,
+                data_name=data_name,
+                loader_name='lang',
+                local_rank=args.local_rank,
+                lang=lang,
+                text_repr=opt.dataset.text_repr,
+                vocab_paths=opt.dataset.vocab_paths,
+                ngpu=1,
+                **opt.dataset.adapt,
             )
+        )
 
-    # if args.device != 'cpu':
-    #     device = torch.device('cuda:{}'.format(args.local_rank))
-
-    # model_params = Dict(
-    #     imgenc_name=args.image_encoder,
-    #     txtenc_name=args.text_encoder,
-    #     latent_size=args.latent_size,
-    #     num_embeddings=len(train_loader.dataset.tokenizer),
-    #     embed_dim=args.embed_dim,
-    #     txt_pooling=args.text_pooling,
-    #     img_pooling=args.image_pooling,
-    #     similarity_name=args.sim,
-    # )
-
+    logger.info(f'Adapt loaders: {len(adapt_loaders)}')
 
     tokenizers = train_loader.dataset.tokenizers
     if type(tokenizers) != list:
@@ -211,7 +196,7 @@ if __name__ == '__main__':
     )
 
     multilanguage_criterion = loss.ContrastiveLoss(
-        **opt.criterion
+        **opt.ml_criterion
     )
 
     # TODO: improve

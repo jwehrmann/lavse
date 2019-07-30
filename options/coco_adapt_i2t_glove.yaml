@@ -8,11 +8,11 @@ dataset:
   loader_name: precomp
   train:
     data: coco_precomp.en
-    workers: 0
+    workers: 1
     batch_size: 128
   val: 
     data: [coco_precomp.en]
-    workers: 0
+    workers: 1
     batch_size: 32
     limit: 5000
 model:

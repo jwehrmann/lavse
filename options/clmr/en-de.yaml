@@ -1,0 +1,72 @@
+exp:
+  outpath: logs/m30k_precomp.en-de/cmlr/
+  resume: null # last, best_[...], or empty (from scratch)
+dataset:  
+  vocab_paths: [.vocab_cache/complete_precomp.json,]
+  text_repr: word
+  loader_name: precomp
+  train:
+    data: m30k_precomp.en
+    workers: 1
+    batch_size: 128
+  val: 
+    data: [m30k_precomp.en, m30k_precomp.de]
+    workers: 1
+    batch_size: 32
+    limit: 5000
+  adapt: 
+    data: [m30k_precomp.en-de]
+    workers: 1
+    batch_size: 64
+    limit: 5000
+model:
+  latent_size: 1024
+  freeze_modules: []  
+  txt_enc:
+    name: gru
+    params:
+      embed_dim: 300
+      use_bi_gru: true
+    pooling: lens
+    devices: [cuda,]
+  img_enc:
+    name: hierarchical
+    params:
+      img_dim: 2048
+    devices: [cuda,]
+    pooling: mean    
+  similarity:
+    name: cosine
+    params:
+      device: cuda # FIXME
+    device: cuda # FIXME
+criterion:
+  margin: 0.2
+  max_violation: False
+  beta: 0.991
+ml_criterion:
+  margin: 0.2
+  max_violation: False
+  beta: 0.91
+optimizer:
+  import: lavse.optimizers.factory
+  name: adam
+  params:
+    lr: 0.0006
+  lr_scheduler:
+    name: step
+    params:
+      step_size: 8000
+      gamma: 0.1
+  grad_clip: 2.
+engine:
+  eval_before_training: False
+  debug: False
+  print_freq: 10
+  nb_epochs: 22
+  early_stop: 50
+  valid_interval: 500
+misc: # TODO
+  cuda: True
+  distributed: False # TODO 
+  seed: 1337 # TODO

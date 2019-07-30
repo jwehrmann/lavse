@@ -194,8 +194,8 @@ class Trainer:
         self, captions_a, lens_a, captions_b, lens_b, *args
     ):
 
-        cap_a_embed = self.model.embed_captions(captions_a, lens_a)
-        cap_b_embed = self.model.embed_captions(captions_b, lens_b)
+        cap_a_embed = self.model.embed_captions({'caption': (captions_a, lens_a)})
+        cap_b_embed = self.model.embed_captions({'caption': (captions_b, lens_b)})
 
         sim_matrix = self.model.get_sim_matrix(cap_a_embed, cap_b_embed, lens_b)
         loss = self.ml_criterion(sim_matrix)

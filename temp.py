@@ -1,24 +1,59 @@
-import torch
-from torch.optim import lr_scheduler
+import lavse
 import numpy as np
 
-def update_lr(curr_lr, gamma=0.25):
-    return curr_lr * gamma
 
-iters = [16000, 80000, 10000]
-it = range(*iters)
-print(it)
-
-gamma = 0.25
-curr_lr = 0.002
-lrs = {}
-for i in range(22*4000):
-    if i not in it:
-        continue
-    curr_lr = update_lr(curr_lr, gamma=gamma)
-    lrs[curr_lr] = i / 4000
+def print_stats(x):
+    print(f'Min : {np.min(x)}')
+    print(f'Max : {np.max(x)}')
+    print(f'Mean: {np.mean(x)}')
+    print(f'Std : {np.std(x)}')
 
 
-epochs = np.array(it) / 4000.
-print(epochs)
-print(lrs)
+ds = lavse.data.datasets.CrossLanguageLoader(
+    data_path='/opt/jonatas/datasets/lavse/',
+    data_name='jap_precomp',
+    lang='en-jt',
+    data_split='train',
+    tokenizers=[lavse.data.tokenizer.Tokenizer('.vocab_cache/char.json')],
+)
+
+# def collect_stats(sentences):
+
+wlen = []
+char_per_word = []
+nchar = []
+for caption in ds.lang_a:
+    words = ds.tokenizer.split_sentence(caption)
+    wlen.append(len(words))
+    char_per_word.extend([len(w) for w in words])
+    nchar.append(len(caption))
+
+print('\nLang A')
+print('Word Lengths')
+print_stats(wlen)
+
+print('\nChar per word')
+print_stats(char_per_word)
+
+print('\nN Char')
+print_stats(nchar)
+
+
+wlen = []
+char_per_word = []
+nchar = []
+for caption in ds.lang_b:
+    words = ds.tokenizer.split_sentence(caption)
+    wlen.append(len(words))
+    char_per_word.extend([len(w) for w in words])
+    nchar.append(len(caption))
+
+print('\nLang B')
+print('Word Lengths')
+print_stats(wlen)
+
+print('\nChar per word')
+print_stats(char_per_word)
+
+print('\nN Char')
+print_stats(nchar)

@@ -162,6 +162,12 @@ __text_encoders__ = {
             'liwe_neurons': [256, 512,],
         },
     },
+    'liwe_gru': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+        },
+    },
     'liwe_convgru_384_384': {
         'class': txtenc.LiweConvGRU,
         'args': {

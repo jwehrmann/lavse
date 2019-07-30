@@ -96,7 +96,12 @@ def get_loader(
         )
         shuffle = False
 
-    collate = collate_fns.Collate()
+    collate = collate_fns.Collate(text_repr)
+
+    if loader_name == 'lang' and text_repr == 'liwe':
+        collate = collate_fns.collate_lang_liwe
+    if loader_name == 'lang' and text_repr == 'word':
+        collate = collate_fns.collate_lang_word
 
     loader = DataLoader(
         dataset=dataset,

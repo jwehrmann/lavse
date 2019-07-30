@@ -192,13 +192,16 @@ class GloveRNNEncoderGlobal(nn.Module):
 class RNNEncoder(nn.Module):
 
     def __init__(
-        self, num_embeddings, embed_dim, latent_size,
+        self, tokenizers, embed_dim, latent_size,
         num_layers=1, use_bi_gru=True, no_txtnorm=False,
         rnn_type=nn.GRU):
 
         super(RNNEncoder, self).__init__()
         self.latent_size = latent_size
         self.no_txtnorm = no_txtnorm
+
+        assert len(tokenizers) == 1
+        num_embeddings = len(tokenizers[0])
 
         # word embedding
         self.embed = nn.Embedding(num_embeddings, embed_dim)
@@ -625,7 +628,7 @@ class LiweGRU(nn.Module):
 
     def __init__(
         self,
-        num_embeddings, embed_dim, latent_size,
+        tokenizers, embed_dim, latent_size,
         num_layers=1, use_bi_gru=True, no_txtnorm=False,
         rnn_cell=nn.GRU, partial_class=PartialConcat,
         liwe_neurons=[128, 256], liwe_dropout=0.0,
@@ -634,6 +637,10 @@ class LiweGRU(nn.Module):
     ):
 
         super(LiweGRU, self).__init__()
+
+        assert len(tokenizers) == 1
+
+        num_embeddings = len(tokenizers[0])
 
         __max_char_in_words = 30
         self.latent_size = latent_size
@@ -651,12 +658,13 @@ class LiweGRU(nn.Module):
         self.use_bi_gru = True
 
         self.rnn = nn.GRU(
-            embed_dim, latent_size, 1,
+            embed_dim, latent_size, num_layers,
             batch_first=True, bidirectional=True
         )
 
-    def forward(self, x, lens=None):
-
+    def forward(self, batch):
+        x, lens = batch['caption']
+        x = x.to(self.device)
         B, W, Ct = x.size()
 
         word_embed = self.embed(x).contiguous()
