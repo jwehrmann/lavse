@@ -1,20 +1,23 @@
-from run import load_yaml_opts, parse_loader_name
-import params
-from lavse.utils.logger import create_logger
-from lavse.data.loaders import get_loader
-from lavse.train.train import Trainer
-from lavse.train import evaluation
-from lavse.model import model
-from lavse.utils import helper, file_utils
-from lavse.data.collate_fns import default_padding
-from pathlib import Path
-import os
-import torch
-from tqdm import tqdm
-import sys
-
 import argparse
+import os
+import sys
+from pathlib import Path
+
+import torch
+
+import params
 from addict import Dict
+from lavse.data.collate_fns import default_padding, liwe_padding
+from lavse.data.loaders import get_loader
+from lavse.model import model
+from lavse.train import evaluation
+from lavse.train.train import Trainer
+from lavse.utils import file_utils, helper
+from lavse.utils.logger import create_logger
+from run import load_yaml_opts, parse_loader_name
+from tqdm import tqdm
+from lavse.model.similarity.measure import cosine_sim, l2norm
+
 
 def load_pickle(path):
     import pickle
@@ -118,8 +121,9 @@ if __name__ == '__main__':
 
     tokenizer = loader.dataset.tokenizers[0]
 
-    path = '/opt/jonatas/datasets/douglas/coco/train/captions.pickle'
-    outpath = Path('/opt/jonatas/datasets/douglas/coco/train/embed.pickle')
+    path = '/opt/jonatas/datasets/douglas/coco/val/captions.pickle'
+    outpath_file = Path('/opt/jonatas/datasets/coco_embeddings/adapt/embed_val.pickle')
+    outpath_folder = Path('/opt/jonatas/datasets/coco_embeddings/adapt/embed_val/')
     file = load_pickle(path)
     model = load_model(opt, [tokenizer])
     device = torch.device('cuda')
@@ -130,12 +134,12 @@ if __name__ == '__main__':
         outfile = {}
         for k, v in tqdm(file.items(), total=len(file)):
             tv, l = default_padding([tokenizer(x) for x in v])
+            # tv, l = liwe_padding([tokenizer(x) for x in v])
             batch = {
                 'caption': (tv, l)
             }
-            cap = model.embed_captions(batch).cpu()
-            # torch.save(cap, outpath / f'{k}.pkl')
+            cap = l2norm(model.embed_captions(batch).cpu(), dim=-1)
+
+            torch.save(cap, outpath_folder / f'{k}.pkl')
             outfile[k] = cap.cpu()
-        torch.save(outfile, outpath)
-
-
+        torch.save(outfile, outpath_file)

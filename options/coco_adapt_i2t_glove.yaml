@@ -1,6 +1,6 @@
 __include__: abstract.yaml
 exp:
-  outpath: logs/coco_precomp/adapt_i2t/glove+rand-/
+  outpath: logs/coco_precomp/adapt_i2t/glove+rand-freeze-simple-lr7e-4/
   resume: null # last, best_[...], or empty (from scratch)
 dataset:  
   vocab_paths: [.vocab_cache/coco_precomp.json]
@@ -17,7 +17,8 @@ dataset:
     limit: 5000
 model:
   latent_size: 1024
-  freeze_modules: [model.txt_enc.embed.glove,]
+  sfreeze_modules: [model.txt_enc.embed.glove,]
+  freeze_modules: []
   txt_enc:
     name: gru_glove
     params:
@@ -28,7 +29,7 @@ model:
     pooling: none
     devices: [cuda,]
   img_enc:
-    name: hierarchical
+    name: simple
     params:
       img_dim: 2048
     devices: [cuda,]
@@ -45,9 +46,15 @@ model:
 optimizer:
   name: adamax
   params:
-    lr: 0.001
-    gradual_warmup_steps: [0.5, 2.0, 8000] #torch.linspace
-    lr_decay_epochs: [16000, 80000, 10000] #range 
+    lr: 0.0007
+    gradual_warmup_steps: [0.5, 2.0, 16000] #torch.linspace
+    lr_decay_epochs: [40000, 80000, 8000] #range 
     lr_decay_rate: .25
   lr_scheduler: 
     name: null  
+
+
+  # lr: 0.0007
+  # gradual_warmup_steps: [0.5, 2.0, 4] #torch.linspace
+  # lr_decay_epochs: [10, 20, 2] #range
+  # lr_decay_rate: .25

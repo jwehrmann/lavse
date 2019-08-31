@@ -1,1 +1,15 @@
-{"coco_precomp.test.en/pred_time": 0.008611924000035742, "coco_precomp.test.en/sim_time": 0.0692636979999861, "coco_precomp.test.en/i2t_r1": 70.4, "coco_precomp.test.en/i2t_r5": 93.1, "coco_precomp.test.en/i2t_r10": 97.1, "coco_precomp.test.en/i2t_medr": 1.0, "coco_precomp.test.en/i2t_meanr": 2.3689999999999998, "coco_precomp.test.en/t2i_r1": 55.76, "coco_precomp.test.en/t2i_r5": 86.92, "coco_precomp.test.en/t2i_r10": 93.6, "coco_precomp.test.en/t2i_medr": 1.0, "coco_precomp.test.en/t2i_meanr": 4.9638, "coco_precomp.test.en/rsum": 496.88}
+{
+    "coco_precomp.test.en/pred_time": 0.008611924000035742,
+    "coco_precomp.test.en/sim_time": 0.0692636979999861,
+    "coco_precomp.test.en/i2t_r1": 70.4,
+    "coco_precomp.test.en/i2t_r5": 93.1,
+    "coco_precomp.test.en/i2t_r10": 97.1,
+    "coco_precomp.test.en/i2t_medr": 1.0,
+    "coco_precomp.test.en/i2t_meanr": 2.3689999999999998,
+    "coco_precomp.test.en/t2i_r1": 55.76,
+    "coco_precomp.test.en/t2i_r5": 86.92,
+    "coco_precomp.test.en/t2i_r10": 93.6,
+    "coco_precomp.test.en/t2i_medr": 1.0,
+    "coco_precomp.test.en/t2i_meanr": 4.9638,
+    "coco_precomp.test.en/rsum": 496.88
+}

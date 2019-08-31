@@ -191,16 +191,24 @@ if __name__ == '__main__':
         sysoutlog=print_fn,
     )
 
-    multimodal_criterion = loss.ContrastiveLoss(
-        **opt.criterion
-    )
+    if 'name' in opt.criterion:
+        print(opt.criterion)
+        multimodal_criterion = loss.get_loss(**opt.criterion)
+        multilanguage_criterion = loss.get_loss(**opt.criterion)
+    else:
+        multimodal_criterion = loss.ContrastiveLoss(
+            **opt.criterion
+        )
 
-    multilanguage_criterion = loss.ContrastiveLoss(
-        **opt.ml_criterion
-    )
+        multilanguage_criterion = loss.ContrastiveLoss(
+            **opt.ml_criterion
+        )
 
     # TODO: improve
     model.mm_criterion = multimodal_criterion
+    model.ml_criterion = None
+    if len(opt.dataset.adapt.data) > 0:
+        model.ml_criterion = multilanguage_criterion
 
     trainer.setup_optim(
         lr=opt.optimizer.lr,
@@ -226,5 +234,6 @@ if __name__ == '__main__':
         nb_epochs=opt.engine.nb_epochs,
         path=opt.exp.outpath,
         valid_interval=opt.engine.valid_interval,
-        world_size=1 # TODO
+        log_interval=opt.engine.print_freq,
+        world_size=1 # TODO,
     )

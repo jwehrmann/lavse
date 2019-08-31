@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+from ..layers import convblocks
+from ..layers import attention
 
 
 class PartialConcat(nn.Module):
@@ -19,6 +21,10 @@ class PartialConcat(nn.Module):
         ):
         super(PartialConcat, self).__init__()
 
+        weight_norm = nn.Identity
+        if liwe_wnorm:
+            from torch.nn.utils import weight_norm
+
         self.embed = nn.Embedding(num_embeddings, liwe_char_dim)
 
         self.total_embed_size = liwe_char_dim * max_chars
@@ -26,10 +32,6 @@ class PartialConcat(nn.Module):
         layers = []
         liwe_neurons = liwe_neurons + [embed_dim]
         in_sizes = [liwe_char_dim * max_chars] + liwe_neurons
-
-        weight_norm = nn.Identity
-        if liwe_wnorm:
-            from torch.nn.utils import weight_norm
 
         batch_norm = nn.BatchNorm1d
         if not liwe_batch_norm:
@@ -68,6 +70,81 @@ class PartialConcat(nn.Module):
         self.B, self.W, self.Ct = x.size()
         return self.forward_embed(x)
 
+
+class PartialConcat(nn.Module):
+
+    def __init__(
+            self,
+            num_embeddings,
+            embed_dim=300,
+            liwe_char_dim=24,
+            liwe_neurons=[128, 256],
+            liwe_dropout=0.0,
+            liwe_wnorm=True,
+            liwe_batch_norm=True,
+            liwe_activation=nn.ReLU(inplace=True),
+            max_chars=26,
+            **kwargs
+        ):
+        super(PartialConcat, self).__init__()
+
+        if type(liwe_activation) == str:
+            liwe_activation = eval(liwe_activation)
+
+        weight_norm = nn.Identity
+        if liwe_wnorm:
+            from torch.nn.utils import weight_norm
+
+        self.embed = nn.Embedding(num_embeddings, liwe_char_dim)
+
+        self.attn = attention.SelfAttention(
+            liwe_char_dim * max_chars,
+            activation=liwe_activation,
+            k=4,
+        )
+
+        self.total_embed_size = liwe_char_dim * max_chars
+
+        layers = []
+        liwe_neurons = liwe_neurons + [embed_dim]
+        in_sizes = [liwe_char_dim * max_chars] + liwe_neurons
+
+        batch_norm = nn.BatchNorm1d
+        if not liwe_batch_norm:
+            batch_norm = nn.Identity
+
+        for n, i in zip(liwe_neurons, in_sizes):
+            layer = nn.Sequential(*[
+                weight_norm(
+                    nn.Conv1d(i, n, 1)
+                ),
+                nn.Dropout(liwe_dropout),
+                batch_norm(n),
+                liwe_activation,
+            ])
+            layers.append(layer)
+
+        self.layers = nn.Sequential(*layers)
+
+    def forward_embed(self, x):
+
+        partial_words = x.view(self.B, -1) # (B, W*Ct)
+        char_embed = self.embed(partial_words) # (B, W*Ct, Cw)
+        # char_embed = l2norm(char_embed, 2)
+        char_embed = char_embed.view(self.B, self.W, -1)
+        # a, b, c = char_embed.shape
+        # left = self.total_embed_size - c
+        # char_embed = nn.ReplicationPad1d(left//2)(char_embed)
+        char_embed = char_embed.permute(0, 2, 1)
+        word_embed = self.layers(char_embed)
+        return word_embed
+
+    def forward(self, x):
+        '''
+            x: (batch, nb_words, nb_characters [tokens])
+        '''
+        self.B, self.W, self.Ct = x.size()
+        return self.forward_embed(x)
 
 
 class PartialGRUs(nn.Module):
@@ -127,13 +204,15 @@ class PartialConcatScale(nn.Module):
         ):
         super(PartialConcatScale, self).__init__()
 
+        if type(liwe_activation) == str:
+            liwe_activation = eval(liwe_activation)
 
         if not liwe_wnorm:
             weight_norm = nn.Identity
         else:
             from torch.nn.utils import weight_norm
 
-        self.embed = weight_norm(nn.Embedding(num_embeddings, liwe_char_dim))
+        self.embed = nn.Embedding(num_embeddings, liwe_char_dim)
         self.embed_dim = embed_dim
         self.max_chars = max_chars
         self.total_embed_size = liwe_char_dim * max_chars
@@ -157,6 +236,8 @@ class PartialConcatScale(nn.Module):
             ])
             layers.append(layer)
 
+        self.scale = nn.Parameter(torch.ones(1))
+
         self.layers = nn.Sequential(*layers)
 
     def forward_embed(self, x):
@@ -178,7 +259,7 @@ class PartialConcatScale(nn.Module):
             self.B, self.W, self.max_chars, -1
         )
 
-        char_embed_scale = char_embed_scale * torch.sqrt(words_length)
+        char_embed_scale = char_embed_scale * (torch.sqrt(words_length) * self.scale)
         char_embed_scale = char_embed_scale.view(self.B, self.W, -1)
 
         # a, b, c = char_embed.shape
@@ -255,7 +336,6 @@ class PartialGRUProj(nn.Module):
         return embed_word.permute(0, 2, 1)
 
 
-
 class GloveEmb(nn.Module):
 
     def __init__(
@@ -278,6 +358,7 @@ class GloveEmb(nn.Module):
         self.glove = nn.Embedding(num_embeddings, glove_dim)
         glove = nn.Parameter(torch.load(glove_path))
         self.glove.weight = glove
+        self.glove.requires_grad = False
 
         if add_rand_embed:
             self.embed = nn.Embedding(num_embeddings, rand_dim)
@@ -285,7 +366,6 @@ class GloveEmb(nn.Module):
 
     def get_word_embed_size(self,):
         return self.final_word_emb
-
 
     def forward(self, x):
         '''

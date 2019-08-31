@@ -1,0 +1,15 @@
+__include__: 'clmr.yaml'
+exp:
+  outpath: logs/m30k_precomp.de/clmr/
+dataset:
+  train:
+    data: m30k_precomp.de
+  val: 
+    data: [m30k_precomp.de]
+  adapt:
+    data: []
+optimizer:
+  lr_scheduler: 
+    params:
+      step_size: 15000
+      gamma: 0.1

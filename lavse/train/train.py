@@ -140,15 +140,19 @@ class Trainer:
             exit()
 
         # Set up tensorboard logger
-        tb_writer = helper.get_tb_writer(path)
-        if os.path.exists(path):
-            a = input(f'{path} already exists! Do you want to rewrite it? [y/n] ')
-            if a.lower() == 'y':
-                import shutil
-                shutil.rmtree(path)
-                tb_writer = helper.get_tb_writer(path)
+        if path is not None:
+            if os.path.exists(path):
+                a = input(f'{path} already exists! Do you want to rewrite it? [y/n] ')
+                if a.lower() == 'y':
+                    import shutil
+                    shutil.rmtree(path)
+                    tb_writer = helper.get_tb_writer(path)
+                else:
+                    exit()
             else:
-                exit()
+                tb_writer = helper.get_tb_writer(path)
+        else:
+            tb_writer = helper.get_tb_writer()
 
         path = tb_writer.file_writer.get_logdir()
         file_utils.save_yaml_opts(Path(path) / 'options.yaml', self.args)
@@ -197,8 +201,13 @@ class Trainer:
         cap_a_embed = self.model.embed_captions({'caption': (captions_a, lens_a)})
         cap_b_embed = self.model.embed_captions({'caption': (captions_b, lens_b)})
 
-        sim_matrix = self.model.get_sim_matrix(cap_a_embed, cap_b_embed, lens_b)
-        loss = self.ml_criterion(sim_matrix)
+        if len(cap_a_embed.shape) == 3:
+            from ..model.txtenc import pooling
+            cap_a_embed = pooling.last_hidden_state_pool(cap_a_embed, lens_a)
+            cap_b_embed = pooling.last_hidden_state_pool(cap_b_embed, lens_b)
+
+        sim_matrix = self.model.get_ml_sim_matrix(cap_a_embed, cap_b_embed, lens_b)
+        loss = self.model.ml_criterion(sim_matrix)
 
         return loss
 

@@ -1,1 +1,15 @@
-{"jap_precomp.test.en/pred_time": 1.3173265939985868, "jap_precomp.test.en/sim_time": 45.27786530699814, "jap_precomp.test.en/i2t_r1": 42.68167860798362, "jap_precomp.test.en/i2t_r5": 76.76560900716478, "jap_precomp.test.en/i2t_r10": 86.89866939611055, "jap_precomp.test.en/i2t_medr": 2.0, "jap_precomp.test.en/i2t_meanr": 5.992835209825998, "jap_precomp.test.en/t2i_r1": 28.49539406345957, "jap_precomp.test.en/t2i_r5": 64.4216990788127, "jap_precomp.test.en/t2i_r10": 79.77482088024566, "jap_precomp.test.en/t2i_medr": 3.0, "jap_precomp.test.en/t2i_meanr": 11.47410440122825, "jap_precomp.test.en/rsum": 379.0378710337769}
+{
+    "jap_precomp.test.en/pred_time": 1.3173265939985868,
+    "jap_precomp.test.en/sim_time": 45.27786530699814,
+    "jap_precomp.test.en/i2t_r1": 42.68167860798362,
+    "jap_precomp.test.en/i2t_r5": 76.76560900716478,
+    "jap_precomp.test.en/i2t_r10": 86.89866939611055,
+    "jap_precomp.test.en/i2t_medr": 2.0,
+    "jap_precomp.test.en/i2t_meanr": 5.992835209825998,
+    "jap_precomp.test.en/t2i_r1": 28.49539406345957,
+    "jap_precomp.test.en/t2i_r5": 64.4216990788127,
+    "jap_precomp.test.en/t2i_r10": 79.77482088024566,
+    "jap_precomp.test.en/t2i_medr": 3.0,
+    "jap_precomp.test.en/t2i_meanr": 11.47410440122825,
+    "jap_precomp.test.en/rsum": 379.0378710337769
+}

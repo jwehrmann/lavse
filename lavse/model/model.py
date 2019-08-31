@@ -1,12 +1,12 @@
 import torch
 import torch.nn as nn
 
-from .imgenc import get_image_encoder, get_img_pooling
-from .txtenc import get_text_encoder, get_txt_pooling
-from .similarity.similarity import Similarity
-from .similarity.measure import l2norm
-from .similarity.factory import get_similarity_object
 from ..utils.logger import get_logger
+from .imgenc import get_image_encoder, get_img_pooling
+from .similarity.factory import get_similarity_object
+from .similarity.measure import l2norm
+from .similarity.similarity import Similarity
+from .txtenc import get_text_encoder, get_txt_pooling
 
 logger = get_logger()
 
@@ -15,7 +15,8 @@ class LAVSE(nn.Module):
 
     def __init__(
         self, txt_enc={}, img_enc={}, similarity={},
-        tokenizers=None, latent_size=1024, **kwargs
+        ml_similarity={}, tokenizers=None, latent_size=1024,
+        **kwargs
     ):
         super(LAVSE, self).__init__()
 
@@ -58,6 +59,23 @@ class LAVSE(nn.Module):
             **kwargs
         )
 
+        self.ml_similarity = nn.Identity()
+        if ml_similarity is not None:
+            self.ml_similarity = self.similarity
+
+            if ml_similarity != {}:
+                ml_sim_obj = get_similarity_object(
+                    ml_similarity.name,
+                    **ml_similarity.params
+                )
+
+                self.ml_similarity = Similarity(
+                    similarity_object=ml_sim_obj,
+                    device=similarity.device,
+                    latent_size=latent_size,
+                    **kwargs
+                )
+
         logger.info(f'Using similarity: {similarity.name,}')
 
     def set_devices_(
@@ -69,7 +87,6 @@ class LAVSE(nn.Module):
         if len(txt_devices) > 1:
             self.txt_enc = data_parallel.DataParallel(self.txt_enc)
             self.txt_enc.device = torch.device('cuda')
-
         elif len(txt_devices) == 1:
             self.txt_enc.to(txt_devices[0])
             self.txt_enc.device = torch.device(txt_devices[0])
@@ -84,7 +101,9 @@ class LAVSE(nn.Module):
         self.loss_device = torch.device(
             loss_device
         )
+
         self.similarity = self.similarity.to(self.loss_device)
+        self.ml_similarity = self.ml_similarity.to(self.loss_device)
 
         logger.info((
             f'Setting devices: '
@@ -127,6 +146,9 @@ class LAVSE(nn.Module):
 
     def get_sim_matrix(self, embed_a, embed_b, lens=None):
         return self.similarity(embed_a, embed_b, lens)
+
+    def get_ml_sim_matrix(self, embed_a, embed_b, lens=None):
+        return self.ml_similarity(embed_a, embed_b, lens)
 
     def get_sim_matrix_shared(
         self, embed_a, embed_b, lens=None, shared_size=128

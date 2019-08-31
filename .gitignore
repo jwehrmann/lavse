@@ -10,6 +10,15 @@ runs/
 temp/
 .vocab_cache/
 logs/
+figures/
+logs/
+logs2/
+logs_aaai/
+jupyter/correct_predictions/
+jupyter/incorrect_predictions/
+jupyter/t2i_imgs/
+
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

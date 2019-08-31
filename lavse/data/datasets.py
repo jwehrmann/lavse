@@ -97,7 +97,7 @@ class PrecompDataset(Dataset):
 
     def __init__(
         self, data_path, data_name,
-        data_split, tokenizers, lang='en'
+        data_split, tokenizers, lang='en',
     ):
         logger.debug(f'Precomp dataset\n {[data_path, data_split, tokenizers, lang]}')
         self.tokenizers = tokenizers

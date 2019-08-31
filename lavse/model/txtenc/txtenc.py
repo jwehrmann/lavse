@@ -8,7 +8,7 @@ from torch.nn.utils.rnn import pack_padded_sequence
 from torch.nn.utils.rnn import pad_packed_sequence
 
 from ...model.layers import attention, convblocks
-from .embedding import PartialConcat, GloveEmb
+from .embedding import PartialConcat, GloveEmb, PartialConcatScale
 from . import pooling
 
 import numpy as np
@@ -91,6 +91,7 @@ class GloveRNNEncoder(nn.Module):
             rand_dim=embed_dim,
         )
 
+
         # caption embedding
         self.use_bi_gru = use_bi_gru
         self.rnn = rnn_type(
@@ -117,6 +118,68 @@ class GloveRNNEncoder(nn.Module):
         if self.use_bi_gru:
             b, t, d = cap_emb.shape
             cap_emb = cap_emb.view(b, t, 2, d//2).mean(-2)
+
+        # normalization in the joint embedding space
+        if not self.no_txtnorm:
+            cap_emb = l2norm(cap_emb, dim=-1)
+
+        return cap_emb, lengths
+
+
+# RNN Based Language Model
+class GloveRNNEncoderProj(nn.Module):
+
+    def __init__(
+        self, tokenizers, embed_dim, latent_size, rnn_units,
+        num_layers=1, use_bi_gru=True, no_txtnorm=False,
+        rnn_type=nn.GRU, glove_path=None, add_rand_embed=False):
+
+        super().__init__()
+        self.latent_size = latent_size
+        self.no_txtnorm = no_txtnorm
+
+        assert len(tokenizers) == 1
+
+        num_embeddings = len(tokenizers[0])
+
+        self.embed = GloveEmb(
+            num_embeddings,
+            glove_dim=embed_dim,
+            glove_path=glove_path,
+            add_rand_embed=add_rand_embed,
+            rand_dim=embed_dim,
+        )
+
+        # caption embedding
+        self.use_bi_gru = use_bi_gru
+        self.rnn = rnn_type(
+            self.embed.final_word_emb,
+            rnn_units, num_layers,
+            batch_first=True,
+            bidirectional=use_bi_gru
+        )
+
+        self.fc = nn.Linear(rnn_units, latent_size)
+
+        self.embed.embed.weight.data.uniform_(-0.1, 0.1)
+
+    def forward(self, batch):
+        """Handles variable size captions
+        """
+        captions, lengths = batch['caption']
+        captions = captions.to(self.device)
+        # Embed word ids to vectors
+        emb = self.embed(captions)
+
+        # Forward propagate RNN
+        # self.rnn.flatten_parameters()
+        cap_emb, _ = self.rnn(emb)
+
+        if self.use_bi_gru:
+            b, t, d = cap_emb.shape
+            cap_emb = cap_emb.view(b, t, 2, d//2).mean(-2)
+
+        cap_emb = self.fc(cap_emb)
 
         # normalization in the joint embedding space
         if not self.no_txtnorm:
@@ -647,6 +710,9 @@ class LiweGRU(nn.Module):
         self.embed_dim = embed_dim
         self.no_txtnorm = no_txtnorm
 
+        if type(partial_class) == str:
+            partial_class = eval(partial_class)
+
         self.embed = partial_class(
             num_embeddings=num_embeddings, embed_dim=embed_dim,
             liwe_neurons=liwe_neurons, liwe_dropout=liwe_dropout,
@@ -683,7 +749,6 @@ class LiweGRU(nn.Module):
             cap_emb = l2norm(cap_emb, dim=-1)
 
         return cap_emb, lens
-
 
 
 class LiweGRUGlove(nn.Module):
@@ -752,8 +817,6 @@ class LiweGRUGlove(nn.Module):
             cap_emb = l2norm(cap_emb, dim=-1)
 
         return cap_emb, clen
-
-
 
 
 class LiweConvGRU(nn.Module):

@@ -20,7 +20,17 @@ def default_padding(captions, device=None):
     return targets.to(device), lengths
 
 
+def repeat_pad(caption, n):
+    nc = len(caption)
+    left = max([n-nc, 0])
+    times = left // nc
+    caption = caption + caption * (times + 1)
+    caption = caption[:n]
+    return caption
+
+
 def liwe_padding(captions):
+
     splitted_caps = []
     for caption in captions:
         sc = split_array(caption)

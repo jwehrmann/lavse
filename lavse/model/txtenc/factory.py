@@ -7,16 +7,14 @@ import torch
 import math
 
 
-class GELU(nn.Module):
-    """
-    Paper Section 3.4, last paragraph notice that BERT used the GELU instead of RELU
-    """
-
-    def forward(self, x):
-        return 0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
-
-
 __text_encoders__ = {
+    'gru_proj': {
+        'class': txtenc.GloveRNNEncoderProj,
+        'args': {
+            'use_bi_gru': True,
+            'rnn_type': nn.GRU,
+        },
+    },
     'gru': {
         'class': txtenc.RNNEncoder,
         'args': {
@@ -101,18 +99,6 @@ __text_encoders__ = {
             # 'liwe_dropout': 0.1,
         },
     },
-    'liwe_gru_scale_384_gelu_nobn': {
-        'class': txtenc.LiweGRU,
-        'args': {
-            'use_bi_gru': True,
-            'partial_class': embedding.PartialConcatScale,
-            # 'liwe_activation': nn.ReLU(),
-            'liwe_activation': GELU(),
-            'liwe_batch_norm': False,
-            'liwe_neurons': [384, 384],
-            # 'liwe_dropout': 0.1,
-        },
-    },
     'liwe_gru_gru': {
         'class': txtenc.LiweGRU,
         'args': {
@@ -181,7 +167,6 @@ __text_encoders__ = {
             'use_bi_gru': True,
             'liwe_neurons': [384, 384],
             'partial_class': embedding.PartialConcat,
-            'liwe_activation': GELU(),
             'liwe_batch_norm': False,
         },
     },
@@ -191,7 +176,6 @@ __text_encoders__ = {
             'use_bi_gru': True,
             'liwe_neurons': [384, 384],
             'partial_class': embedding.PartialConcat,
-            'liwe_activation': GELU(),
             'liwe_batch_norm': True,
         },
     },

@@ -59,7 +59,8 @@ class DataIterator:
 def get_loader(
     loader_name, data_path, data_name, data_split,
     batch_size, vocab_paths, text_repr,
-    lang='en', workers=4, ngpu=1, local_rank=0, **kwargs
+    lang='en', workers=4, ngpu=1, local_rank=0,
+    **kwargs
 ):
 
     logger.debug('Get loader')

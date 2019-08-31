@@ -1,6 +1,6 @@
-__include__: 'abstract.yaml'
+__include__: 'liwe.yaml'
 exp:
-  outpath: logs/m30k_precomp.en-de/liwe384/
+  outpath: logs/m30k_precomp.en-de/liwe/
 dataset:
   train:
     data: m30k_precomp.en    

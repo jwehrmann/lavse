@@ -1,7 +1,11 @@
+'''
+find ../logs/ -name *json -print0 | xargs -0 python print_result.py
+'''
 import sys
 sys.path.append('../')
 
 from lavse.utils.file_utils import load_json
+from collections import defaultdict
 
 files = sys.argv[1:]
 
@@ -21,12 +25,35 @@ def load_and_filter_file(file_path):
     }
 
     res_line = '\t'.join(
-            [f'{result_filtered[metric]:3.2f}' for metric in metrics]
+            [f'{result_filtered[metric]:>4.2f}' for metric in metrics]
         )
-    _file = file_path.split('/')[-1]
+    _file = '/'.join(file_path.split('/')[-3:])
     print(
-        f'{_file:40s}\t{res_line}'
+        f'{_file:60s}\t{res_line}'
     )
+
+
+def load_and_filter_file(file_path):
+
+    result = load_json(file)
+    result_filtered = defaultdict(dict)
+    for k, v in result.items():
+        data_name, metr = k.split('/')
+        if metr not in metrics:
+            continue
+        result_filtered[data_name].update({metr: v})
+
+    _file = '/'.join(file_path.split('/')[-3:-1])
+    for data_name, vals in result_filtered.items():
+        # print(data_name, [vals[m] for m in metrics])
+        res_line = '\t'.join(
+            [f'{vals[metric]:>4.2f}' for metric in metrics]
+        )
+        # print(_file, data_name, res_line)
+
+        print(
+            f'{_file:55s}\t{data_name:20s}\t{res_line}'
+        )
 
 for file in files:
     load_and_filter_file(file)

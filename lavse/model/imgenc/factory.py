@@ -5,6 +5,10 @@ import torchvision
 
 
 _image_encoders = {
+    'simple': {
+        'class': precomp.SimplePrecomp,
+        'args': {}
+    },
     'hierarchical': {
         'class': precomp.HierarchicalEncoder,
         'args': {
