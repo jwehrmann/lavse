@@ -13,6 +13,8 @@ from ...utils.logger import get_logger
 from .. import txtenc
 from ..layers import attention, condbn, dynconv
 from ..txtenc.pooling import mean_pooling
+from ..txtenc import pooling
+from ..txtenc import factory
 from .measure import cosine_sim, l2norm
 
 logger = get_logger()
@@ -394,7 +396,9 @@ class ProjConvI2T(nn.Module):
 
     def __init__(
             self, device, latent_size=1024, reduce_proj=4, groups=1,
-            img_dim=2048, kernel_size=3, padding=1
+            img_dim=2048, kernel_size=3, padding=1,
+            activation='nn.Identity()',
+            norm_output=False, gamma=10, text_pool='max'
         ):
         super().__init__()
 
@@ -415,6 +419,15 @@ class ProjConvI2T(nn.Module):
 
         self.device = device
 
+        self.softmax = lambda x: 1
+        self.gamma = 1.
+        if norm_output:
+            self.softmax = nn.Softmax(dim=-1)
+            # self.gamma = nn.Parameter(torch.ones(1))
+            self.gamma = gamma
+
+        # self.pool = factory.get_txt_pooling(text_pool)
+
     def forward(self, img_embed, cap_embed, lens, **kwargs):
         '''
             img_embed: (B, 36, latent_size)
@@ -431,6 +444,7 @@ class ProjConvI2T(nn.Module):
         ).cuda()
 
         img_vectors = self.red_img(img_embed).mean(-1)
+        cap_embed = cap_embed[:,:,:36]
 
         for i, img_tensor in enumerate(img_embed):
             img_vector = img_vectors[i]
@@ -439,10 +453,12 @@ class ProjConvI2T(nn.Module):
                 cap_embed, img_vector,
             )
 
+            # txt_vector = txt_vector[:,:,:30].max(-1)[0]
             txt_vector = self.conv(txt_filtered)
-            # FIXME: use lens to get correct pooling
-            # TODO: softmax?
-            txt_vector = txt_vector[:,:,:30].max(-1)[0]
+            mask = self.softmax(txt_vector * self.gamma)
+            txt_vector = mask * txt_vector
+            txt_vector = txt_vector.mean(-1)
+            # txt_vector = self.pool(txt_vector.permute(0, 2, 1), lens)
 
             img_vector = l2norm(img_tensor.mean(-1).unsqueeze(0), dim=-1)
             cap_vector = l2norm(txt_vector, dim=-1)
@@ -457,7 +473,8 @@ class ProjConvT2I(nn.Module):
 
     def __init__(
             self, device, latent_size=1024, reduce_proj=4, groups=1,
-            img_dim=2048, kernel_size=3, padding=1, activate=False
+            img_dim=2048, kernel_size=3, padding=1, activate=False,
+            norm_output=False, gamma=1
         ):
         super().__init__()
 
@@ -476,6 +493,13 @@ class ProjConvT2I(nn.Module):
 
         self.conv = nn.Conv1d(latent_size, latent_size, 1)
         self.device = device
+
+        self.softmax = lambda x: 1
+        self.gamma = 1.
+        if norm_output:
+            self.softmax = nn.Softmax(dim=-1)
+            # self.gamma = nn.Parameter(torch.ones(1))
+            self.gamma = gamma
 
     def forward(self, img_embed, cap_embed, lens, **kwargs):
         '''
@@ -500,6 +524,9 @@ class ProjConvT2I(nn.Module):
 
             img_filtered = self.pconv1(img_embed, cap_repr)
             img_filtered = self.conv(img_filtered)
+
+            mask = self.softmax(img_filtered * self.gamma)
+            img_filtered = mask * img_filtered
 
             img_vector = img_filtered.mean(-1)
 

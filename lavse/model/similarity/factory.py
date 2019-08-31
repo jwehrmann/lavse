@@ -120,6 +120,9 @@ _similarities = {
 }
 
 
+_similarities['projconv_i2t'] = _similarities['projconv']
+
+
 def get_similarity_object(name, **kwargs):
     settings = _similarities[name]
     args_dict = settings['args']

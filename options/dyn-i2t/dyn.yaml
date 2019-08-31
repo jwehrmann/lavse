@@ -1,0 +1,61 @@
+exp:  
+  resume: null
+dataset:  
+  text_repr: word
+  loader_name: precomp
+  train:    
+    workers: 1
+    batch_size: 125
+  val:
+    workers: 1
+    batch_size: 32
+    limit: 5000
+model:
+  latent_size: 1024
+  freeze_modules: [model.txt_enc.embed.glove,]
+  txt_enc:
+    name: gru_glove
+    params:
+      embed_dim: 300
+      use_bi_gru: true
+      glove_path: .vocab_cache/glove_840B_f30k_precomp.json.pkl
+      add_rand_embed: true
+    pooling: none
+    devices:
+    - cuda
+  img_enc:
+    name: simple
+    params:
+      img_dim: 2048
+    devices:
+    - cuda
+    pooling: none
+  similarity:
+    name: projconv_i2t
+    params:
+      latent_size: 1024
+      reduce_proj: 8
+      groups: 1024
+      img_dim: 2048
+      kernel_size: 1
+      padding: 1
+      device: cuda
+    device: cuda
+criterion:
+  name: contrastive
+  params:
+    margin: 0.2
+    max_violation: false
+    weight: 1.0
+    beta: 0.991
+engine:
+  eval_before_training: false
+  debug: false
+  print_freq: 50
+  nb_epochs: 100
+  early_stop: 50
+  valid_interval: 500
+misc:
+  cuda: true
+  distributed: false
+  seed: 1337
