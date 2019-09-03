@@ -1,4 +1,4 @@
-__include__: abstract.yaml
+__include__: ../abstract.yaml
 exp:
   outpath: logs_aaai2/f30k_precomp/adapt_t2i/beta_0.9999/
   resume: null # last, best_[...], or empty (from scratch)
@@ -46,3 +46,5 @@ criterion:
   margin: 0.2
   max_violation: False
   beta: 0.9999
+engine:    
+  early_stop: 20
