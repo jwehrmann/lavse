@@ -1,6 +1,6 @@
 __include__: abstract.yaml
 exp:
-  outpath: logs_aaai2/f30k_precomp/adapt_t2i/freeze_gamma_5/
+  outpath: logs_aaai2/f30k_precomp/adapt_t2i/beta_0.999/
   resume: null # last, best_[...], or empty (from scratch)
 model:
   latent_size: 1024
@@ -25,7 +25,7 @@ model:
     params:
       latent_size: 1024
       k: 1
-      gamma: 5
+      gamma: 10
       norm_output: True
       device: cuda # FIXME
     device: cuda # FIXME
@@ -42,3 +42,7 @@ optimizer:
       step_size: 1000
       gamma: 1      
   grad_clip: 2.
+criterion:
+  margin: 0.2
+  max_violation: False
+  beta: 0.999
