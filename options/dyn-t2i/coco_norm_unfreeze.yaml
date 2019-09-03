@@ -1,43 +1,43 @@
 __include__: 'dyn.yaml'
 exp:
-  outpath: logs_aaai/f30k_precomp.en/dyn-i2t/softmax_norm-r16-lr7e-04
+  outpath: logs_aaai/coco_precomp.en/dyn-t2i/softmax_norm-r8-nofreeze
 dataset:
-  vocab_paths: [.vocab_cache/f30k_precomp.json]
+  vocab_paths: [.vocab_cache/coco_precomp.json]
   train:
-    data: f30k_precomp.en
+    data: coco_precomp.en
     workers: 1
     batch_size: 100
   val:
-    data: [f30k_precomp.en]
+    data: [coco_precomp.en]
     workers: 1
     batch_size: 32
     limit: 5000
 optimizer:
   name: adamax
   params:
-    lr: 0.0007 # 7e-4
-    gradual_warmup_steps: [0.5, 2.0, 4000] #torch.linspace
-    lr_decay_epochs: [10000, 20000, 3000] #range
+    lr: 0.0007
+    gradual_warmup_steps: [0.5, 2.0, 16000] #torch.linspace
+    lr_decay_epochs: [40000, 80000, 8000] #range 
     lr_decay_rate: .25
   lr_scheduler: 
-    name: null
+    name: null  
   grad_clip: 2.
 model:
   latent_size: 1024  
+  freeze_modules: []
   txt_enc:
     params:      
-      glove_path: .vocab_cache/glove_840B_f30k_precomp.json.pkl
+      glove_path: .vocab_cache/glove_840B_coco_precomp.json.pkl
   similarity:
-    name: projconv_i2t
+    name: projconv_t2i
     params:
       latent_size: 1024
-      reduce_proj: 16
+      reduce_proj: 8
       groups: 1024
       img_dim: 2048
       kernel_size: 1
-      padding: 1
+      padding: 0
       norm_output: True
       gamma: 10
-      text_pool: mean
       device: cuda
     device: cuda

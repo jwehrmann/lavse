@@ -1,6 +1,6 @@
 __include__: 'dyn.yaml'
 exp:
-  outpath: logs_aaai/coco_precomp.en/dyn-adamax/
+  outpath: logs_aaai/coco_precomp.en/dyn-adamax/lr-7e-4
 dataset:
   vocab_paths: [.vocab_cache/coco_precomp.json]
   train:
@@ -15,8 +15,8 @@ dataset:
 optimizer:
   name: adamax
   params:
-    lr: 0.001
-    gradual_warmup_steps: [0.5, 2.0, 20000] #torch.linspace
+    lr: 0.0007
+    gradual_warmup_steps: [0.5, 2.0, 16000] #torch.linspace
     lr_decay_epochs: [40000, 80000, 8000] #range 
     lr_decay_rate: .25
   lr_scheduler: 

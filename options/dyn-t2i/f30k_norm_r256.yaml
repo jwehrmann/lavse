@@ -1,12 +1,12 @@
 __include__: 'dyn.yaml'
 exp:
-  outpath: logs_aaai/f30k_precomp.en/dyn-i2t/softmax_norm-r16-lr7e-04
+  outpath: logs_aaai/f30k_precomp.en/dyn-t2i/softmax_norm-r256  
 dataset:
   vocab_paths: [.vocab_cache/f30k_precomp.json]
   train:
     data: f30k_precomp.en
     workers: 1
-    batch_size: 100
+    batch_size: 109
   val:
     data: [f30k_precomp.en]
     workers: 1
@@ -15,7 +15,7 @@ dataset:
 optimizer:
   name: adamax
   params:
-    lr: 0.0007 # 7e-4
+    lr: 0.001 # 7e-4
     gradual_warmup_steps: [0.5, 2.0, 4000] #torch.linspace
     lr_decay_epochs: [10000, 20000, 3000] #range
     lr_decay_rate: .25
@@ -28,16 +28,15 @@ model:
     params:      
       glove_path: .vocab_cache/glove_840B_f30k_precomp.json.pkl
   similarity:
-    name: projconv_i2t
+    name: projconv_t2i
     params:
       latent_size: 1024
-      reduce_proj: 16
+      reduce_proj: 256
       groups: 1024
       img_dim: 2048
       kernel_size: 1
-      padding: 1
+      padding: 0
       norm_output: True
       gamma: 10
-      text_pool: mean
       device: cuda
     device: cuda

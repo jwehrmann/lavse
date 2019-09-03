@@ -1,18 +1,7 @@
 __include__: abstract.yaml
 exp:
-  outpath: logs_aaai2/coco_precomp/adapt_t2i/glove_freeze_gamma5/
+  outpath: logs_aaai2/f30k_precomp/adapt_t2i/gamma_10/
   resume: null # last, best_[...], or empty (from scratch)
-dataset:
-  vocab_paths: [.vocab_cache/coco_precomp.json]
-  train:
-    data: coco_precomp.en
-    batch_size: 128
-    workers: 0
-  val: 
-    data: [coco_precomp.en]
-    workers: 0
-  adapt:
-    data: []
 model:
   latent_size: 1024
   freeze_modules: [model.txt_enc.embed.glove,]
@@ -21,7 +10,7 @@ model:
     params:
       embed_dim: 300
       use_bi_gru: true
-      glove_path: '.vocab_cache/glove_coco_precomp.json.pkl'
+      glove_path: '.vocab_cache/glove_f30k_precomp.json.pkl'
       add_rand_embed: true
     pooling: none
     devices: [cuda,]
@@ -35,20 +24,21 @@ model:
     name: adapt_t2i
     params:
       latent_size: 1024
-      k: 1      
+      k: 1
+      gamma: 10
+      train_gamma: False
       norm_output: True
-      gamma: 5
       device: cuda # FIXME
     device: cuda # FIXME
 optimizer:
   name: adamax
   params:
-    lr: 0.0007
-    gradual_warmup_steps: [0.5, 2.0, 16000] #torch.linspace
-    lr_decay_epochs: [40000, 80000, 8000] #range 
+    lr: 0.001 # 7e-4
+    gradual_warmup_steps: [0.5, 2.0, 4000] #torch.linspace
+    lr_decay_epochs: [10000, 20000, 3000] #range
     lr_decay_rate: .25
   lr_scheduler: 
-    name: null  
+    name: null
     params:
       step_size: 1000
       gamma: 1      

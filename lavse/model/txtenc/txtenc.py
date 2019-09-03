@@ -101,7 +101,8 @@ class GloveRNNEncoder(nn.Module):
             bidirectional=use_bi_gru
         )
 
-        self.embed.embed.weight.data.uniform_(-0.1, 0.1)
+        if hasattr(self.embed, 'embed'):
+            self.embed.embed.weight.data.uniform_(-0.1, 0.1)
 
     def forward(self, batch):
         """Handles variable size captions

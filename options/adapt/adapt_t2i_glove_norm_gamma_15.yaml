@@ -1,6 +1,6 @@
 __include__: abstract.yaml
 exp:
-  outpath: logs/f30k_precomp/adapt_t2i/param-glove-freeze-img_norm_softmax-le7e-4/
+  outpath: logs_aaai2/f30k_precomp/adapt_t2i/freeze_gamma_15/
   resume: null # last, best_[...], or empty (from scratch)
 model:
   latent_size: 1024
@@ -24,7 +24,8 @@ model:
     name: adapt_t2i
     params:
       latent_size: 1024
-      k: 1      
+      k: 1
+      gamma: 15
       norm_output: True
       device: cuda # FIXME
     device: cuda # FIXME

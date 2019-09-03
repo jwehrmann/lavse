@@ -18,11 +18,13 @@ metrics = [
 def load_and_filter_file(file_path):
 
     result = load_json(file)
+    print(result)
     result_filtered = {
         k.split('/')[1]: v
         for k, v in result.items()
         if k.split('/')[1] in metrics
     }
+
 
     res_line = '\t'.join(
             [f'{result_filtered[metric]:>4.2f}' for metric in metrics]

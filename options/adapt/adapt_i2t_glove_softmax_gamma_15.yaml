@@ -1,0 +1,31 @@
+__include__: abstract.yaml
+exp:
+  outpath: logs_aaai2/f30k_precomp/adapt_i2t/glove-gamma15-img_norm_softmax/
+  resume: null # last, best_[...], or empty (from scratch)
+model:
+  latent_size: 1024
+  freeze_modules: []
+  txt_enc:
+    name: gru_glove
+    params:
+      embed_dim: 300
+      use_bi_gru: true
+      glove_path: '.vocab_cache/glove_f30k_precomp.json.pkl'
+      add_rand_embed: true
+    pooling: none
+    devices: [cuda,]
+  img_enc:
+    name: simple
+    params:
+      img_dim: 2048
+    devices: [cuda,]
+    pooling: none
+  similarity:
+    name: adapt_i2t
+    params:
+      latent_size: 1024
+      k: 1      
+      gamma: 15
+      norm_output: True
+      device: cuda # FIXME
+    device: cuda # FIXME

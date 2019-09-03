@@ -99,7 +99,7 @@ class AdaptiveEmbeddingT2I(nn.Module):
 
     def __init__(
             self, device, latent_size=1024, k=8, norm=False, task='t2i',
-            norm_output=False, gamma=10
+            norm_output=False, gamma=10, train_gamma=False
         ):
         super().__init__()
 
@@ -124,8 +124,9 @@ class AdaptiveEmbeddingT2I(nn.Module):
         self.gamma = 1.
         if norm_output:
             self.softmax = nn.Softmax(dim=-1)
-            # self.gamma = nn.Parameter(torch.ones(1))
             self.gamma = gamma
+            if train_gamma:
+                self.gamma = nn.Parameter(torch.zeros(1) + self.gamma)
 
     def forward(self, img_embed, cap_embed, lens, **kwargs):
         '''
@@ -308,7 +309,7 @@ class AdaptiveEmbeddingI2T(nn.Module):
 
     def __init__(
             self, device, latent_size=1024,
-            k=8, norm=False, norm_output=False, **kwargs
+            k=8, norm=False, norm_output=False, gamma=10, **kwargs
         ):
         super().__init__()
 
@@ -338,7 +339,7 @@ class AdaptiveEmbeddingI2T(nn.Module):
         if norm_output:
             self.softmax = nn.Softmax(dim=-1)
             # self.gamma = nn.Parameter(torch.ones(1))
-            self.gamma = 10.
+            self.gamma = gamma
 
 
     def forward(self, img_embed, cap_embed, lens, **kwargs):
@@ -347,7 +348,7 @@ class AdaptiveEmbeddingI2T(nn.Module):
             cap_embed: (B, T, latent_size)
         '''
         # (B, 1024, T)
-        cap_embed = cap_embed.permute(0, 2, 1).to(self.device)[:,:,:36]
+        cap_embed = cap_embed.permute(0, 2, 1).to(self.device)[:,:,:34]
         img_embed = img_embed.permute(0, 2, 1).to(self.device)
         # print('cap_embed', cap_embed.shape)
         # print('img_embed', img_embed.shape)
@@ -398,7 +399,8 @@ class ProjConvI2T(nn.Module):
             self, device, latent_size=1024, reduce_proj=4, groups=1,
             img_dim=2048, kernel_size=3, padding=1,
             activation='nn.Identity()',
-            norm_output=False, gamma=10, text_pool='max'
+            norm_output=False, gamma=10, text_pool='max',
+            **kwargs
         ):
         super().__init__()
 
@@ -413,6 +415,7 @@ class ProjConvI2T(nn.Module):
             groups=groups,
             weightnorm='softmax',
         )
+        self.activation = eval(activation)
 
         self.conv = nn.Conv1d(latent_size, latent_size, 1)
         # self.fc_img = nn.Conv1d(latent_size, latent_size, 1)
@@ -455,9 +458,10 @@ class ProjConvI2T(nn.Module):
 
             # txt_vector = txt_vector[:,:,:30].max(-1)[0]
             txt_vector = self.conv(txt_filtered)
+            txt_vector = self.activation(txt_vector)
             mask = self.softmax(txt_vector * self.gamma)
             txt_vector = mask * txt_vector
-            txt_vector = txt_vector.mean(-1)
+            txt_vector = txt_vector.max(-1)[0]
             # txt_vector = self.pool(txt_vector.permute(0, 2, 1), lens)
 
             img_vector = l2norm(img_tensor.mean(-1).unsqueeze(0), dim=-1)
