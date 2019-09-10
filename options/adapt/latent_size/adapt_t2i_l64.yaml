@@ -1,9 +1,9 @@
-__include__: abstract.yaml
+__include__: ../abstract.yaml
 exp:
-  outpath: logs_aaai2/f30k_precomp/adapt_i2t/glove-freeze-img_norm_softmax/
+  outpath: logs_aaai2/f30k_precomp/adapt_t2i/latent_64/
   resume: null # last, best_[...], or empty (from scratch)
 model:
-  latent_size: 1024
+  latent_size: 64
   freeze_modules: [model.txt_enc.embed.glove,]
   txt_enc:
     name: gru_glove
@@ -21,10 +21,24 @@ model:
     devices: [cuda,]
     pooling: none
   similarity:
-    name: adapt_i2t
+    name: adapt_t2i
     params:
-      latent_size: 1024
-      k: 1      
+      latent_size: 64
+      k: 1
+      gamma: 10
       norm_output: True
       device: cuda # FIXME
     device: cuda # FIXME
+optimizer:
+  name: adamax
+  params:
+    lr: 0.001 # 7e-4
+    gradual_warmup_steps: [0.5, 2.0, 4000] #torch.linspace
+    lr_decay_epochs: [10000, 20000, 3000] #range
+    lr_decay_rate: .25
+  lr_scheduler: 
+    name: null
+    params:
+      step_size: 1000
+      gamma: 1      
+  grad_clip: 2.

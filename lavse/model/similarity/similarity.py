@@ -114,13 +114,12 @@ class AdaptiveEmbeddingT2I(nn.Module):
         # self.alpha = nn.Parameter(torch.ones(1))
         # self.beta = nn.Parameter(torch.zeros(1))
 
-
         self.norm = norm
         if norm:
             self.feature_norm = ClippedL2Norm()
         self.task = task
 
-        self.softmax = lambda x: 1
+        self.softmax = lambda x: x
         self.gamma = 1.
         if norm_output:
             self.softmax = nn.Softmax(dim=-1)
@@ -145,6 +144,8 @@ class AdaptiveEmbeddingT2I(nn.Module):
             img_embed.shape[0], cap_embed.shape[0]
         ).to(self.device)
 
+        masks = []
+
         for i, cap_tensor in enumerate(cap_embed):
             # cap: 1024, T
             # img: 1024, 36
@@ -153,20 +154,24 @@ class AdaptiveEmbeddingT2I(nn.Module):
             cap_repr = cap_tensor[:,:n_words].mean(-1).unsqueeze(0)
 
             img_output = self.cbn_img(img_embed, cap_repr)
+            # print(img_output.shape)
 
             mask = self.softmax(img_output * self.gamma)
+            masks.append(mask)
+
             img_output = mask * img_output
 
             img_vector = img_output.mean(-1)
 
             img_vector = l2norm(img_vector, dim=-1)
+
             cap_vector = cap_repr
             cap_vector = l2norm(cap_vector, dim=-1)
 
             sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
             sims[:,i] = sim
 
-
+        self.masks = masks
         return sims
 
 
@@ -305,11 +310,43 @@ class Attentive(nn.Module):
         return sims
 
 
+# class HierPooling(nn.Module):
+
+#     def __init__(self, in_dim=1024, out_dim=1024):
+#         super().__init__()
+#         self.fc = nn.Linear(in_dim * 2, out_dim)
+
+#     def forward(self, txt_output, lens):
+#         max_len = txt_output.shape[-1]
+#         # mask = self.softmax(txt_output * self.gamma)
+#         # txt_output = mask * txt_output
+
+#         mask = torch.arange(max_len).expand(len(lens), max_len) < torch.tensor(lens).long().unsqueeze(1)
+#         mask = mask.float().cuda()
+
+#         # mask_last = torch.arange(max_len).expand(len(lens), max_len) == (torch.tensor(lens).long().unsqueeze(1) - 1)
+#         # mask_last = mask_last.float().cuda()
+
+#         # txt_output = txt_output * mask.unsqueeze(1)
+
+#         mean_vector = txt_output.sum(-1) / mask.unsqueeze(1).sum(-1)
+
+#         max_vector = txt_output.max(-1)[0]
+#         # last_hidden = txt_output * mask_last.unsqueeze(1)
+#         # last_hidden = last_hidden.max(-1)[0]
+
+#         hidden = torch.cat([mean_vector, max_vector,], dim=1)
+#         out = self.fc(hidden)
+#         return out
+
+
+
 class AdaptiveEmbeddingI2T(nn.Module):
 
     def __init__(
             self, device, latent_size=1024,
-            k=8, norm=False, norm_output=False, gamma=10, **kwargs
+            k=8, norm=False, norm_output=False, gamma=10,
+            train_gamma=False, hier_pooling=False, **kwargs
         ):
         super().__init__()
 
@@ -334,12 +371,17 @@ class AdaptiveEmbeddingI2T(nn.Module):
         if norm:
             self.feature_norm = ClippedL2Norm()
 
+        # self.hier_pooling = None
+        # if hier_pooling:
+        #     self.hier_pooling = HierPooling()
+
         self.softmax = lambda x: 1
         self.gamma = 1.
         if norm_output:
             self.softmax = nn.Softmax(dim=-1)
-            # self.gamma = nn.Parameter(torch.ones(1))
             self.gamma = gamma
+            if train_gamma:
+                self.gamma = nn.Parameter(gamma + torch.zeros(1))
 
 
     def forward(self, img_embed, cap_embed, lens, **kwargs):
@@ -363,6 +405,7 @@ class AdaptiveEmbeddingI2T(nn.Module):
         ).cpu()
 
         img_embed = img_embed.mean(-1)
+        max_len = int(np.max(lens))
 
         for i, img_tensor in enumerate(img_embed):
             # cap: 1024, T
@@ -378,7 +421,13 @@ class AdaptiveEmbeddingI2T(nn.Module):
             #     txt_vector = txt_vector.squeeze(2)
             mask = self.softmax(txt_output * self.gamma)
             txt_output = mask * txt_output
-            txt_vector = txt_output.mean(-1)
+
+            # if self.hier_pooling is not None:
+            #     txt_vector = self.hier_pooling(txt_output, lens)
+            # else:
+            mask = torch.arange(max_len).expand(len(lens), max_len) < torch.tensor(lens).long().unsqueeze(1)
+            mask = mask.float().cuda()
+            txt_vector = txt_output.sum(-1) / mask.unsqueeze(1).sum(-1)
 
             # print('txt vector', txt_vector.shape)
             txt_vector = l2norm(txt_vector, dim=-1)
@@ -541,7 +590,6 @@ class ProjConvT2I(nn.Module):
             sims[:,i] = sim
 
         return sims
-
 
 
 class ProjConvT2IAgg(nn.Module):

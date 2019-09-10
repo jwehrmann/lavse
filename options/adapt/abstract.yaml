@@ -7,7 +7,7 @@ dataset:
   train:
     data: f30k_precomp.en
     workers: 1
-    batch_size: 128
+    batch_size: 115
   val: 
     data: [f30k_precomp.en]
     workers: 1

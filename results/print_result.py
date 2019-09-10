@@ -40,7 +40,10 @@ def load_and_filter_file(file_path):
     result = load_json(file)
     result_filtered = defaultdict(dict)
     for k, v in result.items():
-        data_name, metr = k.split('/')
+        try:
+            data_name, metr = k.split('/')
+        except:
+            continue
         if metr not in metrics:
             continue
         result_filtered[data_name].update({metr: v})

@@ -3,6 +3,7 @@ import os
 import sys
 from pathlib import Path
 
+import numpy as np
 import torch
 
 import params
@@ -20,10 +21,7 @@ from tqdm import tqdm
 def get_test_params():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        'options',
-    )
-    parser.add_argument(
-        'options2',
+        'options', nargs='+'
     )
     parser.add_argument(
         '--device', default='cuda',
@@ -74,8 +72,7 @@ if __name__ == '__main__':
 
     # loader_name = 'precomp'
     args = get_test_params()
-    opt = load_yaml_opts(args.options)
-    opt2 = load_yaml_opts(args.options2)
+    opt = load_yaml_opts(args.options[0])
     # init_distributed_mode(args)s
 
     logger = create_logger(
@@ -114,20 +111,25 @@ if __name__ == '__main__':
     if type(tokenizers) != list:
         tokenizers = [tokenizers]
 
-    model_a = load_model(opt, tokenizers)
-    model_b = load_model(opt2, tokenizers)
-
     device = torch.device('cuda')
 
-    img_emb, cap_emb, lens = evaluation.predict_loader(model_a, loader, device)
-    m, sims_a = evaluation.evaluate(model_a, img_emb, cap_emb, lens, device, return_sims=True)
+    sims = []
+    for options in args.options:
+        options = load_yaml_opts(options)
+        model_a = load_model(options, tokenizers)
 
-    img_emb, cap_emb, lens = evaluation.predict_loader(model_b, loader, device)
-    m, sims_b = evaluation.evaluate(model_b, img_emb, cap_emb, lens, device, return_sims=True)
+        img_emb, cap_emb, lens = evaluation.predict_loader(model_a, loader, device)
+        m, sims_a = evaluation.evaluate(model_a, img_emb, cap_emb, lens, device, return_sims=True)
+        sims.append(sims_a)
 
-    sims = (sims_a + sims_b) / 2
+    sims = np.array(sims)
+    # print(sims.shape)
+    sims = sims.mean(0)
 
-    import numpy as np
+    # img_emb, cap_emb, lens = evaluation.predict_loader(model_b, loader, device)
+    # m, sims_b = evaluation.evaluate(model_b, img_emb, cap_emb, lens, device, return_sims=True)
+
+    # sims = (sims_a + sims_b) / 2
 
     i2t_metrics = evaluation.i2t(sims)
     t2i_metrics = evaluation.t2i(sims)
