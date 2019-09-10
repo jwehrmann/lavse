@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from torch.nn import functional as F
 
 
 class SelfAttention(nn.Module):
@@ -181,3 +182,112 @@ class ModuleSelfAttention(nn.Module):
             return out
 
         return out, attention
+
+
+class Attention(nn.Module):
+
+    def __init__(
+        self, input_dim=1024, hidden_units=512,
+        mlp_glimpses=0, smooth=10.):
+        super(Attention, self).__init__()
+        self.mlp_glimpses = mlp_glimpses
+
+        self.fusion = lambda x: torch.cat(x, -1)
+        self.smooth = smooth
+
+        if self.mlp_glimpses > 0:
+            self.linear0 = nn.Linear(input_dim, hidden_units)
+            self.linear1 = nn.Linear(hidden_units, mlp_glimpses)
+
+    def forward(self, q, v):
+        '''
+            q: (batch, dim)
+            v: (1, regions/timesteps, dim)
+        '''
+        alpha = self.process_attention(q, v)
+
+        if self.mlp_glimpses > 0:
+            alpha = self.linear0(alpha)
+            alpha = F.relu(alpha)
+            alpha = self.linear1(alpha)
+
+        alpha = F.softmax(alpha, dim=1)
+
+        if alpha.size(2) > 1: # nb_glimpses > 1
+            alphas = torch.unbind(alpha, dim=2)
+            v_outs = []
+            for alpha in alphas:
+                alpha = alpha.unsqueeze(2).expand_as(v)
+                v_out = alpha*v
+                v_out = v_out.sum(1)
+                v_outs.append(v_out)
+            v_out = torch.cat(v_outs, dim=1)
+        else:
+            # alpha = alpha.expand_as(v)
+            v_out = alpha*v
+            v_out = v_out.sum(1)
+
+        return v_out
+
+    def process_attention(self, q, v):
+        batch_size = q.size(0)
+        n_regions = v.size(1)
+        q = q[:,None,:].expand(batch_size, n_regions, q.size(1))
+        v = v.expand(batch_size, n_regions, v.size(-1))
+
+        alpha = torch.cat([q, v], -1)
+        return alpha
+
+
+
+class AttentionL(nn.Module):
+
+    def __init__(self, input_dim, hidden_units, mlp_glimpses=0):
+        super().__init__()
+        self.mlp_glimpses = mlp_glimpses
+        self.fusion = lambda x: torch.cat(x, dim=-1)
+        if self.mlp_glimpses > 0:
+            self.linear0 = nn.Linear(input_dim, hidden_units)
+            self.linear1 = nn.Linear(hidden_units, mlp_glimpses)
+
+    def forward(self, q, v):
+        alpha = self.process_attention(q, v)
+
+        if self.mlp_glimpses > 0:
+            alpha = self.linear0(alpha)
+            alpha = F.relu(alpha)
+            alpha = self.linear1(alpha)
+
+        alpha = F.softmax(alpha, dim=1)
+
+        # FIXME: wtf is happening here
+        if alpha.size(2) > 1: # nb_glimpses > 1
+            alphas = torch.unbind(alpha, dim=2)
+            v_outs = []
+            for alpha in alphas:
+                alpha = alpha.unsqueeze(2).expand_as(v)
+                v_out = alpha*v
+                v_out = v_out.sum(1)
+                v_outs.append(v_out)
+            v_out = torch.cat(v_outs, dim=1)
+        else:
+            # alpha = alpha.expand_as(v)
+            v_out = alpha*v
+            v_out = v_out.sum(1)
+        return v_out
+
+    def process_attention(self, q, v):
+        '''
+            q: (batch, dim)
+            v: (regions, dim)
+
+        '''
+        batch_size, dimensions = q.shape
+        _, regions, _ = v.shape
+
+        q = q[:,None,:].expand(batch_size, regions, dimensions)
+        v = v.expand(batch_size, regions, dimensions)
+
+        alpha = self.fusion([q, v])
+        # alpha = alpha.view(batch_size, n_regions, -1)
+        return alpha

@@ -1,118 +1,107 @@
-import argparse
+import os
+import sys
 from pathlib import Path
 
 import torch
 
-import profiles
-from addict import Dict
-from lavse.model import imgenc, loss, txtenc
-from lavse.model.model import LAVSE
-from lavse.train import train
-from lavse.data.loaders import get_loader, get_loaders
+import params
+from lavse.data.loaders import get_loader
+from lavse.model import model
+from lavse.train.train import Trainer
+from lavse.utils import file_utils, helper
 from lavse.utils.logger import create_logger
-from lavse.utils import helper, file_utils
+from run import load_yaml_opts, parse_loader_name
+from tqdm import tqdm
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--model_path',
-    )
-    parser.add_argument(
-        '--data_path',
-    )
-    parser.add_argument(
-        '--split',
-        default='test',
-    )
-    parser.add_argument(
-        '--val_data', default=['f30k_precomp.en'], nargs='+',
-        help=(
-            'Data used for evaluation during training.'
-            'Eg.: [f30k_precomp.en,m30k_precomp.de]'
-        ),
-    )
-    parser.add_argument(
-        '--vocab_path', default='./vocab/complete.json',
-        help='Path to saved vocabulary json files.',
-    )
-    parser.add_argument(
-        '--text_repr', default='word', type=str,
-        help='Device to ',
-    )
-    parser.add_argument(
-        '--device', default='cuda:0', type=str,
-        help='Device to run the model.',
-    )
-    parser.add_argument(
-        '--batch_size', default=128, type=int,
-        help='Size of a training mini-batch.',
-    )
-    parser.add_argument(
-        '--outpath',
-        help='Path to save logs and models.',
-    )
-    parser.add_argument(
-        '--workers', default=10, type=int,
-        help='Number of data loader workers.',
-    )
-    parser.add_argument(
-        '--log_level', default='info',
-        choices=['debug', 'info'],
-        help='Log/verbosity level.',
-    )
+    # mp.set_start_method('spawn')
 
+    # loader_name = 'precomp'
+    args = params.get_test_params()
+    opt = load_yaml_opts(args.options)
+    # init_distributed_mode(args)s
 
-    args = parser.parse_args()
-    args = Dict(vars(args))
+    logger = create_logger(
+        level='debug' if opt.engine.debug else 'info')
 
-    logger = create_logger(level=args.log_level)
+    logger.info(f'Used args   : \n{args}')
+    logger.info(f'Used options: \n{opt}')
 
-    logger.info(f'Used args: \n{args}')
+    if 'DATA_PATH' not in os.environ:
+        data_path = opt.dataset.data_path
+    else:
+        data_path = os.environ['DATA_PATH']
 
-    val_loaders = []
-    for val_data in args.val_data:
-        data_name, lang = val_data.split('.')
-        val_loaders.append(
-            get_loader(
-                data_path=args.data_path,
-                data_name=data_name,
-                loader_name='precomp',
-                vocab_path=args.vocab_path,
-                batch_size=args.batch_size,
-                workers=args.workers,
-                text_repr=args.text_repr,
-                data_split=args.split,
-                lang=lang,
-            )
+    ngpu = torch.cuda.device_count()
+
+    loaders = []
+    for data_name in opt.dataset.val.data:
+        data_name, lang = parse_loader_name(data_name)
+
+        loader = get_loader(
+            data_split=args.data_split,
+            data_path=data_path,
+            data_name=data_name,
+            loader_name=opt.dataset.loader_name,
+            local_rank=args.local_rank,
+            lang=lang,
+            text_repr=opt.dataset.text_repr,
+            vocab_paths=opt.dataset.vocab_paths,
+            ngpu=ngpu,
+            **opt.dataset.val,
         )
+        loaders.append(loader)
 
     device = torch.device(args.device)
 
-    checkpoint = helper.restore_checkpoint(args.model_path)
-    model = checkpoint['model'].to(device)
-    model_params = checkpoint['args']['model_args']
+    loader = loaders[0]
+    tokenizers = loader.dataset.tokenizers
+    if type(tokenizers) != list:
+        tokenizers = [tokenizers]
 
-    # model = LAVSE(**model_params).to(device)
-    # model.load_state_dict(checkpoint['model'])
-    print(model)
-
-    model.set_master_(True)
-    model.set_devices_(['cuda'], ['cuda'], 'cuda')
-
-    trainer = train.Trainer(
+    model = model.LAVSE(**opt.model, tokenizers=tokenizers)#.to(device)
+    checkpoint = helper.restore_checkpoint(
+        path=Path(opt.exp.outpath) / 'best_model.pkl',
         model=model,
-        device=device,
-        args={'args': args, 'model_args': model_params},
-        master=True,
+    )
+
+    model = checkpoint['model']
+    logger.info((
+        f"Loaded checkpoint. Iteration: {checkpoint['iteration']}, "
+        f"rsum: {checkpoint['rsum']}, "
+        f"keys: {checkpoint.keys()}"
+    ))
+
+    model.set_devices_(
+        txt_devices=opt.model.txt_enc.devices,
+        img_devices=opt.model.img_enc.devices,
+        loss_device=opt.model.similarity.device,
+    )
+
+    is_master = True
+    model.master = is_master # FIXME: Replace "if print" by built_in print
+    print_fn = (lambda x: x) if not is_master else tqdm.write
+
+    trainer = Trainer(
+        model=model,
+        args={'args': args, 'model_args': opt.model},
+        sysoutlog=print_fn,
     )
 
     result, rs = trainer.evaluate_loaders(
-        val_loaders
+        loaders
     )
     print(result)
 
+    if args.outpath is not None:
+        outpath = args.outpath
+    else:
+        filename = f'{data_name}.{lang}:{args.data_split}:results.json'
+        outpath = Path(opt.exp.outpath) / filename
+
+    print('Saving into', outpath)
     file_utils.save_json(
-        path=args.outpath,
+        path=outpath,
         obj=result,
     )

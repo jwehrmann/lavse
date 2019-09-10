@@ -8,6 +8,18 @@
 pycocotools/
 runs/
 temp/
+.vocab_cache/
+logs/
+figures/
+logs/
+logs2/
+logs_aaai/
+logs_aaai2/
+jupyter/correct_predictions/
+jupyter/incorrect_predictions/
+jupyter/t2i_imgs/
+
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

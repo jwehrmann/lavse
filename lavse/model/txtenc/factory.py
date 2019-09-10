@@ -7,21 +7,29 @@ import torch
 import math
 
 
-class GELU(nn.Module):
-    """
-    Paper Section 3.4, last paragraph notice that BERT used the GELU instead of RELU
-    """
-
-    def forward(self, x):
-        return 0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
-
-
 __text_encoders__ = {
+    'gru_proj': {
+        'class': txtenc.GloveRNNEncoderProj,
+        'args': {
+            'use_bi_gru': True,
+            'rnn_type': nn.GRU,
+        },
+    },
     'gru': {
         'class': txtenc.RNNEncoder,
         'args': {
             'use_bi_gru': True,
             'rnn_type': nn.GRU,
+        },
+    },
+    'gru_glove': {
+        'class': txtenc.GloveRNNEncoder,
+        'args': {
+        },
+    },
+    'gru_glove_global': {
+        'class': txtenc.GloveRNNEncoderGlobal,
+        'args': {
         },
     },
     'scan': {
@@ -91,18 +99,6 @@ __text_encoders__ = {
             # 'liwe_dropout': 0.1,
         },
     },
-    'liwe_gru_scale_384_gelu_nobn': {
-        'class': txtenc.LiweGRU,
-        'args': {
-            'use_bi_gru': True,
-            'partial_class': embedding.PartialConcatScale,
-            # 'liwe_activation': nn.ReLU(),
-            'liwe_activation': GELU(),
-            'liwe_batch_norm': False,
-            'liwe_neurons': [384, 384],
-            # 'liwe_dropout': 0.1,
-        },
-    },
     'liwe_gru_gru': {
         'class': txtenc.LiweGRU,
         'args': {
@@ -152,6 +148,12 @@ __text_encoders__ = {
             'liwe_neurons': [256, 512,],
         },
     },
+    'liwe_gru': {
+        'class': txtenc.LiweGRU,
+        'args': {
+            'use_bi_gru': True,
+        },
+    },
     'liwe_convgru_384_384': {
         'class': txtenc.LiweConvGRU,
         'args': {
@@ -165,7 +167,6 @@ __text_encoders__ = {
             'use_bi_gru': True,
             'liwe_neurons': [384, 384],
             'partial_class': embedding.PartialConcat,
-            'liwe_activation': GELU(),
             'liwe_batch_norm': False,
         },
     },
@@ -175,8 +176,12 @@ __text_encoders__ = {
             'use_bi_gru': True,
             'liwe_neurons': [384, 384],
             'partial_class': embedding.PartialConcat,
-            'liwe_activation': GELU(),
             'liwe_batch_norm': True,
+        },
+    },
+    'liwe_gru_glove': {
+        'class': txtenc.LiweGRUGlove,
+        'args': {
         },
     },
     'liwe_gru_512_512': {
@@ -220,18 +225,23 @@ __text_encoders__ = {
 
 __text_encoders__['liwe_gru_384'] = __text_encoders__['liwe_gru_384_384']
 
+
 def get_available_txtenc():
     return __text_encoders__.keys()
 
-
-def get_text_encoder(model_name, **kwargs):
-    model_settings = __text_encoders__[model_name]
-    model_class = model_settings['class']
-    model_args = model_settings['args']
-    arg_dict = dict(kwargs)
-    arg_dict.update(model_args)
-    model = model_class(**arg_dict)
+def get_text_encoder(name, tokenizers, **kwargs):
+    model_class = __text_encoders__[name]['class']
+    model = model_class(tokenizers=tokenizers, **kwargs)
     return model
+
+# def get_text_encoder(name, **kwargs):
+#     model_settings = __text_encoders__[name]
+#     model_class = model_settings['class']
+#     model_args = model_settings['args']
+#     arg_dict = dict(kwargs)
+#     arg_dict.update(model_args)
+#     model = model_class(**arg_dict)
+#     return model
 
 
 def get_txt_pooling(pool_name):

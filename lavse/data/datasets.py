@@ -8,6 +8,8 @@ from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision.datasets.folder import default_loader
 
+from addict import Dict
+
 from . import collate_fns
 from ..utils.file_utils import read_txt
 from ..utils.logger import get_logger
@@ -95,13 +97,13 @@ class PrecompDataset(Dataset):
 
     def __init__(
         self, data_path, data_name,
-        data_split, tokenizer, lang='en'
+        data_split, tokenizers, lang='en',
     ):
-        logger.debug(f'Precomp dataset\n {[data_path, data_split, tokenizer, lang]}')
-        self.tokenizer = tokenizer
+        logger.debug(f'Precomp dataset\n {[data_path, data_split, tokenizers, lang]}')
+        self.tokenizers = tokenizers
         self.lang = lang
         self.data_split = '.'.join([data_split, lang])
-        self.data_path = Path(data_path)
+        self.data_path = data_path = Path(data_path)
         self.data_name = Path(data_name)
         self.full_path = self.data_path / self.data_name
         # Load Captions
@@ -113,6 +115,7 @@ class PrecompDataset(Dataset):
         img_features_file = self.full_path / f'{data_split}_ims.npy'
         self.images = np.load(img_features_file)
         self.length = len(self.captions)
+        self.ids = np.loadtxt(data_path/ data_name / f'{data_split}_ids.txt', dtype=int)
 
         self.captions_per_image = 5
 
@@ -159,9 +162,20 @@ class PrecompDataset(Dataset):
 
         # caption = self.precomp_captions[index]
         caption = self.captions[index]
-        tokens = self.tokenizer(caption)
 
-        return image, tokens, index, img_id
+        ret_caption = []
+        for tokenizer in self.tokenizers:
+            tokens = tokenizer(caption)
+            ret_caption.append(tokens)
+
+        batch = Dict(
+            image=image,
+            caption=ret_caption,
+            index=index,
+            img_id=img_id,
+        )
+
+        return batch
 
     def __len__(self):
         return self.length
@@ -243,11 +257,11 @@ class CrossLanguageLoader(Dataset):
 
     def __init__(
         self, data_path, data_name, data_split,
-        tokenizer, lang='en-de',
+        tokenizers, lang='en-de',
     ):
         logger.debug((
             'CrossLanguageLoader dataset\n '
-            f'{[data_path, data_split, tokenizer, lang]}'
+            f'{[data_path, data_split, tokenizers, lang]}'
         ))
 
         self.data_path = Path(data_path)
@@ -256,7 +270,10 @@ class CrossLanguageLoader(Dataset):
         self.data_split = '.'.join([data_split, lang])
 
         self.lang = lang
-        self.tokenizer = tokenizer
+
+        assert len(tokenizers) == 1 # TODO: implement multi-tokenizer
+
+        self.tokenizer = tokenizers[0]
 
         lang_base, lang_target = lang.split('-')
         base_filename = f'{data_split}_caps.{lang_base}.txt'

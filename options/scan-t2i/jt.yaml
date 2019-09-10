@@ -1,0 +1,18 @@
+__include__: 'scan.yaml'
+exp:
+  outpath: logs/jap_precomp.jt/scan-t2i-nobeta/
+dataset:
+  train:
+    data: jap_precomp.jt
+  val: 
+    data: [jap_precomp.jt]
+  adapt:
+    data: []
+optimizer:
+  params:
+    lr: .0005
+  lr_scheduler: 
+    params:
+      step_size: 10000
+      gamma: 0.1
+

@@ -20,7 +20,7 @@ def load_state_dict_with_replace(state_dict, own_state):
 
 class SCANImagePrecomp(nn.Module):
 
-    def __init__(self, img_dim, latent_size, no_imgnorm=False):
+    def __init__(self, img_dim, latent_size, no_imgnorm=False, ):
         super(SCANImagePrecomp, self).__init__()
         self.latent_size = latent_size
         self.no_imgnorm = no_imgnorm
@@ -36,11 +36,53 @@ class SCANImagePrecomp(nn.Module):
         self.fc.weight.data.uniform_(-r, r)
         self.fc.bias.data.fill_(0)
 
-    def forward(self, images):
+    def forward(self, batch):
         """Extract image feature vectors."""
         # assuming that the precomputed features are already l2-normalized
-
+        images = batch['image'].to(self.device)
         features = self.fc(images)
+
+        # normalize in the joint embedding space
+        if not self.no_imgnorm:
+            features = l2norm(features, dim=-1)
+
+        return features
+
+    def load_state_dict(self, state_dict):
+        """Copies parameters. overwritting the default one to
+        accept state_dict from Full model
+        """
+        new_state = load_state_dict_with_replace(
+            state_dict=state_dict, own_state=self.state_dict()
+        )
+
+        super(SCANImagePrecomp, self).load_state_dict(new_state)
+
+
+class SimplePrecomp(nn.Module):
+
+    def __init__(self, img_dim, latent_size, no_imgnorm=False, ):
+        super(SimplePrecomp, self).__init__()
+        self.latent_size = latent_size
+        self.no_imgnorm = no_imgnorm
+        self.fc = nn.Linear(img_dim, latent_size)
+
+        self.init_weights()
+
+    def init_weights(self):
+        """Xavier initialization for the fully connected layer
+        """
+        r = np.sqrt(6.) / np.sqrt(self.fc.in_features +
+                                  self.fc.out_features)
+        self.fc.weight.data.uniform_(-r, r)
+        self.fc.bias.data.fill_(0)
+
+    def forward(self, batch):
+        """Extract image feature vectors."""
+        # assuming that the precomputed features are already l2-normalized
+        images = batch['image'].to(self.device)
+        features = self.fc(images)
+        features = nn.LeakyReLU(0.1)(features)
 
         # normalize in the joint embedding space
         if not self.no_imgnorm:
@@ -61,21 +103,25 @@ class SCANImagePrecomp(nn.Module):
 
 class VSEImageEncoder(nn.Module):
 
-    def __init__(self, img_dim, latent_size, no_imgnorm=False):
+    def __init__(self, img_dim, latent_size, no_imgnorm=False, device=None):
         super(VSEImageEncoder, self).__init__()
+        self.device = device
         self.latent_size = latent_size
         self.no_imgnorm = no_imgnorm
         self.fc = nn.Linear(img_dim, latent_size)
+        self.pool = nn.AdaptiveAvgPool1d(1)
 
         self.apply(default_initializer)
 
-    def forward(self, images):
+    def forward(self, batch):
         """Extract image feature vectors."""
         # assuming that the precomputed features are already l2-normalized
 
-        images = images.mean(1) # Global pooling
+        images = batch['image'].to(self.device).to(self.device)
+
+        images = self.pool(images.permute(0, 2, 1)) # Global pooling
+        images = images.permute(0, 2, 1)
         features = self.fc(images)
-        features = features.unsqueeze(1)
         # normalize in the joint embedding space
         if not self.no_imgnorm:
             features = l2norm(features, dim=-1)
@@ -99,9 +145,11 @@ class HierarchicalEncoder(nn.Module):
             self, img_dim, latent_size,
             no_imgnorm=False, activation=nn.LeakyReLU(0.1),
             proj_leaky=True, embed_sa=False,
-            use_sa=True,
+            use_sa=True, k=8,
         ):
         super(HierarchicalEncoder, self).__init__()
+        if type(activation) == str:
+            activation = eval(activation)
         self.latent_size = latent_size
         self.no_imgnorm = no_imgnorm
         self.use_sa = use_sa
@@ -114,19 +162,20 @@ class HierarchicalEncoder(nn.Module):
             projection_layers.append(activation)
 
         if embed_sa:
-            sa_embed = attention.SelfAttention(latent_size, activation)
+            sa_embed = attention.SelfAttention(latent_size, activation, k=k)
             projection_layers.append(sa_embed)
 
         # self.fc = nn.Sequential(*projection_layers)
         self.projection = nn.Sequential(*projection_layers)
 
         if use_sa:
-            self.sa1 = attention.SelfAttention(img_dim, activation)
+            self.sa1 = attention.SelfAttention(img_dim, activation, k=k)
 
         self.apply(default_initializer)
 
-    def forward(self, images):
+    def forward(self, batch):
         """Extract image feature vectors."""
+        images = batch['image'].to(self.device)
         images = images.permute(0, 2, 1)
         if self.use_sa:
             images = self.sa1(images)
@@ -248,8 +297,9 @@ class MultiheadAttentionEncoder(nn.Module):
 
         self.apply(default_initializer)
 
-    def forward(self, images):
+    def forward(self, batch):
         """Extract image feature vectors."""
+        images = batch['image'].to(self.device)
         x = images.permute(0, 2, 1)
         a = self.fc1(x)
         a = self.multihead(a)
@@ -283,9 +333,9 @@ class GRUImgEncoder(nn.Module):
 
         self.apply(default_initializer)
 
-    def forward(self, images):
+    def forward(self, batch):
         """Extract image feature vectors."""
-
+        images = batch['image'].to(self.device)
         x, _ = self.gru(images)
         b, t, d = x.shape
         x = x.view(b, t, 2, d//2).mean(-2)

@@ -1,5 +1,24 @@
 # Language-Agnostic Visual-Semantic Embeddings (LAVSE)
 
+## Todo
+
+- [ ] Make this into a lib / engine(train/test)
+- [x] Liwe + Word emb (glove)
+- [x] Ensemble
+- [ ] Lr_multiplier 
+- [ ] Data Parallel 
+- [ ] Distributed Data Parallel
+- [ ] Fix `if master`
+- [ ] Auto vocab cache
+- [x] Avg Rich Embedding
+- [x] Save yaml !
+- [x] Test with yaml !
+- [x] Batch and collate via dict
+- [x] Optimizer Adamax 
+- [x] Fix __include__ from yaml
+- [x] Test via yaml
+- [x] Fix t2i
+
 ## Setup
 
 ```

@@ -1,0 +1,42 @@
+__include__: 'dyn.yaml'
+exp:
+  outpath: logs_aaai/f30k_precomp.en/dyn-t2i/softmax_norm-r256  
+dataset:
+  vocab_paths: [.vocab_cache/f30k_precomp.json]
+  train:
+    data: f30k_precomp.en
+    workers: 1
+    batch_size: 109
+  val:
+    data: [f30k_precomp.en]
+    workers: 1
+    batch_size: 32
+    limit: 5000
+optimizer:
+  name: adamax
+  params:
+    lr: 0.001 # 7e-4
+    gradual_warmup_steps: [0.5, 2.0, 4000] #torch.linspace
+    lr_decay_epochs: [10000, 20000, 3000] #range
+    lr_decay_rate: .25
+  lr_scheduler: 
+    name: null
+  grad_clip: 2.
+model:
+  latent_size: 1024  
+  txt_enc:
+    params:      
+      glove_path: .vocab_cache/glove_840B_f30k_precomp.json.pkl
+  similarity:
+    name: projconv_t2i
+    params:
+      latent_size: 1024
+      reduce_proj: 1024
+      groups: 1024
+      img_dim: 2048
+      kernel_size: 1
+      padding: 0
+      norm_output: True
+      gamma: 10
+      device: cuda
+    device: cuda

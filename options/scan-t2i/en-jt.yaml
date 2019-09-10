@@ -1,0 +1,29 @@
+__include__: 'scan.yaml'
+exp:
+  outpath: logs/jap_precomp.en-jt/scan-i2t-max-full-i2t/
+dataset:
+  train:
+    data: jap_precomp.en    
+    workers: 1
+  val: 
+    data: [jap_precomp.en, jap_precomp.jt]
+    workers: 1
+  adapt: 
+    data: [jap_precomp.en-jt]
+    workers: 1
+model:
+  ml_similarity:
+    name: scan_t2i
+    params:
+      device: cuda # FIXME
+      feature_norm: clipped_l2norm
+      smooth: 9
+      agg_function: Mean
+    device: cuda # FIXME
+optimizer:
+  params:
+    lr: 0.0005
+  lr_scheduler:
+    params:
+      step_size: 9100
+      gamma: 0.1

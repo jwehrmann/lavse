@@ -1,41 +1,64 @@
-import torch
-from lavse.utils.logger import create_logger
-from lavse import data
-from lavse.data.tokenizer import Tokenizer
-from lavse.data.adapters import Flickr, Coco
-from pathlib import Path
+import lavse
 import numpy as np
 
-from lavse.utils import helper
+a = np.load('/opt/jonatas/datasets/lavse/jap_precomp/test_ids.npy')
+np.savetxt('/opt/jonatas/datasets/lavse/jap_precomp/test_ids.txt', a.astype(np.int32),)
 
-flatten = lambda l: [item for sublist in l for item in sublist]
+print(a)
+exit()
 
-logger = create_logger(level='debug')
+def print_stats(x):
+    print(f'Min : {np.min(x)}')
+    print(f'Max : {np.max(x)}')
+    print(f'Mean: {np.mean(x)}')
+    print(f'Std : {np.std(x)}')
 
-# tokenizer = Tokenizer(
-#     download_tokenizer=True,
-#     char_level=False,
+
+# ds = lavse.data.datasets.CrossLanguageLoader(
+#     data_path='/opt/jonatas/datasets/lavse/',
+#     data_name='jap_precomp',
+#     lang='en-jt',
+#     data_split='train',
+#     tokenizers=[lavse.data.tokenizer.Tokenizer('.vocab_cache/char.json')],
 # )
 
-# birds_train = data.datasets.Birds(
-#     '/opt/jonatas/datasets/lavse/', data_name='birds', data_split='train',
-# )
+# # def collect_stats(sentences):
 
-# birds_test = data.datasets.Birds(
-#     '/opt/jonatas/datasets/lavse/', data_name='birds', data_split='test',
-# )
+# wlen = []
+# char_per_word = []
+# nchar = []
+# for caption in ds.lang_a:
+#     words = ds.tokenizer.split_sentence(caption)
+#     wlen.append(len(words))
+#     char_per_word.extend([len(w) for w in words])
+#     nchar.append(len(caption))
 
-fkt = Coco('/opt/jonatas/datasets/lavse/coco/', data_split='train')
-fkv = Coco('/opt/jonatas/datasets/lavse/coco/', data_split='dev')
+# print('\nLang A')
+# print('Word Lengths')
+# print_stats(wlen)
 
-texts = flatten(fkv.image_captions.values())
-texts += flatten(fkt.image_captions.values())
+# print('\nChar per word')
+# print_stats(char_per_word)
 
-tokenizer = Tokenizer(
-    download_tokenizer=True,
-    char_level=False,
-)
+# print('\nN Char')
+# print_stats(nchar)
 
-tokenizer.fit(texts)
-tokenizer.save('vocab/coco.json')
 
+# wlen = []
+# char_per_word = []
+# nchar = []
+# for caption in ds.lang_b:
+#     words = ds.tokenizer.split_sentence(caption)
+#     wlen.append(len(words))
+#     char_per_word.extend([len(w) for w in words])
+#     nchar.append(len(caption))
+
+# print('\nLang B')
+# print('Word Lengths')
+# print_stats(wlen)
+
+# print('\nChar per word')
+# print_stats(char_per_word)
+
+# print('\nN Char')
+# print_stats(nchar)

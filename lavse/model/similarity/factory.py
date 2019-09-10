@@ -8,6 +8,10 @@ _similarities = {
         'class': sim.Cosine,
         'args': {},
     },
+    'attentive': {
+        'class': sim.Attentive,
+        'args': {},
+    },
     'order': None,
     'scan_i2t': {
         'class': sim.StackedAttention,
@@ -17,28 +21,22 @@ _similarities = {
             lambda_lse=None, smooth=4,
         ),
     },
-    'adaptive': {
-        'class': sim.AdaptiveEmbedding,
+    'scan_t2i': {
+        'class': sim.StackedAttention,
+        'args': Dict(
+            i2t=False, agg_function='Mean',
+            feature_norm='clipped_l2norm',
+            lambda_lse=None, smooth=9,
+        ),
+    },
+    'adapt_t2i': {
+        'class': sim.AdaptiveEmbeddingT2I,
         'args': Dict(
             task='t2i',
         ),
     },
-    'adaptive_norm': {
-        'class': sim.AdaptiveEmbedding,
-        'args': Dict(
-            task='t2i',
-            norm=True,
-        ),
-    },
-    'adaptive_k4': {
-        'class': sim.AdaptiveEmbedding,
-        'args': Dict(
-            task='t2i',
-            k=4,
-        ),
-    },
-    'adaptive_i2t': {
-        'class': sim.AdaptiveEmbeddingI2T,
+    'attn_adapt_t2i': {
+        'class': sim.AttentionAdaptiveEmbeddingT2I,
         'args': {},
     },
     'adapt_i2t': {
@@ -103,42 +101,30 @@ _similarities = {
             nonlinear_proj=False,
         ),
     },
-    'proj_conv_reduced': {
-        'class': sim.ProjConvReducedI2T,
-        'args': Dict(
-            k=8,
-        ),
-    },
-    'proj_conv_reduced': {
-        'class': sim.ProjConvReducedI2T,
-        'args': Dict(
-            k=8,
-        ),
-    },
-    'dynconv': {
-        'class': sim.DynConvI2T,
-        'args': Dict(
-        ),
-    },
     'projconv': {
         'class': sim.ProjConvI2T,
-        'args': Dict(
-            kernel_size=3,
-            reduce_proj=8,
-            groups=512,
-        ),
+        'args': Dict(),
     },
-    'projrnn': {
-        'class': sim.ProjRNNReducedI2T,
-        'args': Dict(
-            k=8
-        ),
+    'projconv_t2i': {
+        'class': sim.ProjConvT2I,
+        'args': Dict(),
     },
+    'projconv_t2i_cond': {
+        'class': sim.ProjConvT2IAgg,
+        'args': Dict(),
+    },
+    'scan_adapt': {
+        'class': sim.AdaptiveStackedAttention,
+        'args': {},
+    }
 }
 
 
-def get_similarity_object(similarity_name, **kwargs):
-    settings = _similarities[similarity_name]
+_similarities['projconv_i2t'] = _similarities['projconv']
+
+
+def get_similarity_object(name, **kwargs):
+    settings = _similarities[name]
     args_dict = settings['args']
     args_dict.update(**kwargs)
     return settings['class'](**args_dict)

@@ -9,6 +9,7 @@ from ..model.loss import cosine_sim
 from tqdm import tqdm
 
 
+@torch.no_grad()
 def predict_loader(model, data_loader, device):
 
     model.eval()
@@ -28,53 +29,54 @@ def predict_loader(model, data_loader, device):
 
     # for i, (images, captions, lengths, ids) in enumerate(data_loader):
     #     max_n_word = max(max_n_word, max(lengths))
-    max_n_word = 70
+    max_n_word = 77
 
-    with torch.no_grad():
-        for (images, captions, lengths, ids) in pbar_fn(data_loader):
+    for batch in pbar_fn(data_loader):
 
-            images = images.to(device)
-            captions = captions.to(device)
-            # compute the embeddings
-            img_emb, cap_emb = model(images, captions, lengths)
-            if img_embs is None:
-                if len(img_emb.shape) == 3:
-                    is_tensor = True
-                    img_embs = np.zeros((len(data_loader.dataset), img_emb.size(1), img_emb.size(2)))
-                    cap_embs = np.zeros((len(data_loader.dataset), max_n_word, cap_emb.size(2)))
-                else:
-                    is_tensor = False
-                    img_embs = np.zeros((len(data_loader.dataset), img_emb.size(1)))
-                    cap_embs = np.zeros((len(data_loader.dataset), cap_emb.size(1)))
-                cap_lens = [0] * len(data_loader.dataset)
-            # cache embeddings
-            img_embs[ids] = img_emb.data.cpu().numpy()
-            if is_tensor:
-                cap_embs[ids,:max(lengths),:] = cap_emb.data.cpu().numpy()
+        ids = batch['index']
+        if len(batch['caption'][0]) == 2:
+            (_, _), (_, lengths) = batch['caption']
+        else:
+            cap, lengths = batch['caption']
+        img_emb, cap_emb = model.forward_batch(batch)
+
+        if img_embs is None:
+            if len(img_emb.shape) == 3:
+                is_tensor = True
+                img_embs = np.zeros((len(data_loader.dataset), img_emb.size(1), img_emb.size(2)))
+                cap_embs = np.zeros((len(data_loader.dataset), max_n_word, cap_emb.size(2)))
             else:
-                cap_embs[ids,] = cap_emb.data.cpu().numpy()
+                is_tensor = False
+                img_embs = np.zeros((len(data_loader.dataset), img_emb.size(1)))
+                cap_embs = np.zeros((len(data_loader.dataset), cap_emb.size(1)))
+            cap_lens = [0] * len(data_loader.dataset)
+        # cache embeddings
+        img_embs[ids] = img_emb.data.cpu().numpy()
+        if is_tensor:
+            cap_embs[ids,:max(lengths),:] = cap_emb.data.cpu().numpy()
+        else:
+            cap_embs[ids,] = cap_emb.data.cpu().numpy()
 
-            for j, nid in enumerate(ids):
-                cap_lens[nid] = lengths[j]
+        for j, nid in enumerate(ids):
+            cap_lens[nid] = lengths[j]
 
-            del images, captions
-
-        # Remove image feature redundancy
-        if img_embs.shape[0] == cap_embs.shape[0]:
-            img_embs = img_embs[
-                np.arange(
-                    start=0,
-                    stop=img_embs.shape[0],
-                    step=data_loader.dataset.captions_per_image,
-                ).astype(np.int),
-            ]
+    # Remove image feature redundancy
+    if img_embs.shape[0] == cap_embs.shape[0]:
+        img_embs = img_embs[
+            np.arange(
+                start=0,
+                stop=img_embs.shape[0],
+                step=data_loader.dataset.captions_per_image,
+            ).astype(np.int),
+        ]
 
     return img_embs, cap_embs, cap_lens
 
 
+@torch.no_grad()
 def evaluate(
     model, img_emb, txt_emb, lengths,
-    device, shared_size=128
+    device, shared_size=128, return_sims=False
 ):
     model.eval()
     _metrics_ = ('r1', 'r5', 'r10', 'medr', 'meanr')
@@ -85,16 +87,15 @@ def evaluate(
     txt_emb = torch.FloatTensor(txt_emb).to(device)
 
     end_pred = dt()
-    with torch.no_grad():
-        sims = model.get_sim_matrix_shared(
-            embed_a=img_emb, embed_b=txt_emb,
-            lens=lengths, shared_size=shared_size
-        )
+    sims = model.get_sim_matrix_shared(
+        embed_a=img_emb, embed_b=txt_emb,
+        lens=lengths, shared_size=shared_size
+    )
         # sims = model.get_sim_matrix(
         #     embed_a=img_emb, embed_b=txt_emb,
         #     lens=lengths,
         # )
-        sims = layers.tensor_to_numpy(sims)
+    sims = layers.tensor_to_numpy(sims)
 
     end_sim = dt()
 
@@ -114,9 +115,8 @@ def evaluate(
     metrics.update(t2i_metrics)
     metrics['rsum'] = rsum
 
-    del sims
-    del img_emb
-    del txt_emb
+    if return_sims:
+        return metrics, sims
 
     return metrics
 

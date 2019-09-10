@@ -18,11 +18,17 @@ from tqdm import tqdm
 from . import evaluation
 from ..data.loaders import DataIterator
 from ..model.loss import cosine_sim, cosine_sim_numpy
-from ..utils import helper, layers, logger
+from ..utils import helper, layers, logger, file_utils
 from .evaluation import i2t, t2i
+from .lr_scheduler import get_scheduler
+
 
 torch.manual_seed(0)
 random.seed(0, version=2)
+
+def freeze(module):
+     for x in module.parameters():
+         x.requires_grad = False
 
 
 class Trainer:
@@ -49,55 +55,56 @@ class Trainer:
         self,
         mm_criterion=None,
         ml_criterion=None,
-        optimizer=torch.optim.Adam,
+        optimizer={},
         lr=1e-3,
-        cnn_lr_factor=0.1,
-        lr_decay_rate=0.1,
-        lr_decay_interval=15,
+        lr_scheduler=None,
         clip_grad=2.,
-        log_histograms=True,
-        log_grad_norm=True,
+        log_histograms=False,
+        log_grad_norm=False,
         early_stop=50,
-        save_all=False,
-        finetune_convnet=False,
+        freeze_modules=[],
         **kwargs
     ):
-
-        # TODO: improve this! :S
-        total_params = 0
-        nb_trainable_params = 0
-        trainable_params = []
-        for k, v in self.model.named_parameters():
-            total_params += np.product(tuple(v.shape))
-            if 'img_enc' in k and 'cnn' in k:
-                if not finetune_convnet:
-                    v.requires_grad = False
-                continue
-            if v.requires_grad:
-                nb_trainable_params += np.product(tuple(v.shape))
-                trainable_params.append(v)
-
-
-        self.optimizer = optimizer(
-            trainable_params, lr, **kwargs
-        )
-
-        if finetune_convnet:
-            _params = self.model.img_enc.module.cnn.parameters()
-            self.optimizer.add_param_group({
-                'params': _params,
-                'lr': lr * cnn_lr_factor,
-                'name': 'cnn',
-            })
-
+        from . import optimizers
         count_params = lambda p: np.sum([
             np.product(tuple(x.shape)) for x in p
         ])
+        # TODO: improve this! :S
+        total_params = count_params(self.model.parameters())
+
+        # if freeze_modules is not None and len(freeze_modules) > 0:
+        for fmod in freeze_modules:
+            print(f'Freezing {fmod}')
+            freeze(eval(f'self.{fmod}'))
+
+        trainable_params = [
+            x for x in self.model.parameters()
+            if x.requires_grad
+        ]
+
+        self.optimizer = optimizers.get_optimizer(
+            optimizer.name,
+            trainable_params,
+            **optimizer.params,
+        )
+        # self.optimizer = optimizer(
+        #     trainable_params, lr
+        # )
+
+        scheduler = None
+        if lr_scheduler.name is not None:
+            scheduler = get_scheduler(
+                optimizer=self.optimizer,
+                name=lr_scheduler.name,
+                **lr_scheduler.params,
+            )
+
 
         for k in self.optimizer.param_groups:
             self.sysoutlog(
                 f"lr: {k['lr']}, #layers: {len(k['params'])}, #params: {count_params(k['params']):,}"
             )
+
         self.sysoutlog(
             #f'Trainable layers: {len(trainable_params)}, '
             f'Total Params: {total_params:,}, '
@@ -112,16 +119,14 @@ class Trainer:
         # self.mm_criterion = mm_criterion
         self.ml_criterion = ml_criterion
         self.initial_lr = lr
-        self.lr_decay_rate = lr_decay_rate
-        self.lr_decay_interval = lr_decay_interval
+        self.lr_scheduler = scheduler
         self.clip_grad = clip_grad
         self.log_histograms = log_histograms
-        self.log_grad_norm = log_grad_norm
-
+        self.log_grad_norm = False
+        self.save_all = False
         self.best_val = 0
         self.count = early_stop
         self.early_stop = early_stop
-        self.save_all = save_all
 
     def fit(
         self, train_loader, valid_loaders, lang_loaders=[],
@@ -135,8 +140,23 @@ class Trainer:
             exit()
 
         # Set up tensorboard logger
-        tb_writer = helper.get_tb_writer(path)
+        if path is not None:
+            if os.path.exists(path):
+                a = input(f'{path} already exists! Do you want to rewrite it? [y/n] ')
+                if a.lower() == 'y':
+                    import shutil
+                    shutil.rmtree(path)
+                    tb_writer = helper.get_tb_writer(path)
+                else:
+                    exit()
+            else:
+                tb_writer = helper.get_tb_writer(path)
+        else:
+            tb_writer = helper.get_tb_writer()
+
         path = tb_writer.file_writer.get_logdir()
+        file_utils.save_yaml_opts(Path(path) / 'options.yaml', self.args)
+
         self.tb_writer = tb_writer
         # Path to store the best models
         self.best_model_path = Path(path) / Path('best_model.pkl')
@@ -150,15 +170,6 @@ class Trainer:
 
         for epoch in pbar(nb_epochs):
         # for epoch in range(nb_epochs):
-
-            # Update learning rate
-            self.learning_rate = helper.adjust_learning_rate(
-                optimizer=self.optimizer,
-                initial_lr=self.initial_lr,
-                interval=self.lr_decay_interval,
-                decay=self.lr_decay_rate,
-                epoch=epoch,
-            )
 
             # Train a single epoch
             continue_training = self.train_epoch(
@@ -174,9 +185,10 @@ class Trainer:
                 break
 
     def _forward_multimodal_loss(
-        self, images, captions, lens
+        self, batch
     ):
-        img_emb, cap_emb = self.model(images, captions, lens)
+        img_emb, cap_emb = self.model.forward_batch(batch)
+        lens = batch['caption'][1]
         sim_matrix = self.model.get_sim_matrix(img_emb, cap_emb, lens)
         loss = self.model.mm_criterion(sim_matrix)
         # loss = self.mm_criterion(sim_matrix)
@@ -186,11 +198,16 @@ class Trainer:
         self, captions_a, lens_a, captions_b, lens_b, *args
     ):
 
-        cap_a_embed = self.model.embed_captions(captions_a, lens_a)
-        cap_b_embed = self.model.embed_captions(captions_b, lens_b)
+        cap_a_embed = self.model.embed_captions({'caption': (captions_a, lens_a)})
+        cap_b_embed = self.model.embed_captions({'caption': (captions_b, lens_b)})
 
-        sim_matrix = self.model.get_sim_matrix(cap_a_embed, cap_b_embed, lens_b)
-        loss = self.ml_criterion(sim_matrix)
+        if len(cap_a_embed.shape) == 3:
+            from ..model.txtenc import pooling
+            cap_a_embed = pooling.last_hidden_state_pool(cap_a_embed, lens_a)
+            cap_b_embed = pooling.last_hidden_state_pool(cap_b_embed, lens_b)
+
+        sim_matrix = self.model.get_ml_sim_matrix(cap_a_embed, cap_b_embed, lens_b)
+        loss = self.model.ml_criterion(sim_matrix)
 
         return loss
 
@@ -217,22 +234,15 @@ class Trainer:
                 leave=False,
             )
 
-        for instance in pbar(train_loader):
+        for batch in pbar(train_loader):
             self.model.train()
 
             # Update progress bar
             self.optimizer.zero_grad()
 
             begin_forward = dt()
-            images, captions, lens, ids = instance
-            images = images.to(self.device)
-            captions = captions.to(self.device)
-            #images = nn.DataParallel(images).cuda()
-            #captions = nn.DataParallel(captions).cuda()
 
-            multimodal_loss = self._forward_multimodal_loss(
-                images, captions, lens
-            )
+            multimodal_loss = self._forward_multimodal_loss(batch)
 
             iteration = self.model.mm_criterion.iteration
             adjusted_iter = self.world_size * iteration
@@ -251,16 +261,22 @@ class Trainer:
             total_loss = multimodal_loss + total_lang_loss
             total_loss.backward()
 
-            if self.log_grad_norm and self.master:
-                logger.log_grad_norm(
-                    self.model, self.tb_writer,
-                    iteration=iteration,
+            # if self.log_grad_norm and self.master:
+            #     norm = logger.log_grad_norm(
+            #         self.model, self.tb_writer,
+            #         iteration=iteration,
+            #         reduce=sum,
+            #     )
+            norm = 0.
+            if self.clip_grad > 0:
+                norm = clip_grad_norm_(
+                    self.model.parameters(),
+                    self.clip_grad
                 )
 
-            if self.clip_grad > 0:
-                clip_grad_norm_(self.model.parameters(), self.clip_grad)
-
             self.optimizer.step()
+            if self.lr_scheduler is not None:
+                self.lr_scheduler.step()
 
             end_backward = dt()
             batch_time = end_backward-begin_forward
@@ -271,9 +287,9 @@ class Trainer:
                 'total_loss': total_loss,
                 'k': self.model.mm_criterion.k,
                 'batch_time': batch_time,
-                'learning_rate': self.learning_rate,
                 'countdown': self.count,
                 'epoch': epoch,
+                'norm': norm,
             })
 
             train_info.update(loss_info)
@@ -352,6 +368,7 @@ class Trainer:
 
             for k, v in result.items():
                 self.sysoutlog(f'{k:<10s}: {v:>6.1f}')
+
             result = {
                 f'{loader_name}/{metric_name}': v
                 for metric_name, v in result.items()

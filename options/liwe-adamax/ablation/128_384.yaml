@@ -1,0 +1,34 @@
+__include__: '../liwe.yaml'
+exp:
+  outpath: logs/coco_precomp.en/liwe-128-384/
+dataset:
+  train:
+    data: coco_precomp.en
+    workers: 0
+  val: 
+    data: [coco_precomp.en]
+    workers: 0
+  adapt:
+    data: []
+model:
+  latent_size: 1024
+  freeze_modules: []
+  txt_enc:
+    name: liwe_gru
+    params:
+      embed_dim: 300
+      liwe_neurons: [128, 384]
+      liwe_activation: nn.LeakyReLU(0.1, inplace=True)
+      use_bi_gru: true
+    pooling: lens
+    devices: [cuda,]
+optimizer:
+  name: adamax
+  params:
+    lr: 0.001
+    gradual_warmup_steps: [0.5, 2.0, 16000] #torch.linspace
+    lr_decay_epochs: [32000, 80000, 8000] #range 
+    lr_decay_rate: .25
+  lr_scheduler: 
+    name: null  
+  grad_clip: 2.
