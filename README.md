@@ -2,13 +2,14 @@
 
 ## Todo
 
-- [] Liwe + Word emb (glove)
-- [] Ensemble
-- [] Lr_multiplier 
-- [] Data Parallel 
-- [] Distributed Data Parallel
-- [] Fix `if master`
-- [] Auto vocab cache
+- [ ] Make this into a lib / engine(train/test)
+- [x] Liwe + Word emb (glove)
+- [x] Ensemble
+- [ ] Lr_multiplier 
+- [ ] Data Parallel 
+- [ ] Distributed Data Parallel
+- [ ] Fix `if master`
+- [ ] Auto vocab cache
 - [x] Avg Rich Embedding
 - [x] Save yaml !
 - [x] Test with yaml !
