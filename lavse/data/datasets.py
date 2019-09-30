@@ -116,15 +116,12 @@ class PrecompDataset(Dataset):
         self.data_path = data_path = Path(data_path)
         self.data_name = Path(data_name)
         self.full_path = self.data_path / self.data_name
+
         # Load Captions
         if lang is None:
-            self.split = data_split
-            caption_file = self.full_path / f'{self.split}_caps.txt'
+            caption_file = self.full_path / f'{data_split}_caps.txt'
         else:
-            self.split = '.'.join([data_split, lang])
-            caption_file = self.full_path / f'{self.split}_caps.{lang}.txt'
-
-
+            caption_file = self.full_path / f'{data_split}_caps.{lang}.txt'
 
         self.captions = read_txt(caption_file)
         logger.debug(f'Read captions. Found: {len(self.captions)}')

@@ -34,14 +34,18 @@ model:
     params:
       device: cuda # FIXME
     device: cuda # FIXME
-criterion:
-  margin: 0.2
-  max_violation: False
-  beta: 0.991
-ml_criterion:
-  margin: 0.2
-  max_violation: False
-  beta: 0.91
+  criterion:
+      name: 'contrastive'
+      params: 
+        margin: 0.2
+        max_violation: False
+        beta: 0.991
+  ml_criterion:
+    name: 'contrastive'
+    params:
+      margin: 0.2
+      max_violation: False
+      beta: 0.91
 optimizer:
   name: adam
   import: lavse.optimizers.factory
@@ -54,7 +58,7 @@ optimizer:
       gamma: 0.1
   grad_clip: 2.
 engine:
-  eval_before_training: False
+  eval_before_training: True
   debug: False
   print_freq: 10
   nb_epochs: 30

@@ -83,13 +83,13 @@ def evaluate(
 
     begin_pred = dt()
 
-    img_emb = torch.FloatTensor(img_emb).to(device)
-    txt_emb = torch.FloatTensor(txt_emb).to(device)
+    img_emb = torch.tensor(img_emb).to(device)
+    txt_emb = torch.tensor(txt_emb).to(device)
 
     end_pred = dt()
-    sims = model.get_sim_matrix_shared(
-        embed_a=img_emb, embed_b=txt_emb,
-        lens=lengths, shared_size=shared_size
+    sims = model.compute_pairwise_similarity(
+        model.similarity, img_emb, txt_emb, lengths,
+        shared_size=shared_size
     )
         # sims = model.get_sim_matrix(
         #     embed_a=img_emb, embed_b=txt_emb,
@@ -98,7 +98,7 @@ def evaluate(
     div = sims.shape[1] / sims.shape[0]
     samp_sim = sims[:,np.arange(0, sims.shape[1], div).astype(np.int)]
 
-    val_loss = model.mm_criterion(samp_sim)
+    val_loss = model.multimodal_criterion(samp_sim)
     sims = layers.tensor_to_numpy(sims)
 
     end_sim = dt()

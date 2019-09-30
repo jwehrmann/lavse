@@ -47,6 +47,7 @@ class ContrastiveLoss(nn.Module):
         self.weight = weight
         self.max_violation = max_violation
         self.beta = beta
+        self.device = None
 
         self.iteration = 0
         self.k = 0
@@ -312,5 +313,5 @@ _loss = {
     'contrastive_softmax': ContrastiveLossWithSoftmax,
 }
 
-def get_loss(name, **params):
+def get_loss(name, params):
     return _loss[name](**params)

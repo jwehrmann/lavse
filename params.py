@@ -2,7 +2,6 @@ import argparse
 from addict import Dict
 from lavse.model.similarity.factory import get_sim_names
 from lavse.model import imgenc, txtenc
-import profiles
 
 
 def get_train_params():

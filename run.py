@@ -6,7 +6,6 @@ from addict import Dict
 from tqdm import tqdm
 
 import params
-import profiles
 from lavse.data.loaders import get_loader, get_loaders
 from lavse.model import imgenc, loss, model
 from lavse.model import txtenc, data_parallel
@@ -172,17 +171,17 @@ if __name__ == '__main__':
             f"keys: {checkpoint.keys()}"
         ))
 
-    # model.set_devices_(
-    #     txt_devices=opt.model.txt_enc.devices,
-    #     img_devices=opt.model.img_enc.devices,
-    #     loss_device=opt.model.similarity.device,
-    # )
+    # if opt.exp.distributed:
+    #     model = data_parallel.DistributedDataParallel(model)
 
-    # Distribute the same process in GPUs
-    # This is used when a single model cannot fit the memory
-    # if args.data_parallel:
-    #     import torch.nn as nn
-    #     model.img_enc = nn.DataParallel(model.img_enc, device_ids=[0,1,2], output_device=0)
+    device = torch.device('cuda')
+    if torch.cuda.device_count() > 1:
+        model = data_parallel.DataParallel(model)
+    elif torch.cuda.device_count() == 0:
+        device = torch.device('cpu')
+
+    model = model.to(device)
+
     is_master = True
     model.master = is_master # FIXME: Replace "if print" by built_in print
     print_fn = (lambda x: x) if not is_master else tqdm.write
@@ -193,31 +192,10 @@ if __name__ == '__main__':
         sysoutlog=print_fn,
     )
 
-    if 'name' in opt.criterion:
-        print(opt.criterion)
-        multimodal_criterion = loss.get_loss(**opt.criterion)
-        multilanguage_criterion = loss.get_loss(**opt.criterion)
-    else:
-        multimodal_criterion = loss.ContrastiveLoss(
-            **opt.criterion
-        )
-
-        multilanguage_criterion = loss.ContrastiveLoss(
-            **opt.ml_criterion
-        )
-
-    # TODO: improve
-    model.mm_criterion = multimodal_criterion
-    model.ml_criterion = None
-    if len(opt.dataset.adapt.data) > 0:
-        model.ml_criterion = multilanguage_criterion
-
     trainer.setup_optim(
         lr=opt.optimizer.lr,
         lr_scheduler=opt.optimizer.lr_scheduler,
         clip_grad=opt.optimizer.grad_clip,
-        mm_criterion=multimodal_criterion,
-        ml_criterion=multilanguage_criterion,
         log_grad_norm=False,
         log_histograms=False,
         optimizer=opt.optimizer,

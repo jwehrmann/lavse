@@ -175,7 +175,9 @@ class HierarchicalEncoder(nn.Module):
 
     def forward(self, batch):
         """Extract image feature vectors."""
-        images = batch['image'].to(self.device)
+
+        images = batch['image']
+        images = images.to(self.device)
         images = images.permute(0, 2, 1)
         if self.use_sa:
             images = self.sa1(images)

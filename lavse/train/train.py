@@ -54,8 +54,6 @@ class Trainer:
 
     def setup_optim(
         self,
-        mm_criterion=None,
-        ml_criterion=None,
         optimizer={},
         lr=1e-3,
         lr_scheduler=None,
@@ -119,8 +117,8 @@ class Trainer:
         #self.optimizer.step = self.optimizer.module.step
 
         # self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=45*1100)
-        # self.mm_criterion = mm_criterion
-        self.ml_criterion = ml_criterion
+        # self.multimodal_criterion = multimodal_criterion
+        # self.ml_criterion = ml_criterion
         self.initial_lr = lr
         self.lr_scheduler = scheduler
         self.clip_grad = clip_grad
@@ -173,41 +171,6 @@ class Trainer:
             if not continue_training:
                 break
 
-    def _forward_multimodal_loss(
-        self, batch
-    ):
-        img_emb, cap_emb = self.model.forward_batch(batch)
-        lens = batch['caption'][1]
-        sim_matrix = self.model.get_sim_matrix(img_emb, cap_emb, lens)
-        loss = self.model.mm_criterion(sim_matrix)
-
-        cap_vec = pooling.last_hidden_state_pool(cap_emb, lens)
-        sim_global = self.model.cosine.forward_shared(
-            img_emb.mean(1), cap_vec, lens,
-        ).cuda()
-        global_loss = self.model.mm_criterion(sim_global).cuda()
-        self.model.mm_criterion.iteration -= 1
-
-        # loss = self.mm_criterion(sim_matrix)
-        return loss + global_loss
-
-    def _forward_multilanguage_loss(
-        self, captions_a, lens_a, captions_b, lens_b, *args
-    ):
-
-        cap_a_embed = self.model.embed_captions({'caption': (captions_a, lens_a)})
-        cap_b_embed = self.model.embed_captions({'caption': (captions_b, lens_b)})
-
-        if len(cap_a_embed.shape) == 3:
-            from ..model.txtenc import pooling
-            cap_a_embed = pooling.last_hidden_state_pool(cap_a_embed, lens_a)
-            cap_b_embed = pooling.last_hidden_state_pool(cap_b_embed, lens_b)
-
-        sim_matrix = self.model.get_ml_sim_matrix(cap_a_embed, cap_b_embed, lens_b)
-        loss = self.model.ml_criterion(sim_matrix)
-
-        return loss
-
     def train_epoch(
         self, train_loader, lang_loaders,
         epoch, valid_loaders=[], log_interval=50,
@@ -239,9 +202,8 @@ class Trainer:
 
             begin_forward = dt()
 
-            multimodal_loss = self._forward_multimodal_loss(batch)
-
-            iteration = self.model.mm_criterion.iteration
+            multimodal_loss = self.model.forward_multimodal_loss(batch)
+            iteration = self.model.multimodal_criterion.iteration
             adjusted_iter = self.world_size * iteration
 
             # Cross-language update
@@ -251,7 +213,7 @@ class Trainer:
 
                 lang_data = lang_iter.next()
 
-                lang_loss = self._forward_multilanguage_loss(*lang_data)
+                lang_loss = self.model.forward_multilanguage_loss(*lang_data)
                 total_lang_loss += lang_loss
                 loss_info[f'train_loss_{str(lang_iter)}'] = lang_loss
 
@@ -282,7 +244,7 @@ class Trainer:
                 'loss': multimodal_loss,
                 'iteration': iteration,
                 'total_loss': total_loss,
-                'k': self.model.mm_criterion.k,
+                'k': self.model.multimodal_criterion.k,
                 'batch_time': batch_time,
                 'countdown': self.count,
                 'epoch': epoch,
@@ -302,7 +264,8 @@ class Trainer:
                     tb_writer=self.tb_writer, data_dict=train_info,
                     iteration=iteration, prefix='train'
                 )
-            if iteration % 500 == 0:
+
+            if iteration % valid_interval == 0:
 
                 # Run evaluation
                 metrics, metric_value = self.evaluate_loaders(valid_loaders)
@@ -338,7 +301,7 @@ class Trainer:
                 if self.log_histograms:
                     logger.log_param_histograms(
                         self.model, self.tb_writer,
-                        iteration=self.model.mm_criterion.iteration,
+                        iteration=self.model.multimodal_criterion.iteration,
                     )
         return True
 
@@ -391,7 +354,7 @@ class Trainer:
             optimizer=self.optimizer,
             is_best=is_best,
             save_all=self.save_all,
-            iteration=self.model.mm_criterion.iteration,
+            iteration=self.model.multimodal_criterion.iteration,
             args=self.args,
             **kwargs
         )

@@ -34,14 +34,18 @@ model:
     params:
       device: cuda # FIXME
     device: cuda # FIXME
-criterion:
-  margin: 0.2
-  max_violation: False
-  beta: 0.991
-ml_criterion:
-  margin: 0.2
-  max_violation: False
-  beta: 0.91
+  criterion:
+    name: 'contrastive'
+    params: 
+      margin: 0.2
+      max_violation: False
+      beta: 0.991
+  ml_criterion:
+    name: 'contrastive'
+    params:
+      margin: 0.2
+      max_violation: False
+      beta: 0.91
 optimizer:
   grad_clip: 2.
 engine:
