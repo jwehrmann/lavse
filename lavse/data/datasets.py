@@ -22,11 +22,12 @@ logger = get_logger()
 class Birds(Dataset):
     def __init__(self, data_path, data_name, transform=None,
                 target_transform=None, data_split='train',
-                tokenizer=None, lang=None):
+                tokenizers=None, lang=None):
 
         self.data_path = data_path
         self.data_name = data_name
-        self.tokenizer = tokenizer
+        self.tokenizer = tokenizers[0]
+        self.tokenizers = self.tokenizer
 
         self.target_transform = target_transform
         self.data_split = data_split
@@ -56,9 +57,10 @@ class Birds(Dataset):
                 captions.extend(cap)
 
         self.captions = captions
-        self.transform = get_transform(data_split,)
+        self.transform = transform
 
         self.captions_per_image = 10
+        self.ids = self.fnames
 
         logger.info(f'[Birds] #Captions {len(self.captions)}')
         logger.info(f'[Birds] #Images {len(self.images)}')
@@ -67,17 +69,24 @@ class Birds(Dataset):
             self.n = 10000
 
     def __getitem__(self, ix):
-
-        img = Image.fromarray(self.images[ix//self.captions_per_image]).convert('RGB')
+        img_id = ix//self.captions_per_image
+        img = Image.fromarray(self.images[img_id]).convert('RGB')
         if self.transform is not None:
             img = self.transform(img)
 
         fname = self.fnames[ix//self.captions_per_image]
 
         caption = self.captions[ix]
-        tokens = self.tokenizer(caption)
+        tokens = [self.tokenizer(caption)]
 
-        return img, tokens, ix, fname
+        batch = Dict(
+            image=img,
+            caption=tokens,
+            index=ix,
+            img_id=img_id,
+        )
+
+        return batch
 
     def __len__(self):
         return self.n
@@ -97,17 +106,26 @@ class PrecompDataset(Dataset):
 
     def __init__(
         self, data_path, data_name,
-        data_split, tokenizers, lang='en',
+        data_split, tokenizers, lang='en', transform=None
     ):
         logger.debug(f'Precomp dataset\n {[data_path, data_split, tokenizers, lang]}')
         self.tokenizers = tokenizers
         self.lang = lang
-        self.data_split = '.'.join([data_split, lang])
+        self.data_split = data_split
+
         self.data_path = data_path = Path(data_path)
         self.data_name = Path(data_name)
         self.full_path = self.data_path / self.data_name
         # Load Captions
-        caption_file = self.full_path / f'{data_split}_caps.{lang}.txt'
+        if lang is None:
+            self.split = data_split
+            caption_file = self.full_path / f'{self.split}_caps.txt'
+        else:
+            self.split = '.'.join([data_split, lang])
+            caption_file = self.full_path / f'{self.split}_caps.{lang}.txt'
+
+
+
         self.captions = read_txt(caption_file)
         logger.debug(f'Read captions. Found: {len(self.captions)}')
 
@@ -320,19 +338,23 @@ class ImageDataset(Dataset):
 
     def __init__(
         self, data_path, data_name,
-        data_split, tokenizer, lang='en',
-        resize_to=256, crop_size=224,
+        data_split, tokenizers, lang='en',
+        resize_to=256, crop_size=224, transform=None
     ):
         from .adapters import Flickr, Coco
 
-        logger.debug(f'ImageDataset\n {[data_path, data_split, tokenizer, lang]}')
-        self.tokenizer = tokenizer
+        logger.debug(f'ImageDataset\n {[data_path, data_split, tokenizers, lang]}')
+        self.tokenizer = tokenizers[0]
         self.lang = lang
         self.data_split = data_split
-        self.split = '.'.join([data_split, lang])
+        if lang is None:
+            self.split = data_split
+        else:
+            self.split = '.'.join([data_split, lang])
         self.data_path = Path(data_path)
         self.data_name = Path(data_name)
         self.full_path = self.data_path / self.data_name
+        self.tokenizers = self.tokenizer
 
         self.data_wrapper = (
             Flickr(
@@ -348,13 +370,14 @@ class ImageDataset(Dataset):
         self._fetch_captions()
         self.length = len(self.ids)
 
-        self.transform = get_transform(
-            data_split, resize_to=resize_to, crop_size=crop_size
-        )
+        # self.transform = get_transform(
+        #     data_split, resize_to=resize_to, crop_size=crop_size
+        # )
+        self.transform = transform
 
         self.captions_per_image = 5
 
-        if data_split == 'dev' and len(self.length) > 5000:
+        if data_split == 'dev' and self.length > 5000:
             self.length = 5000
 
         logger.debug(f'Split size: {len(self.ids)}')
@@ -390,9 +413,16 @@ class ImageDataset(Dataset):
         image = self.load_img(image_id)
 
         caption = self.captions[index]
-        cap_tokens = self.tokenizer(caption)
+        cap_tokens = [self.tokenizer(caption)]
 
-        return image, cap_tokens, index, image_id
+        batch = Dict(
+            image=image,
+            caption=cap_tokens,
+            index=index,
+            img_id=image_id,
+        )
+
+        return batch
 
     def __len__(self):
         return self.length

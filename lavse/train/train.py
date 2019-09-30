@@ -21,6 +21,7 @@ from ..model.loss import cosine_sim, cosine_sim_numpy
 from ..utils import helper, layers, logger, file_utils
 from .evaluation import i2t, t2i
 from .lr_scheduler import get_scheduler
+from ..model.txtenc import pooling
 
 
 torch.manual_seed(0)
@@ -62,7 +63,9 @@ class Trainer:
         log_histograms=False,
         log_grad_norm=False,
         early_stop=50,
+        save_all=False,
         freeze_modules=[],
+        val_metric='rsum',
         **kwargs
     ):
         from . import optimizers
@@ -123,10 +126,11 @@ class Trainer:
         self.clip_grad = clip_grad
         self.log_histograms = log_histograms
         self.log_grad_norm = False
-        self.save_all = False
+        self.save_all = save_all
         self.best_val = 0
         self.count = early_stop
         self.early_stop = early_stop
+        self.val_metric = val_metric
 
     def fit(
         self, train_loader, valid_loaders, lang_loaders=[],
@@ -139,24 +143,9 @@ class Trainer:
             print('You forgot to setup_optim.')
             exit()
 
-        # Set up tensorboard logger
-        if path is not None:
-            if os.path.exists(path):
-                a = input(f'{path} already exists! Do you want to rewrite it? [y/n] ')
-                if a.lower() == 'y':
-                    import shutil
-                    shutil.rmtree(path)
-                    tb_writer = helper.get_tb_writer(path)
-                else:
-                    exit()
-            else:
-                tb_writer = helper.get_tb_writer(path)
-        else:
-            tb_writer = helper.get_tb_writer()
-
-        path = tb_writer.file_writer.get_logdir()
+        path = file_utils.get_logdir(path)
+        tb_writer = helper.get_tb_writer(path)
         file_utils.save_yaml_opts(Path(path) / 'options.yaml', self.args)
-
         self.tb_writer = tb_writer
         # Path to store the best models
         self.best_model_path = Path(path) / Path('best_model.pkl')
@@ -191,8 +180,16 @@ class Trainer:
         lens = batch['caption'][1]
         sim_matrix = self.model.get_sim_matrix(img_emb, cap_emb, lens)
         loss = self.model.mm_criterion(sim_matrix)
+
+        cap_vec = pooling.last_hidden_state_pool(cap_emb, lens)
+        sim_global = self.model.cosine.forward_shared(
+            img_emb.mean(1), cap_vec, lens,
+        ).cuda()
+        global_loss = self.model.mm_criterion(sim_global).cuda()
+        self.model.mm_criterion.iteration -= 1
+
         # loss = self.mm_criterion(sim_matrix)
-        return loss
+        return loss + global_loss
 
     def _forward_multilanguage_loss(
         self, captions_a, lens_a, captions_b, lens_b, *args
@@ -305,25 +302,25 @@ class Trainer:
                     tb_writer=self.tb_writer, data_dict=train_info,
                     iteration=iteration, prefix='train'
                 )
+            if iteration % 500 == 0:
 
-            if iteration % valid_interval == 0:
                 # Run evaluation
-                metrics, val_metric = self.evaluate_loaders(valid_loaders)
+                metrics, metric_value = self.evaluate_loaders(valid_loaders)
 
                 # Update early stop variables
                 # and save checkpoint
-                if val_metric < self.best_val:
+                if metric_value < self.best_val:
                     self.count -= 1
                 elif not self.save_all:
                     self.count = self.early_stop
-                    self.best_val = val_metric
+                    self.best_val = metric_value
 
                 if self.master:
                     self.save(
                         path=self.path,
-                        is_best=(val_metric >= self.best_val),
+                        is_best=(metric_value >= self.best_val),
                         args=self.args,
-                        rsum=val_metric,
+                        rsum=metric_value,
                     )
 
                     # Log updates
@@ -366,6 +363,10 @@ class Trainer:
                 device=self.device, shared_size=128,
             )
 
+            metric_value = result[self.val_metric]
+            if 'loss' in self.val_metric:
+                metric_value = -metric_value
+
             for k, v in result.items():
                 self.sysoutlog(f'{k:<10s}: {v:>6.1f}')
 
@@ -375,7 +376,7 @@ class Trainer:
             }
 
             loader_metrics.update(result)
-            final_sum += result[f'{loader_name}/rsum']
+            final_sum += metric_value
 
         return loader_metrics, final_sum/float(nb_loaders)
 

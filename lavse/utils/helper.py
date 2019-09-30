@@ -20,6 +20,8 @@ def save_checkpoint(
 
     if not save_all:
         epoch = -1
+    else:
+        epoch = kwargs['iteration']
 
     torch.save(
         obj=state_dict,

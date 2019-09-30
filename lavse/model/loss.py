@@ -312,5 +312,5 @@ _loss = {
     'contrastive_softmax': ContrastiveLossWithSoftmax,
 }
 
-def get_loss(name, params):
+def get_loss(name, **params):
     return _loss[name](**params)

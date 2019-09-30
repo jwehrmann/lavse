@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader, Dataset
 
 from . import collate_fns
 from . import datasets
+from . import preprocessing
 from .tokenizer import Tokenizer
 from ..utils.file_utils import read_txt
 from ..utils.logger import get_logger
@@ -60,7 +61,7 @@ def get_loader(
     loader_name, data_path, data_name, data_split,
     batch_size, vocab_paths, text_repr,
     lang='en', workers=4, ngpu=1, local_rank=0,
-    **kwargs
+    cnn=None, **kwargs
 ):
 
     logger.debug('Get loader')
@@ -84,6 +85,7 @@ def get_loader(
         data_split=data_split,
         tokenizers=tokenizers,
         lang=lang,
+        transform=preprocessing.get_transform(cnn, data_split),
     )
     logger.debug(f'Dataset built: {dataset}')
 

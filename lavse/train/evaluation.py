@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 
 @torch.no_grad()
-def predict_loader(model, data_loader, device):
+def predict_loader(model, data_loader, device,):
 
     model.eval()
 
@@ -95,6 +95,10 @@ def evaluate(
         #     embed_a=img_emb, embed_b=txt_emb,
         #     lens=lengths,
         # )
+    div = sims.shape[1] / sims.shape[0]
+    samp_sim = sims[:,np.arange(0, sims.shape[1], div).astype(np.int)]
+
+    val_loss = model.mm_criterion(samp_sim)
     sims = layers.tensor_to_numpy(sims)
 
     end_sim = dt()
@@ -110,6 +114,7 @@ def evaluate(
     metrics = {
         'pred_time': end_pred-begin_pred,
         'sim_time': end_sim-end_pred,
+        'val_loss': val_loss,
     }
     metrics.update(i2t_metrics)
     metrics.update(t2i_metrics)

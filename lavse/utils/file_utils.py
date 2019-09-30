@@ -73,3 +73,25 @@ def parse_loader_name(data_name):
         return name, lang
     else:
         return data_name, None
+
+
+def get_logdir(logdir, comment=''):
+    import shutil
+    import os
+    if logdir is None:
+        from datetime import datetime
+        current_time = datetime.now().strftime('%b%d_%H-%M-%S')
+        logdir = os.path.join(
+            'runs', current_time + '_' + comment
+        )
+
+    if os.path.exists(logdir):
+        a = input(f'{logdir} already exists! Do you want to rewrite it? [y/n] ')
+        if a.lower() == 'y':
+            shutil.rmtree(logdir)
+        else:
+            exit()
+
+
+    return logdir
+

@@ -4,6 +4,7 @@ from . import pooling
 import torchvision
 
 
+
 _image_encoders = {
     'simple': {
         'class': precomp.SimplePrecomp,
@@ -67,6 +68,14 @@ _image_encoders = {
             'cnn': torchvision.models.resnet50,
             'img_dim': 2048,
             'finetune': True,
+        },
+    },
+    'inception_v3': {
+        'class': fullencoder.InceptionEncoder,
+        'args': {
+            'cnn': torchvision.models.inception_v3,
+            'img_dim': 2048,
+            'finetune': False,
         },
     },
     'resnet101': {

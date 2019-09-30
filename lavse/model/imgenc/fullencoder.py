@@ -4,7 +4,9 @@ from typing import Dict, List
 
 import numpy as np
 import torch
+import torchvision
 from torch import nn
+from torch.nn import functional as F
 from torchvision import models
 
 from ...model.layers import attention, convblocks
@@ -108,6 +110,142 @@ class ImageEncoder(nn.Module):
         )
 
         super().load_state_dict(new_state)
+
+
+def inceptionv3(num_classes=1000, pretrained=True):
+    r"""Inception v3 model architecture from
+    `"Rethinking the Inception Architecture for Computer Vision" <http://arxiv.org/abs/1512.00567>`_.
+    """
+    model = models.inception_v3(pretrained=pretrained)
+
+    # Modify attributs
+    model.last_linear = model.fc
+    del model.fc
+
+    def features(self, input):
+        # 299 x 299 x 3
+        x = self.Conv2d_1a_3x3(input) # 149 x 149 x 32
+        x = self.Conv2d_2a_3x3(x) # 147 x 147 x 32
+        x = self.Conv2d_2b_3x3(x) # 147 x 147 x 64
+        x = F.max_pool2d(x, kernel_size=3, stride=2) # 73 x 73 x 64
+        x = self.Conv2d_3b_1x1(x) # 73 x 73 x 80
+        x = self.Conv2d_4a_3x3(x) # 71 x 71 x 192
+        x = F.max_pool2d(x, kernel_size=3, stride=2) # 35 x 35 x 192
+        x = self.Mixed_5b(x) # 35 x 35 x 256
+        x = self.Mixed_5c(x) # 35 x 35 x 288
+        x = self.Mixed_5d(x) # 35 x 35 x 288
+        x = self.Mixed_6a(x) # 17 x 17 x 768
+        x = self.Mixed_6b(x) # 17 x 17 x 768
+        x = self.Mixed_6c(x) # 17 x 17 x 768
+        x = self.Mixed_6d(x) # 17 x 17 x 768
+        x = self.Mixed_6e(x) # 17 x 17 x 768
+        # if self.training and self.aux_logits:
+        #     self._out_aux = self.AuxLogits(x) # 17 x 17 x 768
+        x = self.Mixed_7a(x) # 8 x 8 x 1280
+        x = self.Mixed_7b(x) # 8 x 8 x 2048
+        x = self.Mixed_7c(x) # 8 x 8 x 2048
+        return x
+
+    def logits(self, features):
+        x = F.avg_pool2d(features, kernel_size=8) # 1 x 1 x 2048
+        x = F.dropout(x, training=self.training) # 1 x 1 x 2048
+        x = x.view(x.size(0), -1) # 2048
+        # x = self.last_linear(x) # 1000 (num_classes)
+        # if self.training and self.aux_logits:
+        #     aux = self._out_aux
+        #     self._out_aux = None
+        #     return x, aux
+        return x
+
+    def forward(self, input):
+        x = self.features(input)
+        x = self.logits(x)
+        return x
+
+    # Modify methods
+    model.features = types.MethodType(features, model)
+    model.logits = types.MethodType(logits, model)
+    model.forward = types.MethodType(forward, model)
+    return model
+
+
+class InceptionEncoder(nn.Module):
+
+    def __init__(
+        self, cnn, img_dim, latent_size,
+        no_imgnorm=False, pretrained=True,
+        proj_regions=True, finetune=False
+    ):
+        super(InceptionEncoder, self).__init__()
+        self.latent_size = latent_size
+        self.proj_regions = proj_regions
+        self.no_imgnorm = no_imgnorm
+
+        # Full text encoder
+        if type(cnn) == str:
+            cnn = eval(cnn)
+
+        cnn = torchvision.models.inception_v3(pretrained)
+        self.cnn = inceptionv3(cnn)
+
+        # # For efficient memory usage.
+        # for param in self.cnn.parameters():
+        #     param.requires_grad = finetune
+
+        # Only applies pooling when region_pool is enabled
+        self.region_pool = nn.AdaptiveAvgPool1d(1)
+        # if proj_regions:
+        #     self.region_pool = lambda x: x
+
+        self.fc = nn.Linear(img_dim, latent_size)
+
+        # self.apply(default_initializer)
+        self.init_weights()
+
+        # self.aggregate = Aggregate()
+
+    def init_weights(self):
+        """Xavier initialization for the fully connected layer
+        """
+        import numpy as np
+        r = np.sqrt(6.) / np.sqrt(self.fc.in_features +
+                                  self.fc.out_features)
+        self.fc.weight.data.uniform_(-r, r)
+        self.fc.bias.data.fill_(0)
+
+    def forward(self, batch):
+        images = batch['image']
+        images = images.cuda()
+        """Extract image feature vectors."""
+        # assuming that the precomputed features are already l2-normalized
+        features = self.cnn(images)
+
+        features = features.view(features.shape[0], features.shape[1], -1)
+        features = l2norm(features, dim=1)
+
+        if not self.proj_regions:
+            features = self.region_pool(features)
+
+        features = features.permute(0, 2, 1)
+
+        features = self.fc(features)
+
+        # normalize in the joint embedding space
+        if not self.no_imgnorm:
+            features = l2norm(features, dim=-1)
+
+        return features
+
+    def load_state_dict(self, state_dict):
+        """Copies parameters. overwritting the default one to
+        accept state_dict from Full model
+        """
+        new_state = load_state_dict_with_replace(
+            state_dict=state_dict, own_state=self.state_dict()
+        )
+
+        super(InceptionEncoder, self).load_state_dict(new_state)
+
 
 # tutorials/09 - Image Captioning
 class VSEPPEncoder(nn.Module):
@@ -225,6 +363,8 @@ class FullImageEncoder(nn.Module):
         self.no_imgnorm = no_imgnorm
 
         # Full text encoder
+        if type(cnn) == str:
+            cnn = eval(cnn)
         self.cnn = BaseFeatures(cnn(pretrained))
 
         # # For efficient memory usage.
@@ -252,7 +392,9 @@ class FullImageEncoder(nn.Module):
         self.fc.weight.data.uniform_(-r, r)
         self.fc.bias.data.fill_(0)
 
-    def forward(self, images):
+    def forward(self, batch):
+        images = batch['image']
+        images = images.cuda()
         """Extract image feature vectors."""
         # assuming that the precomputed features are already l2-normalized
         features = self.cnn(images)

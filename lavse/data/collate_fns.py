@@ -7,6 +7,7 @@ from addict import Dict
 
 
 def default_padding(captions, device=None):
+
     lengths = [len(cap) for cap in captions]
     targets = torch.zeros(len(captions), max(lengths)).long()
 

@@ -95,6 +95,88 @@ class Cosine(nn.Module):
         return cosine_sim(img_embed, cap_embed)#.cpu()
 
 
+
+class AdaptiveEmbeddingT2IGlobal(nn.Module):
+
+    def __init__(
+            self, device, latent_size=1024, k=8, norm=False, task='t2i',
+            norm_output=False, gamma=10, train_gamma=False
+        ):
+        super().__init__()
+
+        self.device = device
+        self.norm_output = norm_output
+
+        # self.fc = nn.Conv1d(latent_size, latent_size*2, 1).to(device)
+
+        self.cbn_img = condbn.CondBatchNorm1d(latent_size, k)
+        # self.cbn_txt = condbn.CondBatchNorm1d(latent_size, k)
+
+        # self.alpha = nn.Parameter(torch.ones(1))
+        # self.beta = nn.Parameter(torch.zeros(1))
+
+        self.norm = norm
+        if norm:
+            self.feature_norm = ClippedL2Norm()
+        self.task = task
+
+        self.softmax = lambda x: x
+        self.gamma = 1.
+        if norm_output:
+            self.softmax = nn.Softmax(dim=-1)
+            self.gamma = gamma
+            if train_gamma:
+                self.gamma = nn.Parameter(torch.zeros(1) + self.gamma)
+
+    def forward(self, img_embed, cap_embed, lens, **kwargs):
+        '''
+            img_embed: (B, 36, latent_size)
+            cap_embed: (B, T, latent_size)
+        '''
+        # (B, 1024, T)
+        cap_embed = cap_embed.permute(0, 2, 1) #.to(self.device)
+        img_embed = img_embed.permute(0, 2, 1) #.to(self.device)
+        # (B, 1024)
+        if self.norm:
+            cap_embed = self.feature_norm(cap_embed)
+            img_embed = self.feature_norm(img_embed)
+
+        sims = torch.zeros(
+            img_embed.shape[0], cap_embed.shape[0]
+        ).to(self.device)
+
+        # masks = []
+
+        for i, cap_tensor in enumerate(cap_embed):
+            # cap: 1024, T
+            # img: 1024, 36
+
+            n_words = lens[i]
+            cap_repr = cap_tensor[:,:n_words].mean(-1).unsqueeze(0)
+
+            img_output = self.cbn_img(img_embed, cap_repr)
+            # print(img_output.shape)
+
+            mask = self.softmax(img_output * self.gamma)
+            # masks.append(mask)
+
+            img_output = mask * img_output
+
+            img_vector = img_output.mean(-1)
+
+            img_vector = l2norm(img_vector, dim=-1)
+
+            cap_vector = cap_repr
+            cap_vector = l2norm(cap_vector, dim=-1)
+
+            sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
+            sims[:,i] = sim
+
+        # self.masks = masks
+        return sims
+
+
+
 class AdaptiveEmbeddingT2I(nn.Module):
 
     def __init__(

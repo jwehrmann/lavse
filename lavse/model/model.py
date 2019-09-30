@@ -20,6 +20,8 @@ class LAVSE(nn.Module):
     ):
         super(LAVSE, self).__init__()
 
+        # Flag for distributed dataparallel
+        self.master = True
         self.latent_size = latent_size
         self.img_enc = get_image_encoder(
             name=img_enc.name,
@@ -63,6 +65,7 @@ class LAVSE(nn.Module):
         if ml_similarity is not None:
             self.ml_similarity = self.similarity
 
+            # FIXME: this is bad
             if ml_similarity != {}:
                 ml_sim_obj = get_similarity_object(
                     ml_similarity.name,
@@ -78,30 +81,39 @@ class LAVSE(nn.Module):
 
         logger.info(f'Using similarity: {similarity.name,}')
 
+        self.set_devices_(
+            txt_devices=txt_enc.devices,
+            img_devices=img_enc.devices,
+            loss_device=similarity.device,
+        )
+
+    def set_device_(
+        self, module, devices
+    ):
+        from . import data_parallel
+        if type(devices) == list:
+            raise Exception('Devices must be a list of strings.')
+        if len(devices) > 1:
+            module = data_parallel.DataParallel(module).cuda()
+            module.device = torch.device('cuda')
+        elif len(devices) == 1:
+            module.to(devices[0])
+            module.device = torch.device(devices[0])
+        else:
+            raise Exception(
+                f'Wrong number of provided devices: {devices}'
+            )
+
     def set_devices_(
         self, txt_devices=['cuda'],
         img_devices=['cuda'], loss_device='cuda',
     ):
         from . import data_parallel
 
-        if len(txt_devices) > 1:
-            self.txt_enc = data_parallel.DataParallel(self.txt_enc)
-            self.txt_enc.device = torch.device('cuda')
-        elif len(txt_devices) == 1:
-            self.txt_enc.to(txt_devices[0])
-            self.txt_enc.device = torch.device(txt_devices[0])
+        self.set_device_(self.txt_enc, txt_devices)
+        self.set_device_(self.img_enc, img_devices)
 
-        if len(img_devices) > 1:
-            self.img_enc = data_parallel.DataParallel(self.img_device)
-            self.img_enc.device = torch.device('cuda')
-        elif len(img_devices) == 1:
-            self.img_enc.to(img_devices[0])
-            self.img_enc.device = torch.device(img_devices[0])
-
-        self.loss_device = torch.device(
-            loss_device
-        )
-
+        self.loss_device = torch.device(loss_device)
         self.similarity = self.similarity.to(self.loss_device)
         self.ml_similarity = self.ml_similarity.to(self.loss_device)
 
@@ -157,3 +169,9 @@ class LAVSE(nn.Module):
             embed_a, embed_b, lens,
             shared_size=shared_size
         )
+
+
+# def lavse_from_checkpoint(model_path):
+#     from .utils import helper
+#     checkpoint = helper.restore_checkpoint(model_path)
+

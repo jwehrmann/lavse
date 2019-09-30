@@ -103,6 +103,7 @@ if __name__ == '__main__':
         text_repr=opt.dataset.text_repr,
         vocab_paths=opt.dataset.vocab_paths,
         ngpu=ngpu,
+        cnn=opt.model.params.cnn,
         **opt.dataset.train,
         # vocab_path=args.vocab_path,
         # batch_size=args.batch_size,
@@ -124,6 +125,7 @@ if __name__ == '__main__':
                 text_repr=opt.dataset.text_repr,
                 vocab_paths=opt.dataset.vocab_paths,
                 ngpu=1,
+                cnn=opt.model.params.cnn,
                 **opt.dataset.val,
             )
         )
@@ -170,11 +172,11 @@ if __name__ == '__main__':
             f"keys: {checkpoint.keys()}"
         ))
 
-    model.set_devices_(
-        txt_devices=opt.model.txt_enc.devices,
-        img_devices=opt.model.img_enc.devices,
-        loss_device=opt.model.similarity.device,
-    )
+    # model.set_devices_(
+    #     txt_devices=opt.model.txt_enc.devices,
+    #     img_devices=opt.model.img_enc.devices,
+    #     loss_device=opt.model.similarity.device,
+    # )
 
     # Distribute the same process in GPUs
     # This is used when a single model cannot fit the memory
@@ -219,7 +221,10 @@ if __name__ == '__main__':
         log_grad_norm=False,
         log_histograms=False,
         optimizer=opt.optimizer,
-        freeze_modules=opt.model.freeze_modules
+        freeze_modules=opt.model.freeze_modules,
+        early_stop=opt.engine.early_stop,
+        save_all=opt.engine.save_all,
+        val_metric=opt.engine.val_metric if opt.engine.val_metric else 'rsum'
     )
 
     if opt.engine.eval_before_training:

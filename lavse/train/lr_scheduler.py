@@ -4,6 +4,7 @@ import torch.optim.lr_scheduler
 
 _scheduler = {
     'cosine': torch.optim.lr_scheduler.CosineAnnealingLR,
+    'exp': torch.optim.lr_scheduler.ExponentialLR,
     'step': torch.optim.lr_scheduler.StepLR,
 }
 
