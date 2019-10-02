@@ -11,7 +11,7 @@ def get_transform(
     means = [0.485, 0.456, 0.406]
     stds = [0.229, 0.224, 0.225]
 
-    if 'inceptionv3' in cnn:
+    if cnn and 'inceptionv3' in cnn:
         resize_to = 299
         crop_size = 299
         means = [0.5, 0.5, 0.5]

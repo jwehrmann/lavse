@@ -52,6 +52,7 @@ class ContrastiveLoss(nn.Module):
         self.iteration = 0
         self.k = 0
 
+
     def adjust_k(self, ):
         """
             Update loss hyper-parameter k

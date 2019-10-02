@@ -20,81 +20,17 @@ from .measure import cosine_sim, l2norm
 logger = get_logger()
 
 
-
-# class Similarity(nn.Module):
-
-#     def __init__(self, device, similarity_object, **kwargs):
-#         super().__init__()
-#         self.device = device
-#         self.similarity = similarity_object
-#         # self.similarity = factory.get_similarity_object(similarity_name, device=device, **kwargs)
-#         logger.info(f'Created similarity: {similarity_object}')
-#         self.set_master_()
-
-#     def set_master_(self, is_master=True):
-#         self.master = is_master
-
-#     def forward(self, img_embed, cap_embed, lens, shared=False):
-#         logger.debug((
-#             f'Similarity - img_shape: {img_embed.shape} '
-#             'cap_shape: {cap_embed.shape}'
-#         ))
-
-#         return self.similarity(img_embed, cap_embed, lens)
-
-#     def forward_shared(self, img_embed, cap_embed, lens, shared_size=128):
-#         """
-#         Compute pairwise i2t image-caption distance with locality sharding
-#         """
-
-#         #img_embed = img_embed.to(self.device)
-#         #cap_embed = cap_embed.to(self.device)
-
-#         n_im_shard = (len(img_embed)-1)//shared_size + 1
-#         n_cap_shard = (len(cap_embed)-1)//shared_size + 1
-
-#         logger.debug('Calculating shared similarities')
-
-#         pbar_fn = lambda x: range(x)
-#         if self.master:
-#             pbar_fn = lambda x: tqdm(
-#                 range(x), total=x,
-#                 desc='Test  ',
-#                 leave=False,
-#             )
-
-#         d = torch.zeros(len(img_embed), len(cap_embed)).cpu()
-#         for i in pbar_fn(n_im_shard):
-#             im_start = shared_size*i
-#             im_end = min(shared_size*(i+1), len(img_embed))
-#             for j in range(n_cap_shard):
-#                 cap_start = shared_size*j
-#                 cap_end = min(shared_size*(j+1), len(cap_embed))
-#                 im = img_embed[im_start:im_end]
-#                 s = cap_embed[cap_start:cap_end]
-#                 l = lens[cap_start:cap_end]
-#                 sim = self.forward(im, s, l)
-#                 d[im_start:im_end, cap_start:cap_end] = sim
-
-#         logger.debug('Done computing shared similarities.')
-#         return d
-
-
 class Cosine(nn.Module):
 
-    def __init__(self, device, latent_size=1024):
+    def __init__(self,):
         super().__init__()
-        self.device = device
+        pass
 
     def forward(self, img_embed, cap_embed, *args, **kwargs):
-        img_embed = img_embed.to(self.device)
-        cap_embed = cap_embed.to(self.device)
-
         img_embed = l2norm(img_embed, dim=1)
         cap_embed = l2norm(cap_embed, dim=1)
 
         return cosine_sim(img_embed, cap_embed)#.cpu()
-
 
 
 class LogSumExp(nn.Module):

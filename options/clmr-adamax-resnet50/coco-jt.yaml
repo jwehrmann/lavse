@@ -1,14 +1,18 @@
 __include__: 'clmr.yaml'
 exp:
-  outpath: logs/m30k_precomp.en-de/clmr-adamax/
+  outpath: logs/coco_precomp.en-jt/clmr-adamax/
 dataset:
   train:
-    data: m30k_precomp.en    
+    data: coco_precomp.en    
+    workers: 0
   val: 
-    data: [m30k_precomp.en, m30k_precomp.de]    
+    data: [coco_precomp.en, jap_precomp.jt]
+    workers: 0
   adapt: 
-    data: [m30k_precomp.en-de]
-optimizer:  
+    data: [jap_precomp.en-jt]
+    workers: 0
+optimizer:
+  import: lavse.optimizers.factory
   name: adamax
   params:
     lr: 0.001 # 7e-4

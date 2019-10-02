@@ -8,7 +8,15 @@ import argparse
 import collections
 from collections import OrderedDict
 from yaml import Dumper
-from bootstrap.lib.utils import merge_dictionaries
+# from bootstrap.lib.utils import merge_dictionaries
+
+
+def merge_dictionaries(dict1, dict2):
+    for key in dict2:
+        if key in dict1 and isinstance(dict1[key], dict) and isinstance(dict2[key], dict):
+            merge_dictionaries(dict1[key], dict2[key])
+        else:
+            dict1[key] = dict2[key]
 
 
 class OptionsDict(OrderedDict):
@@ -118,7 +126,7 @@ class OptionsDict(OrderedDict):
 # https://stackoverflow.com/questions/6760685/creating-a-singleton-in-python
 class Options(object):
     """ Options is a singleton. It parses a yaml file to generate rules to the argument parser.
-        If a path to a yaml file is not provided, it relies on the `-o/--path_opts` command line argument.
+        If a path to a yaml file is not provided, it relies on the `-o/--options` command line argument.
         Args:
             path_yaml(str): path to the yaml file
             arguments_callback(func): function to be called after running argparse,
@@ -160,16 +168,18 @@ class Options(object):
             if path_yaml:
                 self.path_yaml = path_yaml
             else:
-                # Parsing only the path_opts argument to find yaml file
+                # Parsing only the options argument to find yaml file
                 optfile_parser = argparse.ArgumentParser(add_help=False)
-                optfile_parser.add_argument('-o', '--path_opts', type=str, required=True)
-                self.path_yaml = optfile_parser.parse_known_args()[0].path_opts
+                optfile_parser.add_argument('-o', '--options', type=str, required=True)
+                self.path_yaml = optfile_parser.parse_known_args()[0].options
 
             options_yaml = Options.load_yaml_opts(self.path_yaml)
 
             if run_parser:
                 fullopt_parser = Options.HelpParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-                fullopt_parser.add_argument('-o', '--path_opts', type=str, required=True)
+                fullopt_parser.add_argument('-o', '--options', type=str, required=True)
+                fullopt_parser.add_argument('--ngpu', type=int, default=1)
+                fullopt_parser.add_argument('--local_rank', type=int, default=0)
                 Options.__instance.add_options(fullopt_parser, options_yaml)
 
                 arguments = fullopt_parser.parse_args()
@@ -324,8 +334,8 @@ class Options(object):
     def save_yaml_opts(opts, path_yaml):
         # Warning: copy is not nested
         options = copy.copy(opts)
-        if 'path_opts' in options:
-            del options['path_opts']
+        if 'options' in options:
+            del options['options']
 
         # https://gist.github.com/oglops/c70fb69eef42d40bed06
         def dict_representer(dumper, data):

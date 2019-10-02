@@ -272,7 +272,7 @@ class CrossLanguageLoader(Dataset):
 
     def __init__(
         self, data_path, data_name, data_split,
-        tokenizers, lang='en-de',
+        tokenizers, lang='en-de', **kwargs
     ):
         logger.debug((
             'CrossLanguageLoader dataset\n '

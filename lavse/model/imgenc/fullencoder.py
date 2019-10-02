@@ -365,23 +365,13 @@ class FullImageEncoder(nn.Module):
         # Full text encoder
         if type(cnn) == str:
             cnn = eval(cnn)
+
         self.cnn = BaseFeatures(cnn(pretrained))
-
-        # # For efficient memory usage.
-        # for param in self.cnn.parameters():
-        #     param.requires_grad = finetune
-
-        # Only applies pooling when region_pool is enabled
+        # Used only when projecting regions
         self.region_pool = nn.AdaptiveAvgPool1d(1)
-        # if proj_regions:
-        #     self.region_pool = lambda x: x
-
         self.fc = nn.Linear(img_dim, latent_size)
 
-        # self.apply(default_initializer)
         self.init_weights()
-
-        # self.aggregate = Aggregate()
 
     def init_weights(self):
         """Xavier initialization for the fully connected layer
@@ -392,8 +382,9 @@ class FullImageEncoder(nn.Module):
         self.fc.weight.data.uniform_(-r, r)
         self.fc.bias.data.fill_(0)
 
-    def forward(self, batch):
-        images = batch['image']
+    def forward(self, images):
+        # images = batch['image']
+
         images = images.cuda()
         """Extract image feature vectors."""
         # assuming that the precomputed features are already l2-normalized
@@ -406,7 +397,6 @@ class FullImageEncoder(nn.Module):
             features = self.region_pool(features)
 
         features = features.permute(0, 2, 1)
-
         features = self.fc(features)
 
         # normalize in the joint embedding space

@@ -7,6 +7,7 @@ from .imgenc import get_image_encoder, get_img_pooling
 from .similarity.factory import get_similarity_object
 from .similarity.measure import l2norm
 from .txtenc import get_text_encoder, get_txt_pooling
+import types
 
 from tqdm import tqdm
 
@@ -58,7 +59,7 @@ class LAVSE(nn.Module):
             f'{txt_enc.name}'
         ))
 
-        self.similarity = get_similarity_object(
+        similarity = get_similarity_object(
             similarity.name,
             **similarity.params
         )
@@ -78,66 +79,28 @@ class LAVSE(nn.Module):
             )
 
         if criterion:
-            self.multimodal_criterion = loss.get_loss(**criterion)
+            multimodal_criterion = loss.get_loss(**criterion)
+            self.__dict__['multimodal_criterion'] = multimodal_criterion
+            # self.multimodal_criterion = types.MethodType(multimodal_criterion, self)
+            # types.MethodType(func, a)
         if ml_criterion:
-            self.multilanguage_criterion = loss.get_loss(**ml_criterion)
+            multilanguage_criterion = loss.get_loss(**ml_criterion)
+            self.__dict__['multilanguage_criterion'] = multilanguage_criterion
 
-        logger.info(f'Using similarity: {similarity.name,}')
+        self.__dict__['similarity'] = similarity
+        self.__dict__['ml_similarity'] = ml_similarity
 
+        logger.info(f'Using similarity: {similarity,}')
         if torch.cuda.is_available():
-            self.device = torch.device('cuda')
-            self.img_enc.device = self.device
-            self.txt_enc.device = self.device
-            self.similarity.device = self.device
+            self.set_device('cuda')
 
-    #     self.set_devices_(
-    #         txt_devices=txt_enc.devices,
-    #         img_devices=img_enc.devices,
-    #         loss_device=similarity.device,
-    #     )
-
-    # def set_device_(
-    #     self, module, devices
-    # ):
-    #     from . import data_parallel
-    #     if type(devices) == list:
-    #         raise Exception('Devices must be a list of strings.')
-    #     if len(devices) > 1:
-    #         module = data_parallel.DataParallel(module).cuda()
-    #         module.device = torch.device('cuda')
-    #     elif len(devices) == 1:
-    #         module.to(devices[0])
-    #         module.device = torch.device(devices[0])
-    #     else:
-    #         raise Exception(
-    #             f'Wrong number of provided devices: {devices}'
-    #         )
-
-    # def set_devices_(
-    #     self, txt_devices=['cuda'],
-    #     img_devices=['cuda'], loss_device='cuda',
-    # ):
-    #     from . import data_parallel
-
-    #     self.set_device_(self.txt_enc, txt_devices)
-    #     self.set_device_(self.img_enc, img_devices)
-
-    #     self.loss_device = torch.device(loss_device)
-    #     self.similarity = self.similarity.to(self.loss_device)
-    #     self.ml_similarity = self.ml_similarity.to(self.loss_device)
-
-    #     logger.info((
-    #         f'Setting devices: '
-    #         f'img: {self.img_enc.device},'
-    #         f'txt: {self.txt_enc.device}, '
-    #         f'loss: {self.loss_device}'
-    #     ))
-
-    # def embed_caption_features(self, cap_features, lengths):
-    #     return self.txt_pool(cap_features, lengths)
-
-    # def embed_image_features(self, img_features):
-    #     return self.img_pool(img_features)
+    def set_device(self, device):
+        self.device = torch.device(device)
+        self.img_enc.device = self.device
+        self.txt_enc.device = self.device
+        self.similarity.device = self.device
+        if self.ml_similarity:
+            self.ml_similarity.device = self.device
 
     def embed_images(self, batch):
         img_tensor = self.img_enc(batch)
@@ -152,7 +115,7 @@ class LAVSE(nn.Module):
     def forward_batch(
         self, batch
     ):
-        img_embed = self.embed_images(batch)
+        img_embed = self.embed_images(batch['image'])
         txt_embed = self.embed_captions(batch)
 
         return img_embed, txt_embed
@@ -171,22 +134,6 @@ class LAVSE(nn.Module):
     # def get_ml_sim_matrix(self, embed_a, embed_b, lens=None):
     #     return self.ml_similarity(embed_a, embed_b, lens)
 
-    def get_ml_sim_matrix(
-        self, embed_a, embed_b, lens=None, shared_size=128
-    ):
-        return self.compute_pairwise_similarity(
-            self.ml_similarity, embed_a, embed_b, lens,
-            shared_size=shared_size
-        )
-
-    def get_sim_matrix(
-        self, embed_a, embed_b, lens=None, shared_size=128
-    ):
-        return self.compute_pairwise_similarity(
-            self.ml_similarity, embed_a, embed_b, lens,
-            shared_size=shared_size
-        )
-
     def compute_pairwise_similarity(
         self, similarity, img_embed, cap_embed, lens, shared_size=128
     ):
@@ -204,7 +151,7 @@ class LAVSE(nn.Module):
         logger.debug('Calculating shared similarities')
 
         pbar_fn = lambda x: range(x)
-        if self.master:
+        if self.master and len(img_embed) > 1000:
             pbar_fn = lambda x: tqdm(
                 range(x), total=x,
                 desc='Test  ',
@@ -265,8 +212,10 @@ class LAVSE(nn.Module):
             cap_a_embed = pooling.last_hidden_state_pool(cap_a_embed, lens_a)
             cap_b_embed = pooling.last_hidden_state_pool(cap_b_embed, lens_b)
 
-        sim_matrix = self.get_ml_sim_matrix(cap_a_embed, cap_b_embed, lens_b)
-        loss = self.ml_criterion(sim_matrix)
+        sim_matrix = self.compute_pairwise_similarity(
+            self.ml_similarity, cap_a_embed, cap_b_embed, lens_b
+        )
+        loss = self.multilanguage_criterion(sim_matrix)
 
         return loss
 

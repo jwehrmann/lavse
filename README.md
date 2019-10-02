@@ -9,10 +9,8 @@ This is LAVSE (pronounced læːvɪs), the official source code for our ICCV'19 p
 * Single language and multi-language support (English, German, Japanese)
 * Text encoders (GRU, Liwe, BERT, etc)
 * Image encoders (Precomp, full ConvNet encoders)
-* Similarity computation (easy to extend)
-* Warm-up hinge-loss function  
-* Retrieval demo
-* Distributed training: data parallel and data distributed
+* Similarity computation (easy to extend, it supports attention layers)
+* Warm-up hinge-loss function
 * Tensorboard logging
 
 ## Supported methods
@@ -47,6 +45,7 @@ Alternatively, you can download each dataset as follows:
 ### Original images
 
 To use full image encoders (only pure ConvNets is supported, i.e., no FasterRCNN-based encoders for now), you need to download the original images from:
+
 * COCO train/val/test
 * COCO annotations
 * Flickr30k train/val/test

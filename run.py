@@ -20,29 +20,16 @@ import os
 import torch.multiprocessing as mp
 
 
-def init_distributed_mode(args):
-    if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
-        args.rank = int(os.environ["RANK"])
-        args.world_size = int(os.environ['WORLD_SIZE'])
-        args.gpu = int(os.environ['LOCAL_RANK'])
-    elif 'SLURM_PROCID' in os.environ:
-        args.rank = int(os.environ['SLURM_PROCID'])
-        args.gpu = args.rank % torch.cuda.device_count()
-    else:
-        print('Not using distributed mode')
-        args.distributed = False
-        return
+def init_distributed_mode(opt):
+    opt.distributed = True
 
-    args.distributed = True
-
-    torch.cuda.set_device(args.gpu)
-    args.dist_backend = 'nccl'
-    print('| distributed init (rank {}): {}'.format(
-        args.rank, args.dist_url), flush=True)
-    torch.distributed.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
-                                         world_size=args.world_size, rank=args.rank)
-    torch.distributed.barrier()
-    setup_for_distributed(args.rank == 0)
+    torch.distributed.init_process_group(
+        'nccl',
+        init_method='env://',
+        world_size=opt.ngpu,
+        rank=opt.local_rank,
+    )
+    setup_for_distributed(opt.rank == 0)
 
 
 def setup_for_distributed(is_master):
@@ -60,19 +47,23 @@ def setup_for_distributed(is_master):
     __builtin__.print = print
 
 
-
 if __name__ == '__main__':
     # mp.set_start_method('spawn')
 
     # loader_name = 'precomp'
-    args = params.get_train_params()
-    opt = load_yaml_opts(args.options)
-    # init_distributed_mode(args)s
+    from lavse.utils import options
+
+    # args = params.get_train_params()
+    # opt = load_yaml_opts(args.options)
+    opt = options.Options()
+    opt = Dict(vars(opt)).options
+
+    if opt.misc.distributed:
+        init_distributed_mode(opt)
 
     logger = create_logger(
         level='debug' if opt.engine.debug else 'info')
 
-    logger.info(f'Used args   : \n{args}')
     logger.info(f'Used options: \n{opt}')
 
     # torch.cuda.set_device(args.local_rank)
@@ -82,14 +73,14 @@ if __name__ == '__main__':
     # if args.local_rank != 0:
     #     logger.propagate = False
 
-    train_data = opt.dataset.train_data
+    train_data = opt.dataset.train
 
     if 'DATA_PATH' not in os.environ:
         data_path = opt.dataset.data_path
     else:
         data_path = os.environ['DATA_PATH']
 
-    ngpu = torch.cuda.device_count()
+    ngpu = opt.ngpu
 
     data_name, lang = parse_loader_name(opt.dataset.train.data)
     train_loader = get_loader(
@@ -97,7 +88,7 @@ if __name__ == '__main__':
         data_path=data_path,
         data_name=data_name,
         loader_name=opt.dataset.loader_name,
-        local_rank=args.local_rank,
+        local_rank=opt.local_rank,
         lang=lang,
         text_repr=opt.dataset.text_repr,
         vocab_paths=opt.dataset.vocab_paths,
@@ -119,7 +110,7 @@ if __name__ == '__main__':
                 data_path=data_path,
                 data_name=data_name,
                 loader_name=opt.dataset.loader_name,
-                local_rank=args.local_rank,
+                local_rank=opt.local_rank,
                 lang=lang,
                 text_repr=opt.dataset.text_repr,
                 vocab_paths=opt.dataset.vocab_paths,
@@ -140,7 +131,7 @@ if __name__ == '__main__':
                 data_path=data_path,
                 data_name=data_name,
                 loader_name='lang',
-                local_rank=args.local_rank,
+                local_rank=opt.local_rank,
                 lang=lang,
                 text_repr=opt.dataset.text_repr,
                 vocab_paths=opt.dataset.vocab_paths,
@@ -156,12 +147,15 @@ if __name__ == '__main__':
         tokenizers = [tokenizers]
 
     model = model.LAVSE(**opt.model, tokenizers=tokenizers)#.to(device)
+    if opt.misc.sync_bn:
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+
     logger.info(model)
 
     if opt.exp.resume is not None:
-        logger.info(f'Resuming checkpoint: {args.resume}')
+        logger.info(f'Resuming checkpoint: {opt.resume}')
         checkpoint = helper.restore_checkpoint(
-            path=args.resume,
+            path=opt.resume,
             model=model,
         )
         model = checkpoint['model']
@@ -171,16 +165,29 @@ if __name__ == '__main__':
             f"keys: {checkpoint.keys()}"
         ))
 
-    # if opt.exp.distributed:
-    #     model = data_parallel.DistributedDataParallel(model)
-
-    device = torch.device('cuda')
-    if torch.cuda.device_count() > 1:
-        model = data_parallel.DataParallel(model)
-    elif torch.cuda.device_count() == 0:
-        device = torch.device('cpu')
-
-    model = model.to(device)
+    # Distributed data parallel training
+    if opt.misc.distributed:
+        device = torch.device('cuda:{}'.format(opt.local_rank))
+        model = model.to(device)
+        model = data_parallel.DistributedDataParallel(
+               model, device_ids=[opt.local_rank],
+               output_device=opt.local_rank,
+        )
+        model.set_device(device)
+        # model = data_parallel.DistributedDataParallel(model)
+    # Standard Data parallel + Single gpu
+    else:
+        device = torch.device('cuda')
+        nb_devices = torch.cuda.device_count()
+        if nb_devices > 1:
+            logger.info(f'Found {nb_devices} devices. Using DataParallel.')
+            model.img_enc = data_parallel.DataParallel(model.img_enc)
+            # model.txt_enc = model.txt_enc
+            # model = torch.nn.DataParallel(model, device_ids=[0,1,2])
+        elif nb_devices == 0:
+            device = torch.device('cpu')
+        print(device)
+        model = model.to(device)
 
     is_master = True
     model.master = is_master # FIXME: Replace "if print" by built_in print

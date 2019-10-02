@@ -22,30 +22,27 @@ model:
       embed_dim: 300
       use_bi_gru: true
     pooling: lens
-    devices: [cuda,]
   img_enc:
-    name: hierarchical
+    name: simple
     params:
       img_dim: 2048
-    devices: [cuda,]
     pooling: mean    
   similarity:
     name: cosine
-    params:
-      device: cuda # FIXME
-    device: cuda # FIXME
+  ml_similarity: 
+    name: cosine    
   criterion:
-    name: 'contrastive'
+    name: contrastive
     params: 
       margin: 0.2
       max_violation: False
-      beta: 0.991
+      beta: 0.995
   ml_criterion:
-    name: 'contrastive'
+    name: contrastive
     params:
       margin: 0.2
       max_violation: False
-      beta: 0.91
+      beta: 0.991
 optimizer:
   grad_clip: 2.
 engine:

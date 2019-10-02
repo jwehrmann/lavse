@@ -3,26 +3,20 @@ import logging
 import os
 import random
 from pathlib import Path
-from random import shuffle
 from timeit import default_timer as dt
 
 import numpy as np
 import torch
 import torch.nn as nn
-from addict import Dict
-from numpy.polynomial.polynomial import polyfit
 from torch.nn.utils.clip_grad import clip_grad_norm_
-from torch.utils.data import DataLoader, dataset
+
+from addict import Dict
 from tqdm import tqdm
 
 from . import evaluation
 from ..data.loaders import DataIterator
-from ..model.loss import cosine_sim, cosine_sim_numpy
-from ..utils import helper, layers, logger, file_utils
-from .evaluation import i2t, t2i
+from ..utils import file_utils, helper, layers, logger
 from .lr_scheduler import get_scheduler
-from ..model.txtenc import pooling
-
 
 torch.manual_seed(0)
 random.seed(0, version=2)
@@ -59,7 +53,6 @@ class Trainer:
         lr_scheduler=None,
         clip_grad=2.,
         log_histograms=False,
-        log_grad_norm=False,
         early_stop=50,
         save_all=False,
         freeze_modules=[],
@@ -70,10 +63,9 @@ class Trainer:
         count_params = lambda p: np.sum([
             np.product(tuple(x.shape)) for x in p
         ])
-        # TODO: improve this! :S
+
         total_params = count_params(self.model.parameters())
 
-        # if freeze_modules is not None and len(freeze_modules) > 0:
         for fmod in freeze_modules:
             print(f'Freezing {fmod}')
             freeze(eval(f'self.{fmod}'))
@@ -88,9 +80,6 @@ class Trainer:
             trainable_params,
             **optimizer.params,
         )
-        # self.optimizer = optimizer(
-        #     trainable_params, lr
-        # )
 
         scheduler = None
         if lr_scheduler.name is not None:
@@ -100,32 +89,22 @@ class Trainer:
                 **lr_scheduler.params,
             )
 
-
         for k in self.optimizer.param_groups:
             self.sysoutlog(
                 f"lr: {k['lr']}, #layers: {len(k['params'])}, #params: {count_params(k['params']):,}"
             )
 
         self.sysoutlog(
-            #f'Trainable layers: {len(trainable_params)}, '
+            f'Trainable layers: {len(trainable_params)}, '
             f'Total Params: {total_params:,}, '
             #f'Train Params: {nb_trainable_params:,}'
         )
 
-        #self.optimizer = nn.DataParallel(self.optimizer).cuda()
-        #self.optimizer.param_groups = self.optimizer.module.param_groups
-        #self.optimizer.step = self.optimizer.module.step
-
-        # self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=45*1100)
-        # self.multimodal_criterion = multimodal_criterion
-        # self.ml_criterion = ml_criterion
-        self.initial_lr = lr
         self.lr_scheduler = scheduler
         self.clip_grad = clip_grad
         self.log_histograms = log_histograms
-        self.log_grad_norm = False
         self.save_all = save_all
-        self.best_val = 0
+        self.best_val = 1e10 if 'loss' in val_metric else 0
         self.count = early_stop
         self.early_stop = early_stop
         self.val_metric = val_metric
@@ -212,7 +191,6 @@ class Trainer:
             for lang_iter in lang_iters:
 
                 lang_data = lang_iter.next()
-
                 lang_loss = self.model.forward_multilanguage_loss(*lang_data)
                 total_lang_loss += lang_loss
                 loss_info[f'train_loss_{str(lang_iter)}'] = lang_loss
@@ -220,12 +198,6 @@ class Trainer:
             total_loss = multimodal_loss + total_lang_loss
             total_loss.backward()
 
-            # if self.log_grad_norm and self.master:
-            #     norm = logger.log_grad_norm(
-            #         self.model, self.tb_writer,
-            #         iteration=iteration,
-            #         reduce=sum,
-            #     )
             norm = 0.
             if self.clip_grad > 0:
                 norm = clip_grad_norm_(

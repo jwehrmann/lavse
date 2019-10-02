@@ -1,7 +1,5 @@
 import argparse
 from addict import Dict
-from lavse.model.similarity.factory import get_sim_names
-from lavse.model import imgenc, txtenc
 
 
 def get_train_params():
@@ -10,6 +8,7 @@ def get_train_params():
         'options',
     )
     parser.add_argument('--local_rank', type=int, default=0)
+    parser.add_argument('--ngpu', type=int, default=1)
 
     args = parser.parse_args()
     args = Dict(vars(args))
@@ -34,3 +33,7 @@ def get_test_params():
     args = parser.parse_args()
     args = Dict(vars(args))
     return args
+
+'''
+python
+'''
