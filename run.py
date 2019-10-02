@@ -182,8 +182,6 @@ if __name__ == '__main__':
         if nb_devices > 1:
             logger.info(f'Found {nb_devices} devices. Using DataParallel.')
             model.img_enc = data_parallel.DataParallel(model.img_enc)
-            # model.txt_enc = model.txt_enc
-            # model = torch.nn.DataParallel(model, device_ids=[0,1,2])
         elif nb_devices == 0:
             device = torch.device('cpu')
         print(device)

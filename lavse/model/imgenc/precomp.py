@@ -39,7 +39,8 @@ class SCANImagePrecomp(nn.Module):
     def forward(self, batch):
         """Extract image feature vectors."""
         # assuming that the precomputed features are already l2-normalized
-        images = batch['image'].to(self.device)
+        images = images.to(self.device)
+        # images = batch['image'].to(self.device)
         features = self.fc(images)
 
         # normalize in the joint embedding space
@@ -77,10 +78,11 @@ class SimplePrecomp(nn.Module):
         self.fc.weight.data.uniform_(-r, r)
         self.fc.bias.data.fill_(0)
 
-    def forward(self, batch):
+    def forward(self, images):
         """Extract image feature vectors."""
         # assuming that the precomputed features are already l2-normalized
-        images = batch['image'].to(self.device)
+        images = images.to(self.device)
+        # images = batch['image'].to(self.device)
         features = self.fc(images)
         features = nn.LeakyReLU(0.1)(features)
 
@@ -117,7 +119,8 @@ class VSEImageEncoder(nn.Module):
         """Extract image feature vectors."""
         # assuming that the precomputed features are already l2-normalized
 
-        images = batch['image'].to(self.device).to(self.device)
+        # images = batch['image'].to(self.device).to(self.device)
+        images = images.to(self.device)
 
         images = self.pool(images.permute(0, 2, 1)) # Global pooling
         images = images.permute(0, 2, 1)
@@ -173,10 +176,10 @@ class HierarchicalEncoder(nn.Module):
 
         self.apply(default_initializer)
 
-    def forward(self, batch):
+    def forward(self, images):
         """Extract image feature vectors."""
 
-        images = batch['image']
+        # images = batch['image']
         images = images.to(self.device)
         images = images.permute(0, 2, 1)
         if self.use_sa:
