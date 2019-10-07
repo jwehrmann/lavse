@@ -15,7 +15,7 @@ dataset:
     batch_size: 128
 model:
   latent_size: 1024
-  freeze_modules: []  
+  freeze_modules: []
   txt_enc:
     name: gru
     params:
@@ -32,16 +32,11 @@ model:
   similarity:
     name: scan_i2t
     params:
-      device: cuda # FIXME
       feature_norm: clipped_l2norm
       smooth: 4
       agg_function: Mean
-    device: cuda # FIXME
   ml_similarity:
     name: cosine
-    params:
-      device: cuda # FIXME
-    device: cuda # FIXME
 criterion:
   margin: 0.2
   max_violation: False
@@ -52,7 +47,6 @@ ml_criterion:
   beta: 0.91
 optimizer:
   name: adam
-  import: lavse.optimizers.factory
   params:
     lr: 0.0002
   lr_scheduler:
@@ -68,7 +62,7 @@ engine:
   nb_epochs: 30
   early_stop: 50
   valid_interval: 500
-misc: # TODO
+misc:
   cuda: True
-  distributed: False # TODO 
-  seed: 1337 # TODO
+  distributed: False
+  seed: 1337

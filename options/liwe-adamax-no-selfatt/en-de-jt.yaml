@@ -1,13 +1,16 @@
 __include__: 'liwe.yaml'
 exp:
-  outpath: logs/m30k_precomp.en-de/liwe-adamax/
+  outpath: logs/en-jt-de-1024,512/simple-liwe-adamax/
 dataset:
   train:
-    data: m30k_precomp.en    
+    data: jap_precomp.en
+    workers: 0
   val: 
-    data: [m30k_precomp.en, m30k_precomp.de]    
+    data: [jap_precomp.en, jap_precomp.jt, m30k_precomp.de]
+    workers: 0
   adapt: 
-    data: [m30k_precomp.en-de]
+    data: [jap_precomp.en-jt, m30k_precomp.en-de]
+    workers: 0
 model:
   latent_size: 1024
   freeze_modules: []
@@ -15,10 +18,11 @@ model:
     name: liwe_gru
     params:
       embed_dim: 300
-      liwe_neurons: [384, 448]
+      liwe_neurons: [1024, 512]
       liwe_activation: nn.LeakyReLU(0.1, inplace=True)
       use_bi_gru: true
     pooling: lens
+    devices: [cuda,]        
 optimizer:
   import: lavse.optimizers.factory
   name: adamax

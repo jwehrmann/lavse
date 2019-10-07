@@ -71,12 +71,13 @@ class LAVSE(nn.Module):
         #     **kwargs
         # )
 
-        self.ml_similarity = nn.Identity()
         if ml_similarity:
-            self.ml_similarity = get_similarity_object(
+            ml_similarity = get_similarity_object(
                 ml_similarity.name,
                 **ml_similarity.params
             )
+        else:
+            ml_similarity = nn.Identity()
 
         if criterion:
             multimodal_criterion = loss.get_loss(**criterion)

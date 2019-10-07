@@ -1,14 +1,20 @@
 __include__: 'liwe.yaml'
 exp:
-  outpath: logs/f30k_precomp.en/liwe-adamax.1/
+  outpath: logs/coco_precomp.en-jt/liwe-adamax-d256/
 dataset:
   train:
-    data: f30k_precomp.en
+    data: coco_precomp.en    
+    workers: 0
   val: 
-    data: [f30k_precomp.en]
-  adapt:
-    data: []
-optimizer:  
+    data: [coco_precomp.en, jap_precomp.jt]
+    workers: 0
+  adapt: 
+    data: [jap_precomp.en-jt]
+    workers: 0
+model:
+  latent_size: 256
+optimizer:
+  import: lavse.optimizers.factory
   name: adamax
   params:
     lr: 0.001 # 7e-4

@@ -32,7 +32,7 @@ model:
   similarity:
     name: cosine
   ml_similarity: 
-    name: cosine   
+    name: cosine
   criterion:
     name: 'contrastive'
     params: 

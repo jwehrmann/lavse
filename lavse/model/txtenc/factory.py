@@ -9,8 +9,10 @@ import math
 
 _text_encoders = {
     'gru': txtenc.RNNEncoder,
+    'gru_glove': txtenc.GloveRNNEncoder,
     'scan_t2i': txtenc.EncoderText,
     'liwe_gru': txtenc.LiweGRU,
+    'liwe_gru_glove': txtenc.LiweGRUGlove,
 }
 
 

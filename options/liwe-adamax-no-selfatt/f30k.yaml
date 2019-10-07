@@ -1,6 +1,6 @@
-__include__: 'scan.yaml'
+__include__: 'liwe.yaml'
 exp:
-  outpath: logs/f30k_precomp.en/scan-adamax/
+  outpath: logs/f30k_precomp.en/simple-liwe-adamax/
 dataset:
   train:
     data: f30k_precomp.en
@@ -8,10 +8,11 @@ dataset:
     data: [f30k_precomp.en]
   adapt:
     data: []
-optimizer:  
+optimizer:
+  import: lavse.optimizers.factory
   name: adamax
   params:
-    lr: 0.0002 # 7e-4
+    lr: 0.001 # 7e-4
     gradual_warmup_steps: [0.5, 2.0, 4000] #torch.linspace
     lr_decay_epochs: [10000, 20000, 2000] #range
     lr_decay_rate: .25

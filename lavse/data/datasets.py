@@ -130,7 +130,8 @@ class PrecompDataset(Dataset):
         img_features_file = self.full_path / f'{data_split}_ims.npy'
         self.images = np.load(img_features_file)
         self.length = len(self.captions)
-        self.ids = np.loadtxt(data_path/ data_name / f'{data_split}_ids.txt', dtype=int)
+        # self.ids = np.loadtxt(data_path/ data_name / f'{data_split}_ids.txt', dtype=int)
+
 
         self.captions_per_image = 5
 

@@ -1,6 +1,6 @@
-__include__: 'liwe.yaml'
+__include__: '../liwe.yaml'
 exp:
-  outpath: logs/f30k_precomp.en/liwe-adamax.1/
+  outpath: logs/f30k_precomp.en/ablation/liwe_scan_image/
 dataset:
   train:
     data: f30k_precomp.en
@@ -8,7 +8,22 @@ dataset:
     data: [f30k_precomp.en]
   adapt:
     data: []
-optimizer:  
+model:
+  latent_size: 1024
+  freeze_modules: []
+  img_enc:
+    name: scan
+    params:
+      img_dim: 2048
+    devices: [cuda,]
+    pooling: mean    
+  similarity:
+    name: cosine
+    params:
+      device: cuda # FIXME
+    device: cuda # FIXME
+optimizer:
+  import: lavse.optimizers.factory
   name: adamax
   params:
     lr: 0.001 # 7e-4
