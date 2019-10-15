@@ -4,6 +4,10 @@ from . import similarity as sim
 _similarities = {
     'cosine': sim.Cosine,
     'scan_t2i': sim.StackedAttention,
+    'kp_t2i': sim.KernelProjectionT2I,
+    'kp_i2t': sim.KernelProjectionI2T,
+    # 'kp_i2t': sim.KPTextToImageOneToMany,
+    'dynconv_fb_t2i': sim.DynConvT2i,
 }
 
 

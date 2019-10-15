@@ -209,6 +209,331 @@ class Attention(nn.Module):
         return weightedContext, attnT
 
 
+class KernelProjectionI2T(nn.Module):
+
+    def __init__(
+            self, device, latent_size=1024, reduce_proj=4, groups=1,
+            img_dim=2048, kernel_size=3, padding=1,
+            activation='nn.Identity()',
+            norm_output=False, gamma=10, text_pool='max',
+            train_gamma=True,
+            **kwargs
+        ):
+        super().__init__()
+
+        self.red_img = nn.Conv1d(latent_size, latent_size//reduce_proj, 1)
+
+        self.pconv1 = dynconv.KernelProjection1d(
+            in_channels=latent_size,
+            query_size=(latent_size//reduce_proj),
+            out_channels=latent_size,
+            kernel_size=kernel_size,
+            padding=padding,
+            groups=groups,
+            weightnorm='softmax',
+        )
+        self.activation = eval(activation)
+
+        self.conv = nn.Conv1d(latent_size, latent_size, 1)
+        # self.fc_img = nn.Conv1d(latent_size, latent_size, 1)
+
+        self.device = device
+
+        self.softmax = lambda x: 1
+        self.gamma = 1.
+        if norm_output:
+            self.softmax = nn.Softmax(dim=-1)
+            self.gamma = gamma
+            if train_gamma:
+                self.gamma = nn.Parameter(torch.ones(1))
+            
+
+        # self.pool = factory.get_txt_pooling(text_pool)
+
+    def forward(self, img_embed, cap_embed, lens, **kwargs):
+        '''
+            img_embed: (B, 36, latent_size)
+            cap_embed: (B, T, latent_size)
+        '''
+
+        # Ready to conv
+        cap_embed = cap_embed.permute(0, 2, 1)
+        img_embed = img_embed.permute(0, 2, 1)
+        B, D, HW = img_embed.shape
+
+        sims = torch.zeros(
+            img_embed.shape[0], cap_embed.shape[0]
+        ).cuda()
+
+        img_vectors = self.red_img(img_embed).mean(-1)
+        cap_embed = cap_embed[:,:,:36]
+
+        for i, img_tensor in enumerate(img_embed):
+            img_vector = img_vectors[i]
+
+            txt_filtered = self.pconv1(
+                cap_embed, img_vector,
+            )
+
+            # txt_vector = txt_vector[:,:,:30].max(-1)[0]
+            txt_vector = self.conv(txt_filtered)
+            txt_vector = self.activation(txt_vector)
+            mask = self.softmax(txt_vector * self.gamma)
+            txt_vector = mask * txt_vector
+            txt_vector = txt_vector.max(-1)[0]
+            # txt_vector = self.pool(txt_vector.permute(0, 2, 1), lens)
+
+            img_vector = l2norm(img_tensor.mean(-1).unsqueeze(0), dim=-1)
+            cap_vector = l2norm(txt_vector, dim=-1)
+
+            sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
+            sims[i,:] = sim
+
+        return sims
+
+
+class KernelProjectionT2I(nn.Module):
+
+    def __init__(
+            self, device, latent_size=1024, reduce_proj=4, groups=1,
+            img_dim=2048, kernel_size=3, padding=1, activate=False,
+            norm_output=False, gamma=1, train_gamma=False,
+            batchnorm=False
+        ):
+        super().__init__()
+
+
+        self.red_txt = nn.Conv1d(latent_size, latent_size//reduce_proj, 1)
+
+        self.bn = nn.Identity()
+        if batchnorm:
+            self.bn = nn.BatchNorm1d(latent_size, affine=False)
+
+        self.pconv1 = dynconv.KernelProjection1d(
+            in_channels=latent_size,
+            query_size=(latent_size//reduce_proj),
+            out_channels=latent_size,
+            kernel_size=kernel_size,
+            padding=padding,
+            groups=groups,
+            weightnorm='softmax',
+        )
+
+        self.conv = nn.Conv1d(latent_size, latent_size, 1)
+        self.device = device
+
+        self.softmax = lambda x: 1
+        self.gamma = gamma
+
+        if norm_output:
+            self.softmax = nn.Softmax(dim=-1)
+
+        if train_gamma:
+            self.gamma = nn.Parameter(torch.ones(1) * gamma)
+
+        self.to(device)
+
+    def forward(self, img_embed, cap_embed, lens, **kwargs):
+        '''
+            img_embed: (B, 36, latent_size)
+            cap_embed: (B, T, latent_size)
+        '''
+        # (B, 1024, T)
+        cap_embed = cap_embed.permute(0, 2, 1).float().to(self.device)
+        img_embed = img_embed.permute(0, 2, 1).float().to(self.device)
+
+        sims = torch.zeros(
+            img_embed.shape[0], cap_embed.shape[0]
+        ).to(self.device)
+
+        cap_vectors = self.red_txt(cap_embed)
+        img_embed = self.bn(img_embed)
+
+        for i, (cap_tensor, cap_vector) in enumerate(zip(cap_embed, cap_vectors)):
+
+            n_words = lens[i]
+            cap_repr = cap_vector[:,0].unsqueeze(0)
+            cap_full_repr = cap_tensor[:,0].unsqueeze(0)
+
+            img_filtered = self.pconv1(img_embed, cap_repr)
+            img_filtered = self.conv(img_filtered)
+
+            # img_filtered = nn.GLU(img_filtered)
+            mask = self.softmax(img_filtered * self.gamma)
+            img_filtered = mask * img_filtered
+
+            img_vector = img_filtered.sum(-1)
+
+            img_vector = l2norm(img_vector, dim=-1)
+            cap_vector = l2norm(cap_full_repr, dim=-1)
+
+            sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
+            sims[:,i] = sim
+
+        return sims
+
+
+
+class DynConvT2i(nn.Module):
+
+    def __init__(
+            self, device, latent_size=1024, reduce_proj=4, groups=1,
+            img_dim=2048, kernel_size=3, padding=1, activate=False,
+            norm_output=False, gamma=1
+        ):
+        super().__init__()
+
+
+        self.red_txt = nn.Conv1d(latent_size, latent_size//reduce_proj, 1)
+
+        import sys
+        sys.path.append('/home/jonatas/repos/lavse/fairseq/')
+        from fairseq.modules import DynamicConv1dTBC
+
+        # self.proj_in = nn.Linear(embedding_size, num_features, )
+        # self.proj_out = nn.Linear(num_features, embedding_size, )
+
+        self.pconv = DynamicConv1dTBC(
+            input_size=latent_size,
+            kernel_size=1,
+            padding_l=0,
+            # num_heads=1,
+            weight_softmax=True,
+            query_size=latent_size,
+        )
+
+
+        self.conv = nn.Conv1d(latent_size, latent_size, 1)
+        self.device = device
+
+        self.softmax = lambda x: 1
+        self.gamma = 1.
+        if norm_output:
+            self.softmax = nn.Softmax(dim=-1)
+            self.gamma = nn.Parameter(torch.ones(1) + 10.)
+            # self.gamma = gamma
+
+    def forward(self, img_embed, cap_embed, lens, **kwargs):
+        '''
+            img_embed: (B, 36, latent_size)
+            cap_embed: (B, T, latent_size)
+        '''
+        # (B, 1024, T)
+        cap_embed = cap_embed.permute(0, 2, 1) #.to(self.device)
+        img_embed = img_embed.permute(0, 2, 1) #.to(self.device)
+
+        sims = torch.zeros(
+            img_embed.shape[0], cap_embed.shape[0]
+        ).to(self.device)
+
+        cap_vectors = self.red_txt(cap_embed)
+
+        for i, (cap_tensor, cap_vector) in enumerate(zip(cap_embed, cap_vectors)):
+
+            n_words = lens[i]
+            cap_repr = cap_vector[:,:n_words].mean(-1).unsqueeze(0)
+            cap_full_repr = cap_tensor[:,:n_words].mean(-1).unsqueeze(0).unsqueeze(2)
+
+            # img_filtered = self.pconv1(img_embed, cap_repr)
+            # print(img_embed.shape)
+            # print(cap_repr.shape)
+            # print(cap_full_repr.shape)
+            # exit()
+            cap_full_repr = cap_full_repr.expand_as(img_embed)
+            img_emb = img_embed.permute(2, 0, 1)
+            cap_full_repr = cap_full_repr.permute(2, 0, 1)
+            img_filtered = self.pconv(img_emb, query=cap_full_repr)
+            img_filtered = img_filtered.permute(1, 2, 0)
+            img_filtered = self.conv(img_filtered)
+            mask = self.softmax(img_filtered * self.gamma)
+            img_filtered = mask * img_filtered
+
+            img_vector = img_filtered.mean(-1)
+
+            img_vector = l2norm(img_vector, dim=-1)
+            cap_vector = l2norm(cap_tensor.mean(-1).unsqueeze(0), dim=-1)
+            sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
+
+            sims[:,i] = sim
+
+        return sims
+
+
+class KernelProjectionT2IAttn(nn.Module):
+
+    def __init__(
+            self, device, latent_size=1024, reduce_proj=4, groups=1,
+            img_dim=2048, kernel_size=3, padding=1, activate=False,
+            norm_output=False, gamma=1, train_gamma=False,
+            batchnorm=False
+        ):
+        super().__init__()
+
+
+        self.red_txt = nn.Conv1d(latent_size, latent_size//reduce_proj, 1)
+
+        self.bn = nn.Identity()
+        if batchnorm:
+            self.bn = nn.BatchNorm1d(latent_size, affine=False)
+
+        self.pconv1 = attention.KPAttention(
+            in_dim=latent_size, k=reduce_proj
+        )
+
+        # self.conv = nn.Conv1d(latent_size, latent_size, 1)
+        self.device = device
+
+        self.softmax = lambda x: 1
+        self.gamma = gamma
+
+        if norm_output:
+            self.softmax = nn.Softmax(dim=-1)
+
+        if train_gamma:
+            self.gamma = nn.Parameter(torch.ones(1) * gamma)
+
+        self.to(device)
+
+    def forward(self, img_embed, cap_embed, lens, **kwargs):
+        '''
+            img_embed: (B, 36, latent_size)
+            cap_embed: (B, T, latent_size)
+        '''
+        # (B, 1024, T)
+        cap_embed = cap_embed.permute(0, 2, 1).to(self.device)
+        img_embed = img_embed.permute(0, 2, 1).to(self.device)
+
+        sims = torch.zeros(
+            img_embed.shape[0], cap_embed.shape[0]
+        ).to(self.device)
+
+        cap_vectors = self.red_txt(cap_embed)
+        img_embed = self.bn(img_embed)
+
+        for i, (cap_tensor, cap_vector) in enumerate(zip(cap_embed, cap_vectors)):
+
+            n_words = lens[i]
+            cap_repr = cap_vector[:,0].unsqueeze(0)
+            cap_full_repr = cap_tensor[:,0].unsqueeze(0)
+
+            img_filtered = self.pconv1(img_embed, cap_repr)
+            # img_filtered = self.conv(img_filtered)s
+
+            # img_filtered = nn.GLU(img_filtered)
+            # mask = self.softmax(img_filtered * self.gamma)
+            # img_filtered = mask + img_filtered
+
+            img_vector = img_filtered.sum(-1)
+
+            img_vector = l2norm(img_vector, dim=-1)
+            cap_vector = l2norm(cap_full_repr, dim=-1)
+
+            sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
+            sims[:,i] = sim
+
+        return sims
+
+
 def cosine_similarity(x1, x2, dim=1, eps=1e-8):
     """Returns cosine similarity between x1 and x2, computed along dim."""
     w12 = torch.sum(x1 * x2, dim)
