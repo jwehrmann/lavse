@@ -195,6 +195,7 @@ if __name__ == '__main__':
         model=model,
         args=opt,
         sysoutlog=print_fn,
+        device=device
     )
 
     trainer.setup_optim(
