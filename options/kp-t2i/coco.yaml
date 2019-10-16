@@ -1,12 +1,12 @@
 __include__: 'kp.yaml'
 exp:
-  outpath: logs/coco_precomp/kp-t2i/
+  outpath: logs/coco_precomp/kp-t2i-norm-bn-traingamma1/
 dataset:
   vocab_paths: [.vocab_cache/coco_precomp.json]
   train:
     data: coco_precomp.en
     workers: 0
-    batch_size: 128
+    batch_size: 115
   val:
     data: [coco_precomp.en]
     workers: 0

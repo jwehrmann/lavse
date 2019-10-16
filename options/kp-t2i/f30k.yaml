@@ -1,6 +1,6 @@
 __include__: 'kp.yaml'
 exp:
-  outpath: logs/f30k_precomp/kp-t2i/
+  outpath: logs/f30k_precomp/kp-t2i-r16-norm-traingamma1-batchnorm/
 dataset:
   vocab_paths: [.vocab_cache/f30k_precomp.json]
   train:
@@ -39,5 +39,6 @@ model:
       norm_output: True
       gamma: 1
       train_gamma: True
+      batchnorm: true
       device: cuda
     device: cuda

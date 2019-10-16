@@ -34,13 +34,16 @@ model:
     name: kp_t2i
     params:
       latent_size: 1024
-      reduce_proj: 8
+      reduce_proj: 16
       groups: 1024
       img_dim: 2048
       kernel_size: 1
       padding: 1
+      norm_output: true
+      gamma: 1
+      train_gamma: true
+      batchnorm: true
       device: cuda
-    device: cuda
   criterion:
     name: contrastive
     params:

@@ -297,7 +297,7 @@ class KernelProjectionT2I(nn.Module):
     def __init__(
             self, device, latent_size=1024, reduce_proj=4, groups=1,
             img_dim=2048, kernel_size=3, padding=1, activate=False,
-            norm_output=False, gamma=1, train_gamma=False,
+            norm_output=True, gamma=1, train_gamma=False,
             batchnorm=False
         ):
         super().__init__()
