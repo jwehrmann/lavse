@@ -94,6 +94,8 @@ class LAVSE(nn.Module):
         logger.info(f'Using similarity: {similarity,}')
         if torch.cuda.is_available():
             self.set_device('cuda')
+        else:
+            self.set_device('cpu')
 
     def set_device(self, device):
         self.device = torch.device(device)
