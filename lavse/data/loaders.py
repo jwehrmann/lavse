@@ -8,6 +8,7 @@ from . import collate_fns
 from . import datasets
 from . import preprocessing
 from .tokenizer import Tokenizer
+from .factory import get_tokenizer
 from ..utils.file_utils import read_txt
 from ..utils.logger import get_logger
 
@@ -59,7 +60,7 @@ class DataIterator:
 
 def get_loader(
     loader_name, data_path, data_name, data_split,
-    batch_size, vocab_paths, text_repr,
+    batch_size, tokenizer_name, vocab_paths, text_repr,
     lang='en', workers=4, ngpu=1, local_rank=0,
     cnn=None, **kwargs
 ):
@@ -76,7 +77,7 @@ def get_loader(
 
     tokenizers = []
     for vocab_path in vocab_paths:
-        tokenizers.append(Tokenizer(vocab_path))
+        tokenizers.append(get_tokenizer(tokenizer_name, vocab_path))
         logger.debug(f'Tokenizer built: {tokenizers[-1]}')
 
     dataset = dataset_class(
@@ -121,7 +122,7 @@ def get_loader(
 
 
 def get_loaders(
-        data_path, loader_name, data_name,
+        data_path, loader_name, data_name, tokenizer_name,
         vocab_path, batch_size,
         workers, text_repr,
         splits=['train', 'val', 'test'],
@@ -141,6 +142,7 @@ def get_loaders(
             text_repr=text_repr,
             data_split=split,
             lang=lang,
+            tokenizer_name=tokenizer_name,
             vocab_path=vocab_path,
         )
         loaders.append(loader)
