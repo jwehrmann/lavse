@@ -19,5 +19,6 @@ def get_available_txtenc():
 
 def get_tokenizer(name, vocab_path):
     model_class = _tokenizers[name]
-    model = model_class(vocab_path=vocab_path)
-    return model
+    if name == 'bert':
+        return model_class()
+    return model_class(vocab_path=vocab_path)
