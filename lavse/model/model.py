@@ -44,6 +44,7 @@ class LAVSE(nn.Module):
             f'{img_enc.name,}'
         ))
 
+        txt_enc.params = txt_enc.params or {}
         self.txt_enc = get_text_encoder(
             name = txt_enc.name,
             latent_size=latent_size,
