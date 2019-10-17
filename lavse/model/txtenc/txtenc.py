@@ -12,6 +12,7 @@ from .embedding import PartialConcat, GloveEmb, PartialConcatScale
 from . import pooling
 
 import numpy as np
+import pytorch_transformers
 
 
 # Default text encoder
@@ -254,3 +255,24 @@ class LiweGRUGlove(nn.Module):
             cap_emb = l2norm(cap_emb, dim=-1)
 
         return cap_emb, clen
+
+
+class Bert(nn.Module):
+
+    def __init__(
+        self, latent_size, embed_dim=None, use_bi_gru=None, tokenizers=None):
+
+        super(Bert, self).__init__()
+        self.latent_size = latent_size
+        self.bert = pytorch_transformers.BertModel.from_pretrained('bert-base-uncased')
+        self.fc = nn.Linear(768, self.latent_size)
+
+    def forward(self, batch):
+        """Handles variable size captions
+        """
+        captions, lengths = batch['caption']
+        captions = captions.to(self.device)
+        _, sent_emb = self.bert(captions)
+        out = self.fc(sent_emb)
+
+        return out.unsqueeze(1), lengths
