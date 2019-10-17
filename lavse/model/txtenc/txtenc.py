@@ -260,7 +260,7 @@ class LiweGRUGlove(nn.Module):
 class Bert(nn.Module):
 
     def __init__(
-        self, latent_size, embed_dim=None, use_bi_gru=None, tokenizers=None):
+        self, latent_size, tokenizers=None):
 
         super(Bert, self).__init__()
         self.latent_size = latent_size
