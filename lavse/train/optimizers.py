@@ -45,19 +45,22 @@ class BanOptimizer():
 
     def set_lr(self):
         epoch_id = self.iteration
-        optim = self.optimizer
-        old_lr = optim.param_groups[0]['lr']
-        if epoch_id < len(self.gradual_warmup_steps):
-            new_lr = self.gradual_warmup_steps[epoch_id]
-            optim.param_groups[0]['lr'] = new_lr
-            # logger.info('Gradual Warmup lr: {:.8f} -> {:.8f}'.format(old_lr, new_lr))
-        elif epoch_id in self.lr_decay_epochs:
-            new_lr = optim.param_groups[0]['lr'] * self.lr_decay_rate
-            optim.param_groups[0]['lr'] = new_lr
+        for param_group in self.optimizer.param_groups:
+            self.update_lr(param_group, epoch_id)
             # logger.info('Decrease lr: {:.8f} -> {:.8f}'.format(old_lr, new_lr))
 
         # logger.info('No change to lr: {:.8f}'.format(old_lr))
         # logger.info('train_epoch.lr {}'.format(optim.param_groups[0]['lr'].item()))
+
+    def update_lr(self, param_group, epoch_id):
+        old_lr = param_group['lr']
+        if epoch_id < len(self.gradual_warmup_steps):
+            new_lr = self.gradual_warmup_steps[epoch_id]
+            param_group['lr'] = new_lr
+            # logger.info('Gradual Warmup lr: {:.8f} -> {:.8f}'.format(old_lr, new_lr))
+        elif epoch_id in self.lr_decay_epochs:
+            new_lr = param_group['lr'] * self.lr_decay_rate
+            param_group['lr'] = new_lr
 
     def display_norm(self):
         logger.info('      norm: {:.5f}'.format(self.total_norm / self.count_norm))
