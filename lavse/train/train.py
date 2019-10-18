@@ -69,17 +69,24 @@ class Trainer:
         for fmod in freeze_modules:
             print(f'Freezing {fmod}')
             freeze(eval(f'self.{fmod}'))
+        
+        lr_groups = self.args.optimizer.lr_groups
+        lr_groups_mult = self.args.optimizer.lr_groups_mult
+        lr_params = {}
+        lr_params['params'] = list(eval(f'self.{lr_groups}.parameters()'))
+        lr_params['lr'] = lr_groups_mult
 
-        trainable_params = [
-            x for x in self.model.parameters()
-            if x.requires_grad
-        ]
+        trainable_params = []
+        for k, v in self.model.named_parameters():
+            if not k.startswith(lr_groups[6:]):
+                trainable_params.append(v)
 
         self.optimizer = optimizers.get_optimizer(
             optimizer.name,
             trainable_params,
             **optimizer.params,
         )
+        self.optimizer.add_param_group(lr_params)
 
         scheduler = None
         if lr_scheduler.name is not None:
