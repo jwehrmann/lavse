@@ -1,0 +1,48 @@
+__include__: 'kp.yaml'
+exp:
+  outpath: logs/f30k_precomp/kp-t2i-bert/
+dataset:
+  vocab_paths: [.vocab_cache/f30k_precomp.json]
+  tokenizer_name: bert
+  train:
+    data: f30k_precomp.en
+    workers: 1
+    batch_size: 100
+  val:
+    data: [f30k_precomp.en]
+    workers: 1
+    batch_size: 32
+    limit: 5000
+optimizer:
+  name: adamax
+  params:
+    lr: 0.001 # 7e-4
+    gradual_warmup_steps: [0.5, 2.0, 4000] #torch.linspace
+    lr_decay_epochs: [10000, 20000, 3000] #range
+    lr_decay_rate: .25
+  lr_scheduler: 
+    name: null
+  grad_clip: 1.
+  lr_groups: model.txt_enc.bert
+  lr_groups_mult:  0.0001
+model:
+  latent_size: 1024  
+  freeze_modules: [] #[model.txt_enc.embed.glove,]
+  txt_enc:
+    name: bert
+    params:
+  similarity:
+    name: kp_t2i
+    params:
+      latent_size: 1024
+      reduce_proj: 8
+      groups: 1024
+      img_dim: 2048
+      kernel_size: 1
+      padding: 0
+      norm_output: True
+      gamma: 10
+      train_gamma: False
+      batchnorm: False
+      device: cpu
+    device: cpu
