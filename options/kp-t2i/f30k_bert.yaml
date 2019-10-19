@@ -7,7 +7,7 @@ dataset:
   train:
     data: f30k_precomp.en
     workers: 1
-    batch_size: 100
+    batch_size: 110 # 75 In 2 GPUs 
   val:
     data: [f30k_precomp.en]
     workers: 1
@@ -44,5 +44,5 @@ model:
       gamma: 10
       train_gamma: False
       batchnorm: False
-      device: cpu
-    device: cpu
+      device: cuda
+    device: cuda

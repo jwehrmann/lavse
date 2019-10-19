@@ -90,7 +90,6 @@ class GloveRNNEncoder(nn.Module):
             rand_dim=embed_dim,
         )
 
-
         # caption embedding
         self.use_bi_gru = use_bi_gru
         self.rnn = rnn_type(
@@ -100,6 +99,8 @@ class GloveRNNEncoder(nn.Module):
             bidirectional=use_bi_gru
         )
 
+        self.__dict__['embed'] = self.embed
+
         if hasattr(self.embed, 'embed'):
             self.embed.embed.weight.data.uniform_(-0.1, 0.1)
 
@@ -108,6 +109,7 @@ class GloveRNNEncoder(nn.Module):
         """
         captions, lengths = batch['caption']
         captions = captions.to(self.device)
+
         # Embed word ids to vectors
         emb = self.embed(captions)
 
@@ -261,10 +263,12 @@ class Bert(nn.Module):
 
     def __init__(
         self, latent_size, tokenizers=None):
+        from .. import data_parallel
 
         super(Bert, self).__init__()
         self.latent_size = latent_size
-        self.bert = pytorch_transformers.BertModel.from_pretrained('bert-base-uncased')
+        bert = pytorch_transformers.BertModel.from_pretrained('bert-base-uncased').to('cuda:0')
+        self.bert = data_parallel.DataParallel(bert)
         self.fc = nn.Linear(768, self.latent_size)
 
     def forward(self, batch):

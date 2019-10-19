@@ -246,7 +246,7 @@ class KernelProjectionI2T(nn.Module):
             self.gamma = gamma
             if train_gamma:
                 self.gamma = nn.Parameter(torch.ones(1))
-            
+
 
         # self.pool = factory.get_txt_pooling(text_pool)
 
