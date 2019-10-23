@@ -53,6 +53,7 @@ class Trainer:
         lr_scheduler=None,
         clip_grad=2.,
         log_histograms=False,
+        log_grad_norm=False,
         early_stop=50,
         save_all=False,
         freeze_modules=[],
@@ -116,6 +117,7 @@ class Trainer:
         self.lr_scheduler = scheduler
         self.clip_grad = clip_grad
         self.log_histograms = log_histograms
+        self.log_grad_norm = log_grad_norm
         self.save_all = save_all
         self.best_val = 1e10 if 'loss' in val_metric else 0
         self.count = early_stop
@@ -211,12 +213,21 @@ class Trainer:
             total_loss = multimodal_loss + total_lang_loss
             total_loss.backward()
 
-            norm = 0.
+            norm, img_norm, sim_norm, txt_norm = 0., 0., 0., 0.
             if self.clip_grad > 0:
-                norm = clip_grad_norm_(
-                    self.model.parameters(),
+                img_norm = clip_grad_norm_(
+                    self.model.img_enc.parameters(),
                     self.clip_grad
                 )
+                sim_norm = clip_grad_norm_(
+                    self.model.similarity.parameters(),
+                    self.clip_grad
+                )
+                txt_norm = clip_grad_norm_(
+                    self.model.txt_enc.parameters(),
+                    self.clip_grad
+                )
+                norm = img_norm + sim_norm + txt_norm
 
             self.optimizer.step()
             if self.lr_scheduler is not None:
@@ -234,6 +245,9 @@ class Trainer:
                 'countdown': self.count,
                 'epoch': epoch,
                 'norm': norm,
+                'norm_img': img_norm,
+                'norm_txt': txt_norm,
+                'norm_sim': sim_norm,
             })
 
             train_info.update(loss_info)
@@ -288,6 +302,14 @@ class Trainer:
                         self.model, self.tb_writer,
                         iteration=self.model.multimodal_criterion.iteration,
                     )
+                if self.log_grad_norm:
+                    logger.log_grad_norm(
+                        self.model, self.tb_writer,
+                        iteration=self.model.multimodal_criterion.iteration,
+                    )
+
+
+
         return True
 
     def evaluate_loaders(self, loaders):
