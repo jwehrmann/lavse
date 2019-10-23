@@ -77,12 +77,14 @@ class Trainer:
             lr_groups_mult = self.args.optimizer.lr_groups_mult
             lr_params['params'] = list(eval(f'self.{lr_groups}.parameters()'))
             lr_params['lr'] = lr_groups_mult
+            lr_params['name'] = lr_groups
             lr_groups = lr_groups[6:]
 
         trainable_params = []
         for k, v in self.model.named_parameters():
             if not lr_groups or not k.startswith(lr_groups):
-                trainable_params.append(v)
+                if v.requires_grad:
+                    trainable_params.append(v)
 
         self.optimizer = optimizers.get_optimizer(
             optimizer.name,
