@@ -352,8 +352,9 @@ class KernelProjectionT2I(nn.Module):
         for i, (cap_tensor, cap_vector) in enumerate(zip(cap_embed, cap_vectors)):
 
             n_words = lens[i]
-            cap_repr = cap_vector[:,0].unsqueeze(0)
-            cap_full_repr = cap_tensor[:,0].unsqueeze(0)
+            cap_repr = cap_vector[:,:n_words].mean(-1).unsqueeze(0)
+            cap_full_repr = cap_tensor[:,:n_words].mean(-1).unsqueeze(0)
+
 
             img_filtered = self.pconv1(img_embed, cap_repr)
             img_filtered = self.conv(img_filtered)
