@@ -1,0 +1,73 @@
+exp:
+  resume: null
+  outpath: logs/f30k_precomp/bert-baseline-cosine/
+dataset:
+  text_repr: word
+  loader_name: precomp
+  tokenizer_name: bert
+  vocab_paths: [bert]
+  train:
+    data: f30k_precomp.en
+    workers: 1
+    batch_size: 128
+  val:
+    data: [f30k_precomp.en]
+    workers: 1
+    batch_size: 32
+    limit: 5000
+model:
+  latent_size: 1024
+  # freeze_modules: []
+  freeze_modules: [model.txt_enc.bert]
+  txt_enc:
+    name: bert
+    params: 
+      use_gru: true
+      use_word: true
+      use_bert_sent: false  
+    pooling: mean
+    devices: cuda
+  img_enc:
+    name: simple
+    params:
+      img_dim: 2048
+    devices:
+    - cuda
+    pooling: mean
+  similarity:
+    name: cosine
+    params:
+      latent_size: 1024
+      device: cuda
+    device: cuda
+  criterion:
+    name: contrastive
+    params:
+      margin: 0.2
+      max_violation: false
+      weight: 1.0
+      beta: 0.991
+optimizer:
+  name: adam
+  import: lavse.optimizers.factory
+  params:
+    lr: 0.0002
+  lr_scheduler:
+    name: step
+    params:
+      step_size: 10000
+      gamma: 0.1
+  grad_clip: 2.
+  lr_groups: model.txt_enc.bert
+  # lr_groups_mult:  0.000005
+engine:
+  eval_before_training: false
+  debug: false
+  print_freq: 50
+  nb_epochs: 100
+  early_stop: 50
+  valid_interval: 500
+misc:
+  cuda: true
+  distributed: false
+  seed: 1337

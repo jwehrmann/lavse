@@ -1,0 +1,88 @@
+exp:
+  resume: null
+  outpath: logs/f30k_precomp/bert-base-baseline-cosine-ft-16-sentence/
+dataset:
+  text_repr: word
+  loader_name: precomp
+  tokenizer_name: bert
+  vocab_paths: [bert]
+  train:
+    data: f30k_precomp.en
+    workers: 1
+    batch_size: 110
+  val:
+    data: [f30k_precomp.en]
+    workers: 1
+    batch_size: 32
+    limit: 5000
+model:
+  latent_size: 1024
+  # freeze_modules: []
+  freeze_modules: [
+    "model.txt_enc.bert.module.embeddings",
+    "model.txt_enc.bert.module.encoder.layer[0]",
+    "model.txt_enc.bert.module.encoder.layer[1]",    
+    "model.txt_enc.bert.module.encoder.layer[2]",
+    "model.txt_enc.bert.module.encoder.layer[3]",
+    "model.txt_enc.bert.module.encoder.layer[4]",
+    "model.txt_enc.bert.module.encoder.layer[5]",
+    "model.txt_enc.bert.module.encoder.layer[6]",
+    "model.txt_enc.bert.module.encoder.layer[7]",
+    # model.txt_enc.bert.encoder.layer.5,
+    # model.txt_enc.bert.encoder.layer.6,
+    # model.txt_enc.bert.encoder.layer.7,
+    # model.txt_enc.bert.encoder.layer.8,
+    # model.txt_enc.bert.encoder.layer.9,
+    # model.txt_enc.bert.encoder.layer.10,
+  ]
+  txt_enc:
+    name: bert
+    params: 
+      use_gru: false
+      word_level: false      
+    pooling: mean
+    devices: cuda
+  img_enc:
+    name: simple
+    params:
+      img_dim: 2048
+    devices:
+    - cuda
+    pooling: mean
+  similarity:
+    name: cosine
+    params:
+      latent_size: 1024
+      device: cuda
+    device: cuda
+  criterion:
+    name: contrastive
+    params:
+      margin: 0.2
+      max_violation: false
+      weight: 1.0
+      beta: 0.991
+optimizer:
+  name: adam
+  import: lavse.optimizers.factory
+  params:
+    lr: 0.0002
+  lr_scheduler:
+    name: step
+    params:
+      step_size: 10000
+      gamma: 0.1
+  grad_clip: 2.
+  lr_groups: model.txt_enc.bert
+  lr_groups_mult:  0.00002
+engine:
+  eval_before_training: false
+  debug: false
+  print_freq: 100
+  nb_epochs: 100
+  early_stop: 50
+  valid_interval: 500
+misc:
+  cuda: true
+  distributed: false
+  seed: 1337

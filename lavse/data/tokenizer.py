@@ -6,7 +6,7 @@ import torch
 from tqdm import tqdm
 
 import nltk
-import pytorch_transformers
+import transformers
 
 from ..utils.logger import get_logger
 from ..utils.file_utils import read_txt
@@ -173,6 +173,7 @@ class Tokenizer(object):
         return self.tokenize(sentence)
 
 
+#TODO: Bert version via argument
 class BertTokenizer(object):
     """
     This class converts texts into character or word-level tokens
@@ -182,53 +183,34 @@ class BertTokenizer(object):
     def __init__(
         self
     ):
-        self.unk = '[UNK]'
-        self.pad = '[PAD]'
 
-        self.tokenizer = pytorch_transformers.BertTokenizer.from_pretrained('bert-base-uncased')
-        self.vocab = self.tokenizer.vocab
-        self.idx2word = self.tokenizer.ids_to_tokens
-        self.word2idx = {value: key for key, value in self.idx2word.items()}
-
+        self.tokenizer = transformers.BertTokenizer.from_pretrained(
+            'bert-base-uncased', do_lowercase=True
+        )
+        # self.vocab = self.tokenizer.vocab
+        self.vocab = self.tokenizer.vocab_size
+        # self.idx2word = self.tokenizer.ids_to_tokens
+        # self.word2idx = {value: key for key, value in self.idx2word.items()}
         logger.info('Loaded Bert Tokenizer')
 
-    def split_sentence(self, sentence):
-        tokens = self.tokenizer.tokenize(
-            sentence.lower()
-        )
-        return tokens
-
-    def tokens_to_int(self, tokens):
-        return [self.get_idx(token) for token in tokens]
 
     def tokenize(self, sentence):
-        tokens = self.split_sentence(sentence)
-        tokens = (
-              [self.word2idx[self.pad]]
-            + self.tokens_to_int(tokens)
-            + [self.word2idx[self.pad]]
+        tokens = torch.tensor(
+            self.tokenizer.encode(
+                f'[CLS] {sentence} [SEP]',
+                add_special_tokens=True
+            )
         )
-        return torch.LongTensor(tokens)
 
-    def decode_tokens(self, tokens):
-        logger.debug(f'Decode tokens {tokens}')
-        join_char = ' '
-        text = join_char.join([
-            self.get_word(token) for token in tokens
-        ])
-        return text
+        return tokens
 
-    def get_word(self, idx):
-        if idx in self.idx2word:
-            return self.idx2word[idx]
-        else:
-            return self.unk
-
-    def get_idx(self, word):
-        if word in self.word2idx:
-            return self.word2idx[word]
-        else:
-            return self.word2idx[self.unk]
+    # def decode_tokens(self, tokens):
+    #     logger.debug(f'Decode tokens {tokens}')
+    #     join_char = ' '
+    #     text = join_char.join([
+    #         self.get_word(token) for token in tokens
+    #     ])
+    #     return text
 
     def __len__(self):
         return len(self.vocab)

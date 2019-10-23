@@ -12,8 +12,7 @@ from .embedding import PartialConcat, GloveEmb, PartialConcatScale
 from . import pooling
 
 import numpy as np
-import pytorch_transformers
-
+import transformers
 
 # Default text encoder
 class RNNEncoder(nn.Module):
@@ -259,24 +258,50 @@ class LiweGRUGlove(nn.Module):
         return cap_emb, clen
 
 
+# TODO: Remove ifs for unnecessary modules accordingly to experiments
 class Bert(nn.Module):
 
     def __init__(
-        self, latent_size, tokenizers=None):
+        self, latent_size, use_gru=False, word_level=True, **kwargs):
         from .. import data_parallel
 
         super(Bert, self).__init__()
         self.latent_size = latent_size
-        bert = pytorch_transformers.BertModel.from_pretrained('bert-base-uncased').to('cuda:0')
+        bert = transformers.BertModel.from_pretrained('bert-base-uncased')
         self.bert = data_parallel.DataParallel(bert)
-        self.fc = nn.Linear(768, self.latent_size)
+
+        self.use_gru = use_gru
+        if use_gru:
+            self.gru = nn.GRU(1024, 1024, batch_first=True, bidirectional=True)
+        else:
+            self.fc = nn.Linear(768, self.latent_size)
+
+        self.word_level = word_level
+        # self.bert.__dict__['embeddings'] = self.bert.embeddings
+        # self.bert.__dict__['encoder'] = self.bert.encoder
+        # self.bert.__dict__['pooler'] = self.bert.pooler
 
     def forward(self, batch):
         """Handles variable size captions
         """
         captions, lengths = batch['caption']
         captions = captions.to(self.device)
-        _, sent_emb = self.bert(captions)
-        out = self.fc(sent_emb)
+        # print(captions)
+        word_emb, sent_emb = self.bert(captions)
+        # print(word_emb.shape)
+        # print(sent_emb.shape)
 
-        return out.unsqueeze(1), lengths
+        if self.use_gru:
+            out, _ = self.gru(word_emb)
+        else:
+            out = self.fc(word_emb)
+
+        if self.word_level:
+            out = word_emb
+            out = self.fc(out)
+        else:
+            lengths = torch.ones(len(word_emb), 1).to(self.device).long() + 1
+            out = self.fc(sent_emb.unsqueeze(1))
+
+        return out, lengths
+
