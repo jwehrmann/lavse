@@ -28,12 +28,6 @@ model:
     "model.txt_enc.bert.module.encoder.layer[5]",
     "model.txt_enc.bert.module.encoder.layer[6]",
     "model.txt_enc.bert.module.encoder.layer[7]",
-    # model.txt_enc.bert.encoder.layer.5,
-    # model.txt_enc.bert.encoder.layer.6,
-    # model.txt_enc.bert.encoder.layer.7,
-    # model.txt_enc.bert.encoder.layer.8,
-    # model.txt_enc.bert.encoder.layer.9,
-    # model.txt_enc.bert.encoder.layer.10,
   ]
   txt_enc:
     name: bert

@@ -18,9 +18,6 @@ from ..data.loaders import DataIterator
 from ..utils import file_utils, helper, layers, logger
 from .lr_scheduler import get_scheduler
 
-torch.manual_seed(0)
-random.seed(0, version=2)
-
 def freeze(module):
      for x in module.parameters():
          x.requires_grad = False

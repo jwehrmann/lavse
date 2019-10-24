@@ -355,7 +355,6 @@ class KernelProjectionT2I(nn.Module):
             cap_repr = cap_vector[:,:n_words].mean(-1).unsqueeze(0)
             cap_full_repr = cap_tensor[:,:n_words].mean(-1).unsqueeze(0)
 
-
             img_filtered = self.pconv1(img_embed, cap_repr)
             img_filtered = self.conv(img_filtered)
 
@@ -363,7 +362,7 @@ class KernelProjectionT2I(nn.Module):
             mask = self.softmax(img_filtered * self.gamma)
             img_filtered = mask * img_filtered
 
-            img_vector = img_filtered.sum(-1)
+            img_vector = img_filtered.mean(-1)
 
             img_vector = l2norm(img_vector, dim=-1)
             cap_vector = l2norm(cap_full_repr, dim=-1)

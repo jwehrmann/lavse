@@ -64,6 +64,7 @@ class LAVSE(nn.Module):
             similarity.name,
             **similarity.params
         )
+        self.similarity = similarity
 
         # self.similarity = Similarity(
         #     similarity_object=sim_obj,
@@ -97,6 +98,10 @@ class LAVSE(nn.Module):
             self.set_device('cuda')
         else:
             self.set_device('cpu')
+
+        for k, v in sorted(self.named_parameters()):
+            print(k, v.shape)
+
 
     def set_device(self, device):
         self.device = torch.device(device)

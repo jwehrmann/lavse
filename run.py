@@ -19,6 +19,11 @@ import os
 
 import torch.multiprocessing as mp
 
+import random
+
+torch.manual_seed(0)
+random.seed(0, version=2)
+
 
 def init_distributed_mode(opt):
     opt.distributed = True

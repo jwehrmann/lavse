@@ -1,24 +1,24 @@
 exp:
   resume: null
-  outpath: logs/f30k_precomp/kp-t2i-softax-r8-gamma10
+  outpath: logs/f30k_precomp/kp-t2i-softmax
 dataset:
   text_repr: word
   loader_name: precomp
   train:
     workers: 1
     batch_size: 100
-    data: f30k_precomp
+    data: f30k_precomp.en
   val:
     workers: 1
     batch_size: 32
     limit: 5000
     data:
-    - f30k_precomp
+    - f30k_precomp.en
   vocab_paths:
   - .vocab_cache/f30k_precomp.json
 model:
   latent_size: 1024
-  freeze_modules: [model.txt_enc.embed.glove]
+  freeze_modules: []
   txt_enc:
     name: gru_glove
     params:
