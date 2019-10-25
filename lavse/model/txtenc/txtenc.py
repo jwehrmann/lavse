@@ -262,19 +262,22 @@ class LiweGRUGlove(nn.Module):
 class Bert(nn.Module):
 
     def __init__(
-        self, latent_size, use_gru=False, word_level=True, **kwargs):
+        self, latent_size, model='bert-base-uncased', feat_size=768, use_gru=False, word_level=True, **kwargs):
         from .. import data_parallel
 
         super(Bert, self).__init__()
         self.latent_size = latent_size
-        bert = transformers.BertModel.from_pretrained('bert-base-uncased')
+        bert = transformers.BertModel.from_pretrained(model)
         self.bert = data_parallel.DataParallel(bert)
 
         self.use_gru = use_gru
         if use_gru:
-            self.gru = nn.GRU(1024, 1024, batch_first=True, bidirectional=True)
+            self.gru = nn.GRU(
+                feat_size, self.latent_size,
+                batch_first=True, bidirectional=True
+            )
         else:
-            self.fc = nn.Linear(768, self.latent_size)
+            self.fc = nn.Linear(feat_size, self.latent_size)
 
         self.word_level = word_level
         # self.bert.__dict__['embeddings'] = self.bert.embeddings

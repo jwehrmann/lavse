@@ -181,11 +181,11 @@ class BertTokenizer(object):
     """
 
     def __init__(
-        self
+        self, model='bert-base-uncased',
     ):
 
         self.tokenizer = transformers.BertTokenizer.from_pretrained(
-            'bert-base-uncased', do_lowercase=True
+            model, do_lowercase=True
         )
         # self.vocab = self.tokenizer.vocab
         self.vocab = self.tokenizer.vocab_size

@@ -1,6 +1,6 @@
 exp:
   resume: null
-  outpath: logs/f30k_precomp/kp-bert-base-sent-ft8/
+  outpath: logs/f30k_precomp/kp-bert-base-sent-ft7/
 dataset:
   text_repr: word
   loader_name: precomp
@@ -28,7 +28,7 @@ model:
     "model.txt_enc.bert.module.encoder.layer[5]",
     "model.txt_enc.bert.module.encoder.layer[6]",
     "model.txt_enc.bert.module.encoder.layer[7]",
-    "model.txt_enc.bert.module.encoder.layer[8]",
+    # "model.txt_enc.bert.module.encoder.layer[8]",
     # "model.txt_enc.bert.module.encoder.layer[9]",
     # model.txt_enc.bert.encoder.layer.5,
     # model.txt_enc.bert.encoder.layer.6,
@@ -84,31 +84,29 @@ misc:
   cuda: true
   distributed: false
   seed: 1337
-# optimizer:
-#   name: adamax
-#   params:
-#     lr: 0.001 # 7e-4
-#     gradual_warmup_steps: [0.5, 1.0, 4000] #torch.linspace
-#     lr_decay_epochs: [10000, 20000, 3000] #range
-#     lr_decay_rate: .25
-#   lr_scheduler: 
-#     name: null
-#   grad_clip: 2.
-#   lr_groups: model.txt_enc.bert
-#   lr_groups_mult:  0.0001
 optimizer:
-  name: adam
-  import: lavse.optimizers.factory
+  name: adamax
   params:
-    lr: 0.0002
-  lr_scheduler:
-    name: step
-    params:
-      step_size: 15000
-      gamma: 0.1
+    lr: 0.001 # 7e-4
+    gradual_warmup_steps: [0.5, 1.0, 4000] #torch.linspace
+    lr_decay_epochs: [10000, 20000, 3000] #range
+    lr_decay_rate: .25  
   grad_clip: 2.
   lr_groups: model.txt_enc.bert
-  lr_groups_mult:  0.00002
+  lr_groups_mult:  0.1
+# optimizer:
+#   name: adam
+#   import: lavse.optimizers.factory
+#   params:
+#     lr: 0.0002
+#   lr_scheduler:
+#     name: step
+#     params:
+#       step_size: 15000
+#       gamma: 0.1
+#   grad_clip: 2.
+#   lr_groups: model.txt_enc.bert
+#   lr_groups_mult:  0.00002
   # warmup: 
   #   multiplier: 8
   #   total_epoch: 10

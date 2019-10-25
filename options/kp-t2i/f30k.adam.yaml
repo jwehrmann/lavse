@@ -1,6 +1,6 @@
 exp:
   resume: null
-  outpath: logs/f30k_precomp/kp-t2i-softmax-adamax
+  outpath: logs/f30k_precomp/kp-t2i-softmax
 dataset:
   text_repr: word
   loader_name: precomp
@@ -68,16 +68,13 @@ misc:
   distributed: false
   seed: 1337
 optimizer:
-  name: adamax
+  name: adam
   params:
-    lr: 0.001
-    gradual_warmup_steps:
-    - 0.5
-    - 2.0
-    - 4000
-    lr_decay_epochs:
-    - 10000
-    - 20000
-    - 3000
-    lr_decay_rate: 0.25  
+    lr: 0.0002
+  lr_scheduler:
+    name: step
+    params:
+      step_size: 15000
+      gamma: 0.1
+  grad_clip: 2.
   grad_clip: 2.0

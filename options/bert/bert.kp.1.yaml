@@ -1,10 +1,12 @@
 exp:
   resume: null
-  outpath: logs/f30k_precomp/kp-bert-base-sent-ft8/
+  outpath: logs/f30k_precomp/kp-bert-large-sent-ft16/
 dataset:
   text_repr: word
   loader_name: precomp
   tokenizer_name: bert
+  tokenizer_params: 
+    model: "bert-large-uncased"
   vocab_paths: [bert]
   train:
     data: f30k_precomp.en
@@ -29,6 +31,16 @@ model:
     "model.txt_enc.bert.module.encoder.layer[6]",
     "model.txt_enc.bert.module.encoder.layer[7]",
     "model.txt_enc.bert.module.encoder.layer[8]",
+    "model.txt_enc.bert.module.encoder.layer[9]",
+    "model.txt_enc.bert.module.encoder.layer[10]",
+    "model.txt_enc.bert.module.encoder.layer[11]",
+    "model.txt_enc.bert.module.encoder.layer[12]",
+    "model.txt_enc.bert.module.encoder.layer[13]",
+    "model.txt_enc.bert.module.encoder.layer[14]",
+    "model.txt_enc.bert.module.encoder.layer[15]",
+    "model.txt_enc.bert.module.encoder.layer[16]",
+    "model.txt_enc.bert.module.encoder.layer[17]",
+    "model.txt_enc.bert.module.encoder.layer[18]",
     # "model.txt_enc.bert.module.encoder.layer[9]",
     # model.txt_enc.bert.encoder.layer.5,
     # model.txt_enc.bert.encoder.layer.6,
@@ -40,6 +52,8 @@ model:
   txt_enc:
     name: bert
     params: 
+      model: "bert-large-uncased"
+      feat_size: 1024
       use_gru: false
       word_level: false      
     pooling: none
@@ -55,15 +69,15 @@ model:
       name: kp_t2i
       params:
         latent_size: 1024
-        reduce_proj: 8
+        reduce_proj: 16
         groups: 1024
         img_dim: 2048
         kernel_size: 1
         padding: 0
         norm_output: true
-        gamma: 1
-        train_gamma: true
-        batchnorm: true
+        gamma: 10
+        train_gamma: false
+        batchnorm: false
         device: cuda
   criterion:
     name: contrastive

@@ -5,7 +5,6 @@ from ..utils.logger import get_logger
 
 logger = get_logger()
 
-
 # Inspired from https://github.com/jnhwkim/ban-vqa/blob/master/train.py
 class BanOptimizer():
 
@@ -46,7 +45,9 @@ class BanOptimizer():
     def set_lr(self):
         epoch_id = self.iteration
         for param_group in self.optimizer.param_groups:
-            self.update_lr(param_group, epoch_id)
+            new_lr = self.update_lr(param_group, epoch_id)
+            if 'name' in param_group and 'lr_mult' in param_group:
+                param_group['lr'] = new_lr * param_group['lr_mult']
             # logger.info('Decrease lr: {:.8f} -> {:.8f}'.format(old_lr, new_lr))
 
         # logger.info('No change to lr: {:.8f}'.format(old_lr))
@@ -61,6 +62,7 @@ class BanOptimizer():
         elif epoch_id in self.lr_decay_epochs:
             new_lr = param_group['lr'] * self.lr_decay_rate
             param_group['lr'] = new_lr
+        return new_lr
 
     def display_norm(self):
         logger.info('      norm: {:.5f}'.format(self.total_norm / self.count_norm))
@@ -85,7 +87,7 @@ class BanOptimizer():
         return state
 
     def load_state_dict(self, state):
-        self.optimizer.load_state_dict(state['optsimizer'])
+        self.optimizer.load_state_dict(state['optimizer'])
 
     def __getattr__(self, key):
         return self.optimizer.__getattribute__(key)

@@ -17,6 +17,7 @@ from . import evaluation
 from ..data.loaders import DataIterator
 from ..utils import file_utils, helper, layers, logger
 from .lr_scheduler import get_scheduler
+# from .train import warmup
 
 def freeze(module):
      for x in module.parameters():
@@ -74,7 +75,7 @@ class Trainer:
             lr_groups = self.args.optimizer.lr_groups
             lr_groups_mult = self.args.optimizer.lr_groups_mult
             lr_params['params'] = list(eval(f'self.{lr_groups}.parameters()'))
-            lr_params['lr'] = lr_groups_mult
+            lr_params['lr_mult'] = lr_groups_mult
             lr_params['name'] = lr_groups
             lr_groups = lr_groups[6:]
 
@@ -93,12 +94,17 @@ class Trainer:
             self.optimizer.add_param_group(lr_params)
 
         scheduler = None
-        if lr_scheduler.name is not None:
+        if lr_scheduler:
             scheduler = get_scheduler(
                 optimizer=self.optimizer,
                 name=lr_scheduler.name,
                 **lr_scheduler.params,
             )
+        # if optimizer.warmup:
+        #     scheduler = warmup.GradualWarmupScheduler(
+        #         self.optimizer,
+        #         **optimizer.warmup
+        #     )
 
         for k in self.optimizer.param_groups:
             self.sysoutlog(

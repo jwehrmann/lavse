@@ -62,7 +62,7 @@ def get_loader(
     loader_name, data_path, data_name, data_split,
     batch_size, tokenizer_name, vocab_paths, text_repr,
     lang='en', workers=4, ngpu=1, local_rank=0,
-    cnn=None, **kwargs
+    cnn=None, tokenizer_params={}, **kwargs
 ):
 
     logger.debug('Get loader')

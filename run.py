@@ -100,6 +100,7 @@ if __name__ == '__main__':
         tokenizer_name='default' if 'tokenizer_name' not in opt.dataset else opt.dataset.tokenizer_name,
         ngpu=ngpu,
         cnn=opt.model.params.cnn,
+        tokenizer_params=opt.dataset.tokenizer_params,
         **opt.dataset.train,
         # vocab_path=args.vocab_path,
         # batch_size=args.batch_size,
@@ -123,6 +124,7 @@ if __name__ == '__main__':
                 vocab_paths=opt.dataset.vocab_paths,
                 ngpu=1,
                 cnn=opt.model.params.cnn,
+                tokenizer_params=opt.dataset.tokenizer_params,
                 **opt.dataset.val,
             )
         )
@@ -143,6 +145,7 @@ if __name__ == '__main__':
                 text_repr=opt.dataset.text_repr,
                 vocab_paths=opt.dataset.vocab_paths,
                 ngpu=1,
+                tokenizer_params=opt.dataset.tokenizer_params,
                 **opt.dataset.adapt,
             )
         )
