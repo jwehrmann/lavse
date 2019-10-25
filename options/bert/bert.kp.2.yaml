@@ -1,6 +1,6 @@
 exp:
   resume: null
-  outpath: logs/f30k_precomp/kp-bert-base-sent-ft7/
+  outpath: logs/f30k_precomp/kp-bert-base-sent-ft5/
 dataset:
   text_repr: word
   loader_name: precomp
@@ -26,8 +26,8 @@ model:
     "model.txt_enc.bert.module.encoder.layer[3]",
     "model.txt_enc.bert.module.encoder.layer[4]",
     "model.txt_enc.bert.module.encoder.layer[5]",
-    "model.txt_enc.bert.module.encoder.layer[6]",
-    "model.txt_enc.bert.module.encoder.layer[7]",
+    # "model.txt_enc.bert.module.encoder.layer[6]",
+    # "model.txt_enc.bert.module.encoder.layer[7]",
     # "model.txt_enc.bert.module.encoder.layer[8]",
     # "model.txt_enc.bert.module.encoder.layer[9]",
     # model.txt_enc.bert.encoder.layer.5,

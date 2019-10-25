@@ -62,6 +62,8 @@ class BanOptimizer():
         elif epoch_id in self.lr_decay_epochs:
             new_lr = param_group['lr'] * self.lr_decay_rate
             param_group['lr'] = new_lr
+        else:
+            new_lr = old_lr
         return new_lr
 
     def display_norm(self):
