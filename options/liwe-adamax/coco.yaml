@@ -1,0 +1,22 @@
+__include__: 'liwe.yaml'
+exp:
+  outpath: logs/coco_precomp.en/liwe-adamax-lr/
+dataset:
+  train:
+    data: coco_precomp.en
+    workers: 0
+  val: 
+    data: [coco_precomp.en]
+    workers: 0
+  adapt:
+    data: []
+optimizer:
+  name: adamax
+  params:
+    lr: 0.0007
+    gradual_warmup_steps: [0.5, 2.0, 16000] #torch.linspace
+    lr_decay_epochs: [32000, 80000, 8000] #range 
+    lr_decay_rate: .25
+  lr_scheduler: 
+    name: null  
+  grad_clip: 2.

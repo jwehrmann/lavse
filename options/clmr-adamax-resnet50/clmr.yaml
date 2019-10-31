@@ -1,0 +1,61 @@
+exp:
+  resume: null # last, best_[...], or empty (from scratch)
+dataset:  
+  vocab_paths: [.vocab_cache/complete_precomp.json,]
+  text_repr: word
+  loader_name: image
+  train:
+    workers: 1
+    batch_size: 128
+  val:
+    workers: 1
+    batch_size: 64
+  adapt:
+    workers: 1
+    batch_size: 128
+model:
+  latent_size: 1024
+  # freeze_modules: [model.module.img_enc.cnn]
+  freeze_modules: []
+  txt_enc:
+    name: gru
+    params:
+      embed_dim: 300
+      use_bi_gru: true
+    pooling: lens
+  img_enc:
+    name: image
+    params:
+      cnn: models.resnet152
+      img_dim: 2048
+      pretrained: True
+    pooling: mean    
+  similarity:
+    name: cosine
+  ml_similarity: 
+    name: cosine    
+  criterion:
+    name: contrastive
+    params: 
+      margin: 0.2
+      max_violation: False
+      beta: 0.9999
+  ml_criterion:
+    name: contrastive
+    params:
+      margin: 0.2
+      max_violation: False
+      beta: 0.9999
+optimizer:
+  grad_clip: 2.
+engine:
+  eval_before_training: False
+  debug: False
+  print_freq: 10
+  nb_epochs: 70
+  early_stop: 50
+  valid_interval: 500
+misc: # TODO
+  cuda: True
+  distributed: False # TODO 
+  seed: 1337 # TODO

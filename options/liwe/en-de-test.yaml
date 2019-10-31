@@ -1,0 +1,55 @@
+__include__: 'abstract.yaml'
+exp:
+  outpath: logs/m30k_precomp.en-de/test/leaky_384_448_adamax/
+dataset:
+  train:
+    data: m30k_precomp.en
+    workers: 1
+  val: 
+    data: [m30k_precomp.en, m30k_precomp.de]    
+    workers: 1
+  adapt: 
+    data: [m30k_precomp.en-de]
+    workers: 1
+model:
+  latent_size: 1024
+  freeze_modules: []
+  txt_enc:
+    name: liwe_gru
+    params:
+      embed_dim: 300
+      liwe_dropout: 0.
+      partial_class: PartialConcat
+      liwe_activation: nn.LeakyReLU(0.1, inplace=True)
+      liwe_char_dim: 24
+      liwe_neurons: [384, 448]
+      liwe_wnorm: true
+      use_bi_gru: true
+      num_layers: 1
+    pooling: lens
+    devices: [cuda,]
+  img_enc:
+    name: hierarchical
+    params:
+      img_dim: 2048
+    devices: [cuda,]
+    pooling: mean    
+  similarity:
+    name: cosine
+    params:
+      device: cuda # FIXME
+    device: cuda # FIXME    
+optimizer:
+  import: lavse.optimizers.factory
+  name: adamax
+  params:
+    lr: 0.001 # 7e-4
+    gradual_warmup_steps: [0.5, 2.0, 4000] #torch.linspace
+    lr_decay_epochs: [10000, 20000, 2000] #range
+    lr_decay_rate: .25
+  lr_scheduler: 
+    name: null
+    params:
+      step_size: 1000
+      gamma: 1      
+  grad_clip: 2.

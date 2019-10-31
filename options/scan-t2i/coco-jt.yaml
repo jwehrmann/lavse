@@ -1,0 +1,24 @@
+__include__: 'scan.yaml'
+exp:
+  outpath: logs/coco_precomp.en-jt/scan-t2i/
+dataset:
+  train:
+    data: coco_precomp.en    
+    workers: 0
+  val: 
+    data: [coco_precomp.en, jap_precomp.jt]
+    workers: 0
+  adapt: 
+    data: [jap_precomp.en-jt]
+    workers: 0
+optimizer:
+  import: lavse.optimizers.factory
+  name: adam
+  params:
+    lr: .0005
+  lr_scheduler: 
+    name: null
+    params:
+      step_size: 40000
+      gamma: 1      
+  grad_clip: 2.
