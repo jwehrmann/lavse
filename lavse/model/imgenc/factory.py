@@ -10,6 +10,8 @@ _image_encoders = {
     'scan': precomp.SCANImagePrecomp,
     'simple': precomp.SimplePrecomp,
     'image': fullencoder.FullImageEncoder,
+    'image_feat': fullencoder.ImageFeatEncoder,
+    'tensor_feat': fullencoder.TensorEncoder,
 }
 
 

@@ -53,6 +53,15 @@ def stack(x,):
     return torch.stack(x, 0)
 
 
+def stack_tuple(x,):
+    if type(x[0]) == tuple:
+        a, b = zip(*x)
+        a = torch.stack(a, 0)
+        b = torch.stack(b, 0)
+        return a, b
+    return stack(x)
+
+
 def no_preprocess(x,):
     return x
 
@@ -62,7 +71,7 @@ def to_numpy(x,):
 
 
 _preprocessing_fn = {
-    'image': stack,
+    'image': stack_tuple,
     'caption': default_padding,
     'index': to_numpy,
     'img_id': to_numpy,

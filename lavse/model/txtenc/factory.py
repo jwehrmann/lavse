@@ -13,7 +13,8 @@ _text_encoders = {
     # 'scan_t2i': txtenc.EncoderText,
     'liwe_gru': txtenc.LiweGRU,
     'liwe_gru_glove': txtenc.LiweGRUGlove,
-    'bert': txtenc.Bert
+    'bert': txtenc.Bert,
+    'bag': txtenc.BagOfEmbeddings,
 }
 
 

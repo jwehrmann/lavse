@@ -8,6 +8,7 @@ _similarities = {
     'kp_i2t': sim.KernelProjectionI2T,
     # 'kp_i2t': sim.KPTextToImageOneToMany,
     'dynconv_fb_t2i': sim.DynConvT2i,
+    'sta': sim.STASimilarity,
 }
 
 

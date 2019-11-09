@@ -257,8 +257,8 @@ class KernelProjectionI2T(nn.Module):
         '''
 
         # Ready to conv
-        cap_embed = cap_embed.permute(0, 2, 1)
-        img_embed = img_embed.permute(0, 2, 1)
+        cap_embed = cap_embed.permute(0, 2, 1).float()
+        img_embed = img_embed.permute(0, 2, 1).float()
         B, D, HW = img_embed.shape
 
         sims = torch.zeros(
@@ -457,6 +457,168 @@ class DynConvT2i(nn.Module):
             sims[:,i] = sim
 
         return sims
+
+
+
+class DynConvMultimodalT2i(nn.Module):
+
+    def __init__(
+            self, device, latent_size=1024, reduce_proj=8, groups=1,
+            img_dim=2048, kernel_size=3, padding=1, activate=False,
+            norm_output=False, gamma=1, weight_softmax=True
+        ):
+        super().__init__()
+
+
+        self.red_txt = nn.Conv1d(latent_size, latent_size//reduce_proj, 1)
+        self.red_img = nn.Conv1d(latent_size, latent_size//reduce_proj, 1)
+
+        import sys
+        sys.path.append('/home/jonatas/repos/lavse/fairseq/')
+        from fairseq.modules import DynamicConv1dTBC
+
+        # self.proj_in = nn.Linear(embedding_size, num_features, )
+        # self.proj_out = nn.Linear(num_features, embedding_size, )
+
+        self.pconv = DynamicConv1dTBC(
+            input_size=latent_size,
+            kernel_size=kernel_size,
+            padding_l=padding,
+            # num_heads=1,
+            weight_softmax=weight_softmax,
+            query_size=latent_size//reduce_proj,
+        )
+
+
+        self.conv = nn.Conv1d(latent_size, latent_size, 1)
+        self.device = device
+
+        self.softmax = lambda x: 1
+        self.gamma = 1.
+        if norm_output:
+            self.softmax = nn.Softmax(dim=-1)
+            self.gamma = nn.Parameter(torch.ones(1) + 10.)
+            # self.gamma = gamma
+
+        # self.trade = nn.Parameter(torch.ones(1) - 0.5).float()
+
+    def forward(self, img_embed, cap_embed, lens, **kwargs):
+        '''
+            img_embed: (B, 36, latent_size)
+            cap_embed: (B, T, latent_size)
+        '''
+        # (B, 1024, T)
+        cap_embed = cap_embed.permute(0, 2, 1) #.to(self.device)
+        img_embed = img_embed.permute(0, 2, 1) #.to(self.device)
+
+        sims = torch.zeros(
+            img_embed.shape[0], cap_embed.shape[0]
+        ).to(self.device)
+
+        cap_vectors = self.red_txt(cap_embed)
+        cap_img = self.red_img(img_embed)
+
+        for i, (cap_tensor, cap_vector) in enumerate(zip(cap_embed, cap_vectors)):
+
+            n_words = lens[i]
+            cap_repr = cap_vector[:,:n_words].mean(-1).unsqueeze(0)
+            cap_full_repr = cap_tensor[:,:n_words].mean(-1).unsqueeze(0).unsqueeze(2)
+
+            # img_filtered = self.pconv1(img_embed, cap_repr)
+            # print(img_embed.shape)
+            # print(cap_repr.shape)
+            # print(cap_full_repr.shape)
+            # exit()
+            cap_full_repr = cap_full_repr.expand_as(img_embed)
+            cap_full_repr = torch.tanh(
+                cap_full_repr + cap_img
+            )
+
+            img_emb = img_embed.permute(2, 0, 1)
+            cap_full_repr = cap_full_repr.permute(2, 0, 1)
+            img_filtered = self.pconv(img_emb, query=cap_full_repr)
+            img_filtered = img_filtered.permute(1, 2, 0)
+            img_filtered = self.conv(img_filtered)
+            mask = self.softmax(img_filtered * self.gamma)
+            img_filtered = mask * img_filtered
+
+            img_vector = img_filtered.mean(-1)
+
+            img_vector = l2norm(img_vector, dim=-1)
+            cap_vector = l2norm(cap_tensor.mean(-1).unsqueeze(0), dim=-1)
+            sim = cosine_sim(img_vector, cap_vector).squeeze(-1)
+
+            sims[:,i] = sim
+
+        return sims
+
+
+
+class STASimilarity(nn.Module):
+    def __init__(self, device, latent_size=1024, h1=256, h2=1):
+        super().__init__()
+        self.fc_v = nn.Linear(latent_size, latent_size)
+        self.fc_t = nn.Linear(latent_size, latent_size)
+
+        self.wt0 = nn.Linear(latent_size, h1)
+        self.wt1 = nn.Linear(latent_size, h1)
+
+        self.wt2 = nn.Linear(h1, h2)
+
+    def forward(self, img_embed, cap_embed, lens, **kwargs):
+            '''
+                img_embed: (B, 1, latent_size)
+                cap_embed: (B, T, latent_size)
+            '''
+
+            img_embed = img_embed.float()
+            cap_embed = cap_embed.float()
+            sims = torch.zeros(
+                img_embed.shape[0], cap_embed.shape[0]
+            ).to(self.device).float()
+
+            v = self.fc_v(img_embed).squeeze(1)
+            sent_vec = pooling.mean_pooling(cap_embed, lengths=lens)
+            sent_vec_proj = self.fc_t(sent_vec)
+
+            # img_vec_proj = (B, 1024)
+            # sent_vec_proj = (B, 1024)
+
+            # h = (B, T, 256)
+            hb = torch.tanh(self.wt1(cap_embed))
+            MF = torch.sigmoid(v + sent_vec_proj) # (B, 1024)
+
+            for i, t in enumerate(cap_embed):
+                # tg = sent_vec_proj[i].unsqueeze(0) # (1, 1024)
+                # print(tg.shape)
+                # t_exp = tg.expand_as(v) # (B, 1024)
+                # print(t_exp.shape)
+                # mf = torch.sigmoid(v + t_exp) # (B, 1024)
+                mf = MF[i].unsqueeze(0)
+
+                ha = torch.tanh(self.wt1(mf)).unsqueeze(1) # (B, 1, 256)
+                # if ha.shape[0] != hb.shape[0]:
+                #     print(img_embed.shape)
+                #     print(cap_embed.shape)
+                #     print(ha.shape)
+                #     print(hb.shape)
+
+                # (B, 1, 256) * (1, T, 256)
+                h = ha * hb[i].unsqueeze(0)
+
+                # (B, T, 256) -> (B, T, 1)
+                atj = self.wt2(h)
+                # (B, 1024) = (B, T, 1024) * (B, T, 1)
+                t = (t * atj).sum(1)
+                # (B, 1024)
+                _t = t[0].unsqueeze(0)
+                sim = cosine_sim(v, _t).squeeze(-1)
+                sims[:,i] = sim
+                # sent_vec = sent[:l,:].mean(0).unsqueeze(0).unsqueeze(2)
+                # sent_vec_proj = self.fc_t(sent_vec)
+                # mm_vec = torch.sigmoid(img_vec_proj + sent_vec)
+
+            return sims
 
 
 class KernelProjectionT2IAttn(nn.Module):

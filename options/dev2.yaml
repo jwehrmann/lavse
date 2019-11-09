@@ -1,0 +1,71 @@
+exp:
+  resume: null # last, best_[...], or empty (from scratch)
+  outpath: logs/baseline_feat/
+dataset:  
+  vocab_paths: [.vocab_cache/f30k_precomp.json,]
+  text_repr: word  
+  loader_name: h5    
+  train:
+    data: f30k
+    workers: 4
+    batch_size: 128
+  val:
+    data: [f30k]
+    workers: 1
+    batch_size: 64
+  adapt:
+    data: []
+    workers: 0
+    batch_size: 1
+model:
+  latent_size: 1024
+  freeze_modules: []  
+  txt_enc:
+    name: gru_glove
+    params:      
+      glove_path: .vocab_cache/glove_840B_f30k_precomp.json.pkl
+      embed_dim: 300
+      use_bi_gru: true
+    pooling: lens
+    devices: [cuda,]
+  img_enc:
+    name: tensor_feat
+    params:
+      cnn: resnet50
+      img_dim: 2048
+      pretrained: imagenet
+    devices: [cuda,]
+    pooling: mean    
+  similarity:
+    name: cosine
+    params:
+      device: cuda # FIXME
+    device: cuda # FIXME
+  criterion:
+    name: contrastive
+    params:
+      margin: 0.2
+      max_violation: false
+      weight: 1.0
+      beta: 0.991
+optimizer:
+  name: adamax
+  params:
+    lr: 0.001 # 7e-4
+    gradual_warmup_steps: [0.5, 2.0, 4000] #torch.linspace
+    lr_decay_epochs: [10000, 20000, 3000] #range
+    lr_decay_rate: .25
+  # lr_scheduler: 
+  #   name: none
+  grad_clip: 1.
+engine:
+  eval_before_training: false
+  debug: False
+  print_freq: 10
+  nb_epochs: 30
+  early_stop: 50
+  valid_interval: 500
+misc: # TODO
+  cuda: True
+  distributed: False # TODO 
+  seed: 1337 # TODO

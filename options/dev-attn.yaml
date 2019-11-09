@@ -1,0 +1,67 @@
+exp:
+  resume: null # last, best_[...], or empty (from scratch)
+  outpath: logs/temp-3layers-lr5e05-error/
+dataset:  
+  vocab_paths: [.vocab_cache/f30k_precomp.json,]
+  text_repr: word  
+  loader_name: precomp_image    
+  train:
+    data: f30k
+    workers: 6
+    batch_size: 100
+  val:
+    data: [f30k]
+    workers: 6
+    batch_size: 128
+  adapt:
+    data: []
+    workers: 0
+    batch_size: 1
+model:
+  latent_size: 1024
+  freeze_modules: []
+  txt_enc:
+    name: gru
+    params:      
+      # glove_path: .vocab_cache/glove_840B_f30k_precomp.json.pkl
+      embed_dim: 300
+      use_bi_gru: true
+    pooling: none
+    devices: [cuda,]
+  img_enc:
+    name: image_feat
+    params:
+      cnn: resnet50
+      img_dim: 2048
+    pooling: none
+    devices: [cuda,]
+  similarity:
+    name: sta
+    params:
+      device: cuda # FIXME
+      h1: 256
+      h2: 1
+    device: cuda # FIXME
+  criterion:
+    name: contrastive
+    params:
+      margin: 0.2
+      max_violation: false
+      weight: 1.0
+      beta: 0.991
+optimizer:
+  name: adam
+  params:
+    lr: 0.00005 # 7e-4    
+  grad_clip: 2.
+engine:
+  eval_before_training: false
+  debug: False
+  print_freq: 10
+  nb_epochs: 30
+  early_stop: 50
+  valid_interval: 500
+misc: # TODO
+  cuda: True
+  distributed: False # TODO 
+  seed: 1337 # TODO

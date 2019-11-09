@@ -18,9 +18,7 @@ optimizer:
     lr: 0.001 # 7e-4
     gradual_warmup_steps: [0.5, 2.0, 4000] #torch.linspace
     lr_decay_epochs: [10000, 20000, 3000] #range
-    lr_decay_rate: .25
-  lr_scheduler: 
-    name: null
+    lr_decay_rate: .25      
   grad_clip: 1.
 model:
   latent_size: 1024  

@@ -75,7 +75,8 @@ class Trainer:
             lr_groups = self.args.optimizer.lr_groups
             lr_groups_mult = self.args.optimizer.lr_groups_mult
             lr_params['params'] = list(eval(f'self.{lr_groups}.parameters()'))
-            lr_params['lr_mult'] = lr_groups_mult
+            lr_params['lr'] = lr_groups_mult
+            # lr_params['lr'] = lr * lr_groups_mult
             lr_params['name'] = lr_groups
             lr_groups = lr_groups[6:]
 

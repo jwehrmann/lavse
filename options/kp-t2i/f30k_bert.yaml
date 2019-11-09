@@ -4,10 +4,11 @@ exp:
 dataset:
   vocab_paths: [.vocab_cache/f30k_precomp.json]
   tokenizer_name: bert
+  model: bert-large-uncased
   train:
     data: f30k_precomp.en
     workers: 1
-    batch_size: 110 # 75 In 2 GPUs 
+    batch_size: 90 # 75 In 2 GPUs 
   val:
     data: [f30k_precomp.en]
     workers: 1
@@ -16,7 +17,7 @@ dataset:
 optimizer:
   name: adamax
   params:
-    lr: 0.001 # 7e-4
+    lr: 0.0007 # 7e-4
     gradual_warmup_steps: [0.5, 2.0, 4000] #torch.linspace
     lr_decay_epochs: [10000, 20000, 3000] #range
     lr_decay_rate: .25
@@ -24,18 +25,20 @@ optimizer:
     name: null
   grad_clip: 1.
   lr_groups: model.txt_enc.bert
-  lr_groups_mult:  0.0001
+  lr_groups_mult:  0.1
 model:
   latent_size: 1024  
   freeze_modules: [] #[model.txt_enc.embed.glove,]
   txt_enc:
     name: bert
     params:
+      model: bert-large-uncased
+      word_level: true
   similarity:
     name: kp_t2i
     params:
       latent_size: 1024
-      reduce_proj: 8
+      reduce_proj: 32
       groups: 1024
       img_dim: 2048
       kernel_size: 1

@@ -7,7 +7,8 @@ import torch
 import torchvision
 from torch import nn
 from torch.nn import functional as F
-from torchvision import models
+# from torchvision import models
+import pretrainedmodels
 
 from ...model.layers import attention, convblocks
 from ...utils.layers import default_initializer
@@ -85,18 +86,19 @@ class ImageEncoder(nn.Module):
 
     def __init__(
         self, cnn, img_dim,
-        latent_size, pretrained=True,
+        latent_size, pretrained='imagenet',
     ):
+
         super().__init__()
         self.latent_size = latent_size
 
         # Full text encoder
-        self.cnn = BaseFeatures(cnn(pretrained))
+        self.cnn = pretrainedmodels.__dict__[cnn](pretrained=pretrained)
 
     def forward(self, images):
         """Extract image feature vectors."""
         # assuming that the precomputed features are already l2-normalized
-        features = self.cnn(images)
+        features = self.cnn.features(images)
         B, D, H, W = features.shape
         features = features.view(B, D, H*W)
         return features
@@ -112,128 +114,167 @@ class ImageEncoder(nn.Module):
         super().load_state_dict(new_state)
 
 
-def inceptionv3(num_classes=1000, pretrained=True):
-    r"""Inception v3 model architecture from
-    `"Rethinking the Inception Architecture for Computer Vision" <http://arxiv.org/abs/1512.00567>`_.
-    """
-    model = models.inception_v3(pretrained=pretrained)
+class _ASPP(nn.Module):
+    #  this module is proposed in deeplabv3 and we use it in all of our baselines
+    def __init__(self, in_dim):
+        super(_ASPP, self).__init__()
+        down_dim = in_dim // 2
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(in_dim, down_dim, kernel_size=1), nn.BatchNorm2d(down_dim), nn.PReLU()
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(in_dim, down_dim, kernel_size=3, dilation=2, padding=2), nn.BatchNorm2d(down_dim), nn.PReLU()
+        )
+        self.conv3 = nn.Sequential(
+            nn.Conv2d(in_dim, down_dim, kernel_size=3, dilation=4, padding=4), nn.BatchNorm2d(down_dim), nn.PReLU()
+        )
+        self.conv4 = nn.Sequential(
+            nn.Conv2d(in_dim, down_dim, kernel_size=3, dilation=6, padding=6), nn.BatchNorm2d(down_dim), nn.PReLU()
+        )
+        self.conv5 = nn.Sequential(
+            nn.Conv2d(in_dim, down_dim, kernel_size=1), nn.BatchNorm2d(down_dim), nn.PReLU()
+        )
+        self.fuse = nn.Sequential(
+            nn.Conv2d(5 * down_dim, in_dim, kernel_size=1), nn.BatchNorm2d(in_dim), nn.PReLU()
+        )
 
-    # Modify attributs
-    model.last_linear = model.fc
-    del model.fc
-
-    def features(self, input):
-        # 299 x 299 x 3
-        x = self.Conv2d_1a_3x3(input) # 149 x 149 x 32
-        x = self.Conv2d_2a_3x3(x) # 147 x 147 x 32
-        x = self.Conv2d_2b_3x3(x) # 147 x 147 x 64
-        x = F.max_pool2d(x, kernel_size=3, stride=2) # 73 x 73 x 64
-        x = self.Conv2d_3b_1x1(x) # 73 x 73 x 80
-        x = self.Conv2d_4a_3x3(x) # 71 x 71 x 192
-        x = F.max_pool2d(x, kernel_size=3, stride=2) # 35 x 35 x 192
-        x = self.Mixed_5b(x) # 35 x 35 x 256
-        x = self.Mixed_5c(x) # 35 x 35 x 288
-        x = self.Mixed_5d(x) # 35 x 35 x 288
-        x = self.Mixed_6a(x) # 17 x 17 x 768
-        x = self.Mixed_6b(x) # 17 x 17 x 768
-        x = self.Mixed_6c(x) # 17 x 17 x 768
-        x = self.Mixed_6d(x) # 17 x 17 x 768
-        x = self.Mixed_6e(x) # 17 x 17 x 768
-        # if self.training and self.aux_logits:
-        #     self._out_aux = self.AuxLogits(x) # 17 x 17 x 768
-        x = self.Mixed_7a(x) # 8 x 8 x 1280
-        x = self.Mixed_7b(x) # 8 x 8 x 2048
-        x = self.Mixed_7c(x) # 8 x 8 x 2048
-        return x
-
-    def logits(self, features):
-        x = F.avg_pool2d(features, kernel_size=8) # 1 x 1 x 2048
-        x = F.dropout(x, training=self.training) # 1 x 1 x 2048
-        x = x.view(x.size(0), -1) # 2048
-        # x = self.last_linear(x) # 1000 (num_classes)
-        # if self.training and self.aux_logits:
-        #     aux = self._out_aux
-        #     self._out_aux = None
-        #     return x, aux
-        return x
-
-    def forward(self, input):
-        x = self.features(input)
-        x = self.logits(x)
-        return x
-
-    # Modify methods
-    model.features = types.MethodType(features, model)
-    model.logits = types.MethodType(logits, model)
-    model.forward = types.MethodType(forward, model)
-    return model
+    def forward(self, x):
+        conv1 = self.conv1(x)
+        conv2 = self.conv2(x)
+        conv3 = self.conv3(x)
+        conv4 = self.conv4(x)
+        conv5 = F.upsample(self.conv5(F.adaptive_avg_pool2d(x, 1)), size=x.size()[2:], mode='bilinear',
+                           align_corners=True)
+        return self.fuse(torch.cat((conv1, conv2, conv3, conv4, conv5), 1))
 
 
-class InceptionEncoder(nn.Module):
+class ImageFeatEncoder(nn.Module):
 
     def __init__(
-        self, cnn, img_dim, latent_size,
-        no_imgnorm=False, pretrained=True,
-        proj_regions=True, finetune=False
+        self, cnn, img_dim,
+        latent_size, pretrained='imagenet',
     ):
-        super(InceptionEncoder, self).__init__()
+        super().__init__()
+        import sys
+        sys.path.append('/opt/jonatas/repos/')
         self.latent_size = latent_size
-        self.proj_regions = proj_regions
-        self.no_imgnorm = no_imgnorm
+        from R3Net import R3Net
+
+        r3net = R3Net()
+        check = torch.load('6000.pth', map_location=lambda storage, loc: storage)
+        r3net.load_state_dict(check)
+
+        self.r3net = r3net
+        # self.r3net.reduce_high2 = nn.Sequential(
+        #     nn.Conv2d(1024, 256, kernel_size=3, padding=1), nn.BatchNorm2d(256), nn.PReLU(),
+        #     nn.Conv2d(256, 256, kernel_size=3, padding=1), nn.BatchNorm2d(256), nn.PReLU(),
+        #     _ASPP(256)
+        # )
 
         # Full text encoder
-        if type(cnn) == str:
-            cnn = eval(cnn)
-
-        cnn = torchvision.models.inception_v3(pretrained)
-        self.cnn = inceptionv3(cnn)
-
-        # # For efficient memory usage.
-        # for param in self.cnn.parameters():
-        #     param.requires_grad = finetune
-
-        # Only applies pooling when region_pool is enabled
-        self.region_pool = nn.AdaptiveAvgPool1d(1)
-        # if proj_regions:
-        #     self.region_pool = lambda x: x
-
+        # self.cnn = pretrainedmodels.__dict__[cnn](pretrained=pretrained)
         self.fc = nn.Linear(img_dim, latent_size)
 
-        # self.apply(default_initializer)
-        self.init_weights()
+        self.fc1 = nn.Linear(latent_size, latent_size)
+        self.fc2 = nn.Linear(latent_size, latent_size)
+        self.pool = nn.AdaptiveAvgPool2d(14)
 
-        # self.aggregate = Aggregate()
-
-    def init_weights(self):
-        """Xavier initialization for the fully connected layer
-        """
-        import numpy as np
-        r = np.sqrt(6.) / np.sqrt(self.fc.in_features +
-                                  self.fc.out_features)
-        self.fc.weight.data.uniform_(-r, r)
-        self.fc.bias.data.fill_(0)
-
-    def forward(self, batch):
-        images = batch['image']
-        images = images.cuda()
+    def forward(self, images):
         """Extract image feature vectors."""
         # assuming that the precomputed features are already l2-normalized
-        features = self.cnn(images)
+        images, features = images
 
-        features = features.view(features.shape[0], features.shape[1], -1)
-        features = l2norm(features, dim=1)
-
-        if not self.proj_regions:
-            features = self.region_pool(features)
-
-        features = features.permute(0, 2, 1)
-
+        images = images.to(self.device)
+        features = features.to(self.device)
+        B, D, H, W = features.shape
+        # features = features.view(B, D, H, W)
+        features = features.permute(0, 2, 3, 1)
         features = self.fc(features)
+        features = features.permute(0, 3, 1, 2) # BDHW
 
-        # normalize in the joint embedding space
-        if not self.no_imgnorm:
-            features = l2norm(features, dim=-1)
+        p = self.r3net(images)
+        p = self.pool(F.sigmoid(p))
+        p = p / torch.norm(p, p=1, dim=1) # l1 normalization
+        # if len(predictions) == 7:
+        #     p = predictions[-1]
+        # else:
+        #     p = predictions
 
+        attn_feat = features * p
+        attn_feat = attn_feat.sum(-1).sum(-1).unsqueeze(1)
+
+        features = features.mean(-1).mean(-1).contiguous().unsqueeze(1)
+        vs = self.fc1(attn_feat)
+        vs = l2norm(vs, -1)
+        vg = self.fc2(features)
+        vg = l2norm(vg, -1)
+
+        v = vs + vg
+
+        # print(_feat.shape)
+
+        # features = F.upsample(
+        #     features, size=p0.size()[2:],
+        #     mode='bilinear', align_corners=True
+        # )
+        # _feat = _feat.sum(-1).sum(-1).unsqueeze(1)
+        # print(_feat.shape)
+        return v
+
+    def load_state_dict(self, state_dict):
+        """Copies parameters. overwritting the default one to
+        accept state_dict from Full model
+        """
+        new_state = load_state_dict_with_replace(
+            state_dict=state_dict, own_state=self.state_dict()
+        )
+
+        super().load_state_dict(new_state)
+
+
+class TensorEncoder(nn.Module):
+
+    def __init__(
+        self, cnn, img_dim,
+        latent_size, pretrained='imagenet',
+    ):
+        super().__init__()
+        import sys
+        sys.path.append('/opt/jonatas/repos/')
+        self.latent_size = latent_size
+
+        self.fc1 = nn.Sequential(
+            nn.Linear(img_dim, latent_size),
+            nn.LeakyReLU(0.1),
+        )
+        self.fc2 = nn.Linear(latent_size, latent_size)
+        # self.pool = nn.AdaptiveAvgPool2d(14)
+
+    def forward(self, features):
+        """Extract image feature vectors."""
+        # assuming that the precomputed features are already l2-normalized
+
+        features = features.to(self.device)
+        B, D, H, W = features.shape
+        # features = features.view(B, D, H, W)
+        features = features.permute(0, 2, 3, 1)
+        features = self.fc1(features)
+        features = self.fc2(features)
+        features = features.view(B, H*W, self.latent_size)
+
+        # if len(predictions) == 7:
+        #     p = predictions[-1]
+        # else:
+        #     p = predictions
+        # features = features.view()
+
+        # print(_feat.shape)
+
+        # features = F.upsample(
+        #     features, size=p0.size()[2:],
+        #     mode='bilinear', align_corners=True
+        # )
+        # print(_feat.shape)
         return features
 
     def load_state_dict(self, state_dict):
@@ -244,7 +285,7 @@ class InceptionEncoder(nn.Module):
             state_dict=state_dict, own_state=self.state_dict()
         )
 
-        super(InceptionEncoder, self).load_state_dict(new_state)
+        super().load_state_dict(new_state)
 
 
 # tutorials/09 - Image Captioning
@@ -354,7 +395,7 @@ class FullImageEncoder(nn.Module):
 
     def __init__(
         self, cnn, img_dim, latent_size,
-        no_imgnorm=False, pretrained=True,
+        no_imgnorm=False, pretrained='imagenet',
         proj_regions=True, finetune=False
     ):
         super(FullImageEncoder, self).__init__()
@@ -363,10 +404,11 @@ class FullImageEncoder(nn.Module):
         self.no_imgnorm = no_imgnorm
 
         # Full text encoder
-        if type(cnn) == str:
-            cnn = eval(cnn)
+        self.cnn = pretrainedmodels.__dict__[cnn](pretrained=pretrained)
+        # if type(cnn) == str:
+        #     cnn = eval(cnn)
 
-        self.cnn = BaseFeatures(cnn(pretrained))
+        # self.cnn = BaseFeatures(cnn(pretrained))
         # Used only when projecting regions
         self.region_pool = nn.AdaptiveAvgPool1d(1)
         self.fc = nn.Linear(img_dim, latent_size)
@@ -388,7 +430,7 @@ class FullImageEncoder(nn.Module):
         images = images.cuda()
         """Extract image feature vectors."""
         # assuming that the precomputed features are already l2-normalized
-        features = self.cnn(images)
+        features = self.cnn.features(images)
 
         features = features.view(features.shape[0], features.shape[1], -1)
         features = l2norm(features, dim=1)

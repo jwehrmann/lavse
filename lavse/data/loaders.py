@@ -184,9 +184,16 @@ __loaders__ = {
     'image': {
         'class': datasets.ImageDataset,
     },
+    'precomp_image': {
+        'class': datasets.PrecompPlusImageDataset,
+    },
     'birds': {
         'class': datasets.Birds,
     },
+    'h5': {
+        'class': datasets.H5Dataset,
+    },
+
 }
 
 

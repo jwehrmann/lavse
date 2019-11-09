@@ -65,6 +65,7 @@ class RNNEncoder(nn.Module):
         return cap_emb, lengths
 
 
+
 # GRU Text encoder with Glove support
 class GloveRNNEncoder(nn.Module):
 
@@ -123,6 +124,49 @@ class GloveRNNEncoder(nn.Module):
         # normalization in the joint embedding space
         if not self.no_txtnorm:
             cap_emb = l2norm(cap_emb, dim=-1)
+
+        return cap_emb, lengths
+
+
+class BagOfEmbeddings(nn.Module):
+
+    def __init__(
+        self, tokenizers, embed_dim, latent_size,
+        project_before=False, glove_path=None, add_rand_embed=False):
+
+        super().__init__()
+        self.latent_size = latent_size
+        self.project_before = project_before
+
+        assert len(tokenizers) == 1
+
+        num_embeddings = len(tokenizers[0])
+
+        self.embed = GloveEmb(
+            num_embeddings,
+            glove_dim=embed_dim,
+            glove_path=glove_path,
+            add_rand_embed=add_rand_embed,
+            rand_dim=embed_dim,
+        )
+        self.fc = nn.Linear(self.embed.get_word_embed_size(), latent_size)
+
+        if hasattr(self.embed, 'embed'):
+            self.embed.embed.weight.data.uniform_(-0.1, 0.1)
+
+    def forward(self, batch):
+        """Handles variable size captions
+        """
+        captions, lengths = batch['caption']
+        captions = captions.to(self.device)
+
+        # Embed word ids to vectors
+        emb = self.embed(captions)
+        if self.project_before:
+            cap_emb = self.fc(emb)
+        else:
+            cap_emb = pooling.mean_pooling(emb, lengths).unsqueeze(1)
+            cap_emb = self.fc(cap_emb)
 
         return cap_emb, lengths
 
@@ -262,13 +306,17 @@ class LiweGRUGlove(nn.Module):
 class Bert(nn.Module):
 
     def __init__(
-        self, latent_size, model='bert-base-uncased', feat_size=768, use_gru=False, word_level=True, **kwargs):
+        self, latent_size, model='bert-base-uncased',
+        feat_size=768, use_gru=False, word_level=True, **kwargs
+    ):
         from .. import data_parallel
 
         super(Bert, self).__init__()
         self.latent_size = latent_size
         bert = transformers.BertModel.from_pretrained(model)
-        self.bert = data_parallel.DataParallel(bert)
+        self.bert = nn.DataParallel(
+            bert, device_ids=[1,2,3], output_device=0
+        )
 
         self.use_gru = use_gru
         if use_gru:
@@ -290,7 +338,8 @@ class Bert(nn.Module):
         captions, lengths = batch['caption']
         captions = captions.to(self.device)
         # print(captions)
-        word_emb, sent_emb = self.bert(captions)
+        self.bert.to('cuda:1')
+        word_emb, sent_emb = self.bert(captions.to('cuda:1'))
         # print(word_emb.shape)
         # print(sent_emb.shape)
 
@@ -305,6 +354,7 @@ class Bert(nn.Module):
         else:
             lengths = torch.ones(len(word_emb), 1).to(self.device).long() + 1
             out = self.fc(sent_emb.unsqueeze(1))
+            out = l2norm(out, dim=2)
 
         return out, lengths
 

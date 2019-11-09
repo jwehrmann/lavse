@@ -104,6 +104,19 @@ class LAVSE(nn.Module):
 
 
     def set_device(self, device):
+        # self.device = torch.device(device)
+        self.device = torch.device('cuda:0')
+        self.img_enc.device = torch.device('cuda:0')
+        self.txt_enc.device = torch.device('cuda:1')
+        self.similarity.device = torch.device('cuda:0')
+        if self.ml_similarity:
+            self.ml_similarity.device = torch.device('cuda:1')
+
+        self.txt_enc.to(self.txt_enc.device)
+        self.img_enc.to(self.txt_enc.device)
+        self.txt_enc.bert.to('cuda:1')
+
+    def _set_device(self, device):
         self.device = torch.device(device)
         self.img_enc.device = self.device
         self.txt_enc.device = self.device

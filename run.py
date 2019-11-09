@@ -191,7 +191,7 @@ if __name__ == '__main__':
         nb_devices = torch.cuda.device_count()
         if nb_devices > 1:
             logger.info(f'Found {nb_devices} devices. Using DataParallel.')
-            model.img_enc = data_parallel.DataParallel(model.img_enc)
+            # model.img_enc = data_parallel.DataParallel(model.img_enc)
             # model.txt_enc = data_parallel.DataParallel(model.txt_enc)
             model.set_device(device)
         elif nb_devices == 0:

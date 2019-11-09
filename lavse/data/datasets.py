@@ -430,3 +430,228 @@ class ImageDataset(Dataset):
 
     def __str__(self):
         return f'{self.data_name}.{self.split}'
+
+
+class PrecompPlusImageDataset(Dataset):
+    """
+    Load precomputed captions and image features
+    Possible options: f30k_precomp, coco_precomp
+    """
+
+    def __init__(
+        self, data_path, data_name,
+        data_split, tokenizers, lang='en',
+        resize_to=256, crop_size=224, transform=None
+    ):
+        from .adapters import Flickr, Coco
+
+        logger.debug(f'ImageDataset\n {[data_path, data_split, tokenizers, lang]}')
+        self.tokenizer = tokenizers[0]
+        self.lang = lang
+        self.data_split = data_split
+        if lang is None:
+            self.split = data_split
+        else:
+            self.split = '.'.join([data_split, lang])
+        self.data_path = Path(data_path)
+        self.data_name = Path(data_name)
+        self.full_path = self.data_path / self.data_name
+        self.tokenizers = self.tokenizer
+
+        self.data_wrapper = (
+            Flickr(
+                self.full_path,
+                data_split=data_split,
+            ) if 'f30k' in data_name
+            else Coco(
+                self.full_path,
+                data_split=data_split,
+            )
+        )
+
+        self._fetch_captions()
+        self.length = len(self.ids)
+
+        # self.transform = get_transform(
+        #     data_split, resize_to=resize_to, crop_size=crop_size
+        # )
+        self.transform = transform
+
+        self.captions_per_image = 5
+
+        if data_split == 'dev' and self.length > 5000:
+            self.length = 5000
+
+        logger.debug(f'Split size: {len(self.ids)}')
+
+    def _fetch_captions(self,):
+        self.captions = []
+        for image_id in sorted(self.data_wrapper.image_ids):
+            self.captions.extend(
+                self.data_wrapper.get_captions_by_image_id(image_id)[:5]
+            )
+
+        self.ids = range(len(self.captions))
+        logger.debug(f'Loaded {len(self.captions)} captions')
+
+    def load_img(self, image_id):
+
+        filename = self.data_wrapper.get_filename_by_image_id(image_id)
+        feat_path = self.full_path / filename
+
+        try:
+            image = default_loader(feat_path)
+            image = self.transform(image)
+        except OSError:
+            print('Error to load image: ', feat_path)
+            image = torch.zeros(3, 224, 224,)
+        import h5py
+        ds = h5py.File('tools/f30k_resnet152_temp.h5', 'r')
+        image_name = str(filename.name) + '.npy'
+        _feat = ds['images']['flickr30k_images'][image_name]
+        feat = np.zeros_like(_feat)
+        _feat.read_direct(feat)
+        feat = torch.tensor(feat)
+        ds.close()
+        # f_path = feat_path.parent.parent.parent.parent /  'f30k_resnet152' / f'{filename}.pkl'
+        # feat = torch.load()
+        return image, feat
+
+    def __getitem__(self, index):
+        # handle the image redundancy
+        seq_id = self.ids[index]
+        image_id = self.data_wrapper.image_ids[seq_id//5]
+
+        image, feat = self.load_img(image_id)
+
+        caption = self.captions[index]
+        cap_tokens = [self.tokenizer(caption)]
+
+        batch = Dict(
+            image=(image, feat),
+            caption=cap_tokens,
+            index=index,
+            img_id=image_id,
+        )
+
+        return batch
+
+    def __len__(self):
+        return self.length
+
+    def __repr__(self):
+        return f'PrecompPlusImageDataset.{self.data_name}.{self.split}'
+
+    def __str__(self):
+        return f'{self.data_name}.{self.split}'
+
+
+
+class H5Dataset(Dataset):
+    """
+    Load precomputed captions and image features
+    Possible options: f30k_precomp, coco_precomp
+    """
+
+    def __init__(
+        self, data_path, data_name,
+        data_split, tokenizers, lang='en',
+        resize_to=256, crop_size=224, transform=None
+    ):
+        from .adapters import Flickr, Coco
+
+        logger.debug(f'ImageDataset\n {[data_path, data_split, tokenizers, lang]}')
+        self.tokenizer = tokenizers[0]
+        self.lang = lang
+        self.data_split = data_split
+        if lang is None:
+            self.split = data_split
+        else:
+            self.split = '.'.join([data_split, lang])
+        self.data_path = Path(data_path)
+        self.data_name = Path(data_name)
+        self.full_path = self.data_path / self.data_name
+        self.tokenizers = self.tokenizer
+
+        self.data_wrapper = (
+            Flickr(
+                self.full_path,
+                data_split=data_split,
+            ) if 'f30k' in data_name
+            else Coco(
+                self.full_path,
+                data_split=data_split,
+            )
+        )
+
+        self._fetch_captions()
+        self.length = len(self.ids)
+
+        # self.transform = get_transform(
+        #     data_split, resize_to=resize_to, crop_size=crop_size
+        # )
+        self.transform = transform
+
+        self.captions_per_image = 5
+
+        if data_split == 'dev' and self.length > 5000:
+            self.length = 5000
+
+        logger.debug(f'Split size: {len(self.ids)}')
+
+    def _fetch_captions(self,):
+        self.captions = []
+        for image_id in sorted(self.data_wrapper.image_ids):
+            self.captions.extend(
+                self.data_wrapper.get_captions_by_image_id(image_id)[:5]
+            )
+
+        self.ids = range(len(self.captions))
+        logger.debug(f'Loaded {len(self.captions)} captions')
+
+    def load_img(self, image_id):
+
+        filename = self.data_wrapper.get_filename_by_image_id(image_id)
+        feat_path = self.full_path / filename
+
+        import h5py
+
+        ds = h5py.File('tools/resnet_7x7.h5', 'r')
+        image_name = str(filename.name) #+ '.npy'
+        # print(ds.keys())
+        _feat = ds['images']['flickr30k_images'][image_name]
+        feat = np.zeros_like(_feat)
+        _feat.read_direct(feat)
+        feat = torch.tensor(feat).float()
+        ds.close()
+        # f_path = feat_path.parent.parent.parent.parent /  'f30k_resnet152' / f'{filename}.pkl'
+        # feat = torch.load()
+        return feat
+
+    def __getitem__(self, index):
+        # handle the image redundancy
+        seq_id = self.ids[index]
+        image_id = self.data_wrapper.image_ids[seq_id//5]
+
+        feat = self.load_img(image_id)
+
+        caption = self.captions[index]
+        cap_tokens = [self.tokenizer(caption)]
+
+        batch = Dict(
+            image=feat,
+            caption=cap_tokens,
+            index=index,
+            img_id=image_id,
+        )
+
+        return batch
+
+    def __len__(self):
+        return self.length
+
+    def __repr__(self):
+        return f'PrecompPlusImageDataset.{self.data_name}.{self.split}'
+
+    def __str__(self):
+        return f'{self.data_name}.{self.split}'
