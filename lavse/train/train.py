@@ -19,6 +19,7 @@ from ..utils import file_utils, helper, layers, logger
 from .lr_scheduler import get_scheduler
 # from .train import warmup
 
+
 def freeze(module):
      for x in module.parameters():
          x.requires_grad = False
@@ -32,6 +33,7 @@ class Trainer:
         master=True,
     ):
 
+        self.val_metric = 'rsum'
         self.model = model
         self.device = device
         self.train_logger = logger.LogCollector()
@@ -75,7 +77,7 @@ class Trainer:
             lr_groups = self.args.optimizer.lr_groups
             lr_groups_mult = self.args.optimizer.lr_groups_mult
             lr_params['params'] = list(eval(f'self.{lr_groups}.parameters()'))
-            lr_params['lr'] = lr_groups_mult
+            lr_params['lr_mult'] = lr_groups_mult
             # lr_params['lr'] = lr * lr_groups_mult
             lr_params['name'] = lr_groups
             lr_groups = lr_groups[6:]

@@ -163,9 +163,9 @@ if __name__ == '__main__':
     logger.info(model)
 
     if opt.exp.resume is not None:
-        logger.info(f'Resuming checkpoint: {opt.resume}')
+        logger.info(f'Resuming checkpoint: {opt.exp.resume}')
         checkpoint = helper.restore_checkpoint(
-            path=opt.resume,
+            path=opt.exp.resume,
             model=model,
         )
         model = checkpoint['model']
@@ -191,7 +191,7 @@ if __name__ == '__main__':
         nb_devices = torch.cuda.device_count()
         if nb_devices > 1:
             logger.info(f'Found {nb_devices} devices. Using DataParallel.')
-            # model.img_enc = data_parallel.DataParallel(model.img_enc)
+            model.img_enc = data_parallel.DataParallel(model.img_enc)
             # model.txt_enc = data_parallel.DataParallel(model.txt_enc)
             model.set_device(device)
         elif nb_devices == 0:

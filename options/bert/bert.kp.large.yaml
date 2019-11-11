@@ -1,6 +1,6 @@
 exp:
-  resume: null
-  outpath: logs/f30k_precomp/kp-bert-large-freeze9/
+  resume: logs/f30k_precomp/kp-bert-large-freeze9/best_model.pkl
+  outpath: logs/f30k_precomp/kp-bert-large-freeze9-lr-cont/
 dataset:
   text_repr: word
   loader_name: precomp
@@ -100,15 +100,15 @@ optimizer:
   name: adam
   # import: lavse.optimizers.factory
   params:
-    lr: 0.0002
+    lr: 0.0001
   lr_scheduler:
     name: step
     params:
-      step_size: 15000
-      gamma: 0.1
+      step_size: 4000
+      gamma: 0.50
   grad_clip: 1.
   lr_groups: model.txt_enc.bert
-  lr_groups_mult:  0.00002
+  lr_groups_mult:  0.00001
   # warmup: 
   #   multiplier: 8
   #   total_epoch: 10

@@ -103,7 +103,7 @@ class LAVSE(nn.Module):
             print(k, v.shape)
 
 
-    def set_device(self, device):
+    def _set_device(self, device):
         # self.device = torch.device(device)
         self.device = torch.device('cuda:0')
         self.img_enc.device = torch.device('cuda:0')
@@ -116,7 +116,7 @@ class LAVSE(nn.Module):
         self.img_enc.to(self.txt_enc.device)
         self.txt_enc.bert.to('cuda:1')
 
-    def _set_device(self, device):
+    def set_device(self, device):
         self.device = torch.device(device)
         self.img_enc.device = self.device
         self.txt_enc.device = self.device

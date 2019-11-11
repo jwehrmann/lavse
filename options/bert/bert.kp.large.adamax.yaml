@@ -11,7 +11,7 @@ dataset:
   train:
     data: f30k_precomp.en
     workers: 8
-    batch_size: 110
+    batch_size: 100
   val:
     data: [f30k_precomp.en]
     workers: 8
@@ -30,9 +30,9 @@ model:
     "model.txt_enc.bert.module.encoder.layer[5]",
     "model.txt_enc.bert.module.encoder.layer[6]",
     "model.txt_enc.bert.module.encoder.layer[7]",
-    "model.txt_enc.bert.module.encoder.layer[8]",
-    "model.txt_enc.bert.module.encoder.layer[9]",
-    "model.txt_enc.bert.module.encoder.layer[10]",
+    #"model.txt_enc.bert.module.encoder.layer[8]",
+    #"model.txt_enc.bert.module.encoder.layer[9]",
+    #"model.txt_enc.bert.module.encoder.layer[10]",
     # "model.txt_enc.bert.module.encoder.layer[11]",
     # "model.txt_enc.bert.module.encoder.layer[12]",
     # "model.txt_enc.bert.module.encoder.layer[13]",
@@ -101,8 +101,8 @@ misc:
 optimizer:
   name: adamax
   params:
-    lr: 0.001 # 7e-4
-    gradual_warmup_steps: [0.5, 1.0, 4000] #torch.linspace
+    lr: 0.0007 # 7e-4
+    gradual_warmup_steps: [0.5, 2.0, 4000] #torch.linspace
     lr_decay_epochs: [10000, 20000, 3000] #range
     lr_decay_rate: .25  
   lr_groups: model.txt_enc.bert

@@ -1,0 +1,83 @@
+exp:
+  resume: null
+  outpath: logs/f30k_precomp/proj/32
+dataset:
+  text_repr: word
+  loader_name: precomp
+  train:
+    workers: 1
+    batch_size: 100
+    data: f30k_precomp.en
+  val:
+    workers: 1
+    batch_size: 32
+    limit: 5000
+    data:
+    - f30k_precomp.en
+  vocab_paths:
+  - .vocab_cache/f30k_precomp.json
+model:
+  latent_size: 1024
+  freeze_modules: []
+  txt_enc:
+    name: gru_glove
+    params:
+      embed_dim: 300
+      use_bi_gru: true
+      glove_path: .vocab_cache/glove_840B_f30k_precomp.json.pkl
+      add_rand_embed: true
+    pooling: none
+    devices:
+    - cuda
+  img_enc:
+    name: simple
+    params:
+      img_dim: 2048
+    devices:
+    - cuda
+    pooling: none
+  similarity:
+    name: kp_t2i
+    params:
+      latent_size: 1024
+      reduce_proj: 32
+      groups: 1024
+      img_dim: 2048
+      kernel_size: 1
+      padding: 0
+      device: cuda
+      norm_output: true
+      gamma: 10
+    device: cuda
+  criterion:
+    name: contrastive
+    params:
+      margin: 0.2
+      max_violation: false
+      weight: 1.0
+      beta: 0.991
+engine:
+  eval_before_training: false
+  debug: false
+  print_freq: 100
+  nb_epochs: 20
+  early_stop: 25
+  valid_interval: 500
+misc:
+  cuda: true
+  distributed: false
+  seed: 1337
+optimizer:
+  name: adamax
+  params:
+    lr: 0.001
+    gradual_warmup_steps:
+    - 0.5
+    - 2.0
+    - 4000
+    lr_decay_epochs:
+    - 10000
+    - 20000
+    - 3000
+    lr_decay_rate: 0.25  
+  grad_clip: 2.0

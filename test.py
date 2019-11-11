@@ -48,6 +48,9 @@ if __name__ == '__main__':
             lang=lang,
             text_repr=opt.dataset.text_repr,
             vocab_paths=opt.dataset.vocab_paths,
+            tokenizer_name='default' if 'tokenizer_name' not in opt.dataset else opt.dataset.tokenizer_name,
+            cnn=opt.model.params.cnn,
+            tokenizer_params=opt.dataset.tokenizer_params,
             ngpu=ngpu,
             **opt.dataset.val,
         )
@@ -73,11 +76,8 @@ if __name__ == '__main__':
         f"keys: {checkpoint.keys()}"
     ))
 
-    model.set_devices_(
-        txt_devices=opt.model.txt_enc.devices,
-        img_devices=opt.model.img_enc.devices,
-        loss_device=opt.model.similarity.device,
-    )
+    model.set_device('cuda')
+    model.to('cuda')
 
     is_master = True
     model.master = is_master # FIXME: Replace "if print" by built_in print
@@ -92,7 +92,7 @@ if __name__ == '__main__':
     result, rs = trainer.evaluate_loaders(
         loaders
     )
-    print(result)
+    result = {k: float(v) for k, v in result.items()}
 
     if args.outpath is not None:
         outpath = args.outpath

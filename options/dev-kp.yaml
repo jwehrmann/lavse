@@ -1,6 +1,6 @@
 exp:
   resume: null # last, best_[...], or empty (from scratch)
-  outpath: logs/resnet-14-kp-t2i/
+  outpath: logs/resnet-14-kp-t2i-r16-k5/
 dataset:  
   vocab_paths: [.vocab_cache/f30k_precomp.json,]
   text_repr: word  
@@ -8,11 +8,11 @@ dataset:
   train:
     data: f30k
     workers: 4
-    batch_size: 90
+    batch_size: 128
   val:
     data: [f30k]
     workers: 1
-    batch_size: 32
+    batch_size: 128
   adapt:
     data: []
     workers: 0
@@ -36,13 +36,13 @@ model:
     pooling: none
     devices: [cuda,]
   similarity:
-    name: kp_t2i
+    name: dyn_mm_t2i
     params:
       latent_size: 1024
-      reduce_proj: 8
+      reduce_proj: 16
       groups: 1024
       img_dim: 2048
-      kernel_size: 1
+      kernel_size: 5
       padding: 1
       device: cuda
     device: cuda

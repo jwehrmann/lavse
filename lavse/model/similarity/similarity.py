@@ -459,7 +459,6 @@ class DynConvT2i(nn.Module):
         return sims
 
 
-
 class DynConvMultimodalT2i(nn.Module):
 
     def __init__(
@@ -501,6 +500,8 @@ class DynConvMultimodalT2i(nn.Module):
             # self.gamma = gamma
 
         # self.trade = nn.Parameter(torch.ones(1) - 0.5).float()
+        self.query_bn = nn.BatchNorm1d(latent_size//reduce_proj)
+        self.leaky = nn.LeakyReLU(0.1, inplace=True)
 
     def forward(self, img_embed, cap_embed, lens, **kwargs):
         '''
@@ -508,35 +509,37 @@ class DynConvMultimodalT2i(nn.Module):
             cap_embed: (B, T, latent_size)
         '''
         # (B, 1024, T)
-        cap_embed = cap_embed.permute(0, 2, 1) #.to(self.device)
-        img_embed = img_embed.permute(0, 2, 1) #.to(self.device)
+        cap_embed = cap_embed.permute(0, 2, 1).float() #.to(self.device)
+        img_embed = img_embed.permute(0, 2, 1).float() #.to(self.device)
 
         sims = torch.zeros(
             img_embed.shape[0], cap_embed.shape[0]
         ).to(self.device)
 
-        cap_vectors = self.red_txt(cap_embed)
-        cap_img = self.red_img(img_embed)
+        caps_reduced = self.red_txt(cap_embed)
+        imgs_reduced = self.red_img(img_embed)
 
-        for i, (cap_tensor, cap_vector) in enumerate(zip(cap_embed, cap_vectors)):
+        for i, (cap_tensor, cap_reduced) in enumerate(zip(cap_embed, caps_reduced)):
 
             n_words = lens[i]
-            cap_repr = cap_vector[:,:n_words].mean(-1).unsqueeze(0)
+            cap_reduced_vector = cap_reduced[:,:n_words].mean(-1).unsqueeze(0).unsqueeze(2)
             cap_full_repr = cap_tensor[:,:n_words].mean(-1).unsqueeze(0).unsqueeze(2)
 
-            # img_filtered = self.pconv1(img_embed, cap_repr)
-            # print(img_embed.shape)
-            # print(cap_repr.shape)
-            # print(cap_full_repr.shape)
-            # exit()
-            cap_full_repr = cap_full_repr.expand_as(img_embed)
-            cap_full_repr = torch.tanh(
-                cap_full_repr + cap_img
+            cap_reduced_vector = cap_reduced_vector.repeat(
+                imgs_reduced.shape[0], 1, imgs_reduced.shape[2]
             )
 
+            # query = torch.tanh(
+            #     cap_reduced_vector + imgs_reduced
+            # )
+            query = self.leaky(self.query_bn(cap_reduced_vector + imgs_reduced))
+
+            # query = cap_reduced_vector * torch.sigmoid(imgs_reduced)
+
             img_emb = img_embed.permute(2, 0, 1)
-            cap_full_repr = cap_full_repr.permute(2, 0, 1)
-            img_filtered = self.pconv(img_emb, query=cap_full_repr)
+            query = query.permute(2, 0, 1)
+
+            img_filtered = self.pconv(img_emb, query=query)
             img_filtered = img_filtered.permute(1, 2, 0)
             img_filtered = self.conv(img_filtered)
             mask = self.softmax(img_filtered * self.gamma)
